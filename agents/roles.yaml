@@ -1,0 +1,21 @@
+apiVersion: generic-software-factory/v1alpha1
+kind: AgentRoleCatalog
+roles:
+  - id: planner
+    instruction: harness/agents/planner.md
+    required: true
+  - id: architect
+    instruction: harness/agents/architect.md
+    required: false
+  - id: developer
+    instruction: harness/agents/developer.md
+    required: true
+  - id: tester
+    instruction: harness/agents/tester.md
+    required: true
+  - id: reviewer
+    instruction: harness/agents/reviewer.md
+    required: true
+  - id: security-reviewer
+    instruction: harness/agents/security-reviewer.md
+    required: false
