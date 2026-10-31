@@ -53,7 +53,7 @@ Generic Software Factoryは、再利用可能な開発ファクトリーのパ�
 
 ```text
                     HUMAN / OPERATOR
-              目標、承認、Policyの判断
+             goals, approvals, policy decisions
                             |
                             v
 +-------------------------------------------------------+
@@ -64,7 +64,7 @@ Generic Software Factoryは、再利用可能な開発ファクトリーのパ�
                             v
 +-------------------------------------------------------+
 |                    FACTORY CORE                       |
-| オーケストレーター | Task State | Policy Engine | Audit Log |
+| Orchestrator | Task State | Policy Engine | Audit Log |
 | Workflow Engine | Approval Gate | Retry / Recovery    |
 +-------------------------------------------------------+
            |                |                 |
@@ -75,10 +75,10 @@ Generic Software Factoryは、再利用可能な開発ファクトリーのパ�
      Agent Runtime      Git Provider      Isolated Sandbox
            |
            v
-    Model Provider Adapter (任意。Runtimeがモデルアクセスを担う場合あり)
+    Model Provider Adapter (optional; runtime may own model access)
 
-Harness: Roleの指示、プロジェクトのコンテキスト、標準、制約。
-Quality Gates: 決定的なチェックと、独立して記録されたレビュー。
+Harness: role instructions, project context, standards, constraints.
+Quality Gates: deterministic checks and independently recorded review.
 ```
 
 ## 5. Workflowのライフサイクル
