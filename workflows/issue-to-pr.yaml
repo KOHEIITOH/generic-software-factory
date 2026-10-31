@@ -1,0 +1,25 @@
+apiVersion: generic-software-factory/v1alpha1
+kind: Workflow
+metadata:
+  name: issue-to-pr
+spec:
+  steps:
+    - id: validate
+      action: factory.validate
+    - id: plan
+      role: planner
+    - id: plan-approval
+      action: approval.request
+      when: "${workflow.requirePlanApproval}"
+    - id: implement
+      role: developer
+    - id: test
+      role: tester
+      gates: [tests, lint, security]
+    - id: review
+      role: reviewer
+    - id: create-pr
+      action: source-control.create-pull-request
+    - id: merge-approval
+      action: approval.request
+      required: true
