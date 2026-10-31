@@ -1,0 +1,18 @@
+apiVersion: generic-software-factory/v1alpha1
+kind: ProjectProfile
+metadata:
+  name: example-project
+spec:
+  repositoryRoot: .
+  language: "<configure-language>"
+  framework: "<configure-framework>"
+  commands:
+    test: "<configure-test-command>"
+    lint: "<configure-lint-command>"
+    build: "<configure-build-command>"
+  architectureDocs: []
+  conventions: []
+  definitionOfDone:
+    - "Acceptance criteria are satisfied."
+    - "Required quality gates pass."
+    - "Known limitations are documented."
