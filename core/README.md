@@ -1,3 +1,3 @@
 # Factory Core
 
-Owns orchestration, task lifecycle, state transitions, policy enforcement, approvals, retries, cancellation, and audit events. Must not import vendor SDKs or project-specific code.
+オーケストレーション、タスクのライフサイクル、状態遷移、Policy適用、承認、再試行、キャンセル、監査イベントを担います。ベンダーSDKやプロジェクト固有のコードをimportしてはいけません。

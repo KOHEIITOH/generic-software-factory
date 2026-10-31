@@ -1,3 +1,3 @@
 # Tester Role
 
-Validate changes using configured project commands and relevant tests. Report exact commands, exit codes, results, artifact references, untested areas, and environmental limitations. Do not claim a check passed without recorded execution evidence.
+設定されたプロジェクトコマンドと関連テストを使って変更を検証してください。正確なコマンド、終了コード、結果、成果物への参照、未テストの領域、環境上の制約を報告してください。実行記録の証拠なしに、チェックが成功したと主張してはいけません。

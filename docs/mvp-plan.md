@@ -1,56 +1,60 @@
-# MVP plan — v0.1
+# MVP計画 — v0.1
 
-## Objective
+## 目標
 
-Demonstrate that a user can configure an arbitrary supported agent runtime and target repository, submit one bounded task, and receive a tested pull request without changing Factory Core.
+利用者が任意の対応Agent Runtimeと対象リポジトリを設定し、範囲を限定したタスクを1つ投入して、Factory Coreを変更することなく、テスト済みのPull Requestを受け取れることを実証します。
 
-## MVP workflow
+## MVP Workflow
 
 `Task → Validate → Plan → Human plan approval → Implement → Test → Review → PR creation → Human merge approval`
 
-## Milestones
+## マイルストーン
 
-### M0 — Specification and contracts
-- Freeze core vocabulary and boundaries.
-- Define configuration schema and adapter contracts.
-- Define workflow state machine and event format.
-- Document security baseline.
+### M0 — 仕様と契約
 
-### M1 — Thin vertical slice
-- Implement CLI: `init`, `validate`, `doctor`, `run`, `status`, `cancel`.
-- Support one AgentRuntime adapter and one SourceControl adapter as reference implementations.
-- Support one isolated Execution adapter.
-- Run one workflow from task input to PR creation.
-- Keep runtime/provider/project choices configurable, never hard-coded into Core.
+- Coreの用語と境界を確定する。
+- 設定スキーマとAdapter契約を定義する。
+- Workflowの状態機械とイベント形式を定義する。
+- セキュリティ基準を文書化する。
 
-### M2 — Reliability
-- Add retries, timeouts, cancellation, resumability.
-- Add audit log and artifact manifest.
-- Add deterministic quality gates and failure evidence.
-- Add permission tests and secret redaction.
+### M1 — 最小の垂直スライス
 
-### M3 — Replaceability proof
-- Add a second AgentRuntime adapter or contract-tested mock.
-- Demonstrate that switching runtime requires configuration/adapter changes only, not Core changes.
-- Add adapter conformance tests.
+- CLIを実装する: `init`、`validate`、`doctor`、`run`、`status`、`cancel`。
+- 1つのAgentRuntime Adapterと1つのSourceControl Adapterをリファレンス実装としてサポートする。
+- 1つの分離実行用Execution Adapterをサポートする。
+- タスク入力からPR作成までのWorkflowを1つ実行する。
+- Runtime／Provider／プロジェクトの選択は設定可能に保ち、Coreにハードコードしない。
 
-## Acceptance criteria
+### M2 — 信頼性
 
-1. Clean checkout can be initialized using documented steps.
-2. `validate` catches missing/invalid configuration before execution.
-3. `doctor` checks adapter connectivity and required capabilities.
-4. A bounded task runs in an isolated workspace.
-5. Agent role instructions and Harness version are recorded per run.
-6. Tests/lint/security gates produce machine-readable evidence.
-7. Failure, timeout, cancellation and retry states are recorded.
-8. PR creation is supported; merge and production deployment remain approval-gated.
-9. Secrets do not appear in logs, prompts, artifacts or committed files.
-10. Replacing the AgentRuntime adapter does not require changes to Factory Core.
+- 再試行、タイムアウト、キャンセル、中断からの再開を追加する。
+- 監査ログと成果物マニフェストを追加する。
+- 決定的なQuality Gateと失敗の証拠を追加する。
+- 権限テストとSecretのマスキングを追加する。
 
-## Out of scope
+### M3 — 置き換え可能性の実証
 
-Autonomous merge/deploy, dynamic self-editing of core policy, unbounded agent loops, multi-repository orchestration, and a general-purpose dashboard.
+- 2つ目のAgentRuntime Adapter、または契約テスト済みのMockを追加する。
+- Runtimeを切り替える際に必要なのが設定／Adapterの変更だけで、Coreの変更が不要であることを実証する。
+- Adapterの適合性テストを追加する。
 
-## Open decisions before implementation
+## 受け入れ条件
 
-Implementation language and distribution model; first reference AgentRuntime; first SourceControl provider; execution backend; state store; workflow definition format; license and repository visibility.
+1. 手順書に従い、クリーンなcheckoutを初期化できる。
+2. `validate`が、実行前に設定の不足や不正を検出する。
+3. `doctor`がAdapterへの接続と必要な機能を確認する。
+4. 範囲を限定したタスクを分離workspaceで実行する。
+5. 各runについてAgent Roleの指示とHarnessのバージョンを記録する。
+6. test/lint/securityのGateが機械可読な証拠を生成する。
+7. 失敗、タイムアウト、キャンセル、再試行の状態を記録する。
+8. PRを作成できる。マージと本番デプロイは引き続き承認を必須とする。
+9. Secretがログ、prompt、成果物、commit済みファイルに現れない。
+10. AgentRuntime Adapterの置き換えにFactory Coreの変更が不要である。
+
+## 対象外
+
+自律的なマージ／デプロイ、Core Policyの動的な自己編集、終わりのないAgentループ、複数リポジトリのオーケストレーション、汎用ダッシュボード。
+
+## 実装前の未決事項
+
+実装言語と配布方式、最初のリファレンスAgentRuntime、最初のSourceControl Provider、実行バックエンド、状態ストア、Workflow定義形式、ライセンス、リポジトリの公開範囲。

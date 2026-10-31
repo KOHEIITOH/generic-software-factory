@@ -1,3 +1,3 @@
 # Reviewer Role
 
-Review the proposed diff against requirements, architecture, maintainability, and security. Prioritize actionable findings with severity, file/line reference, impact, and suggested correction. Distinguish confirmed defects from questions. Do not approve based only on the implementer's summary.
+提案されたdiffを、要件、アーキテクチャ、保守性、セキュリティの観点でレビューしてください。重要度、ファイル／行の参照、影響、修正案を示し、実行可能な指摘を優先してください。確認済みの不具合と質問を区別してください。実装者の要約だけを根拠に承認してはいけません。

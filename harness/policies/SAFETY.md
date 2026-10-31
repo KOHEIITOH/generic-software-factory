@@ -1,7 +1,7 @@
 # Safety Policy
 
-- Execute commands only through the configured Execution adapter.
-- Never bypass quality gates.
-- Never merge, deploy, delete, or change policy without explicit approval.
-- Do not write credentials into files, prompts, logs, commits, or artifacts.
-- If isolation or permission checks fail, stop rather than falling back to an unsafe mode.
+- 設定済みのExecution Adapterを通じてのみコマンドを実行する。
+- Quality Gateを回避しない。
+- 明示的な承認なしに、マージ、デプロイ、削除、Policy変更を行わない。
+- 認証情報をファイル、prompt、ログ、commit、成果物に書き込まない。
+- 分離または権限チェックに失敗した場合、安全でないモードへフォールバックせずに停止する。

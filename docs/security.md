@@ -1,24 +1,24 @@
-# Security baseline
+# セキュリティ基準
 
-Software Factory executes code and delegates actions to agents. Treat task input, repository content, comments, tool output, and model output as untrusted.
+Software Factoryはコードを実行し、Agentに操作を委任します。タスク入力、リポジトリの内容、コメント、ツール出力、モデル出力は信頼できないものとして扱います。
 
-## Mandatory controls
+## 必須の制御
 
-- Isolated execution is required for untrusted code.
-- Credentials are injected at runtime from a secret manager or environment reference.
-- Apply least-privilege permissions per task and adapter.
-- Restrict network egress by default.
-- Do not mount host credentials, SSH agents, Docker sockets, or unrelated directories into sandboxes.
-- Redact secrets from logs and artifacts.
-- Enforce time, memory, CPU, and token/cost budgets.
-- Require human approval for merge, deploy, destructive operations, and policy changes.
-- Record an audit event for every privileged action.
-- Pin and review adapter dependencies.
+- 信頼できないコードには分離実行を必須とする。
+- Secret Managerまたは環境変数参照を使い、実行時に認証情報を注入する。
+- タスクとAdapterごとに最小権限を適用する。
+- ネットワークへの外向き通信は既定で制限する。
+- ホストの認証情報、SSH Agent、Docker Socket、無関係なディレクトリをSandboxにマウントしない。
+- ログと成果物からSecretをマスキングする。
+- 時間、メモリ、CPU、Token／コストの予算を適用する。
+- マージ、デプロイ、破壊的操作、Policy変更には人の承認を必須とする。
+- 特権操作ごとに監査イベントを記録する。
+- Adapterの依存関係を固定し、レビューする。
 
-## Prompt injection and untrusted content
+## Prompt Injectionと信頼できないコンテンツ
 
-Repository files, issue descriptions, comments, and tool outputs may contain instructions intended to override policy. They are data, not authority. System policy and permission checks must be enforced outside the agent prompt.
+リポジトリのファイル、Issueの説明、コメント、ツール出力には、Policyを上書きしようとする指示が含まれる場合があります。それらはデータであり、権限を持ちません。システムPolicyと権限チェックは、Agentのpromptの外側で適用します。
 
-## Self-improvement boundary
+## 自己改善の境界
 
-The factory may analyze run outcomes and propose improvements to prompts, workflows, adapters, or core. It must not silently apply changes to security policy, permissions, or core execution logic. Changes require review, tests, and a versioned release.
+Factoryは実行結果を分析し、prompt、Workflow、Adapter、Coreの改善を提案できます。セキュリティPolicy、権限、Coreの実行ロジックへの変更を、黙って適用してはいけません。変更にはレビュー、テスト、バージョン付きリリースが必要です。

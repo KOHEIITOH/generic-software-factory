@@ -1,34 +1,34 @@
 # Generic Software Factory
 
-**Generic AI Software Development Platform**
+**汎用AIソフトウェア開発プラットフォーム (Generic AI Software Development Platform)**
 
-A reusable, vendor-agnostic and project-agnostic package for orchestrating governed software delivery workflows across configurable AI agents, model providers, repositories, and execution environments.
+設定可能なAIエージェント、モデルプロバイダー、リポジトリ、実行環境を横断して、統制されたソフトウェア開発ワークフローを実行するための、再利用可能でベンダーやプロジェクトに依存しないパッケージです。
 
-> The factory defines **how work is governed and delivered**. A deployment supplies **which agents, models, repositories, and tools perform that work**.
+> Factoryは**作業をどのように統制し、届けるか**を定義します。デプロイ時に、**どのエージェント、モデル、リポジトリ、ツールで作業するか**を指定します。
 
-## Design principles
+## 設計原則
 
-1. **Vendor Agnostic** — no mandatory dependency on one AI vendor or agent runtime.
-2. **Project Agnostic** — no mandatory dependency on one language, framework, or repository.
-3. **Modular** — core orchestration, adapters, policies, and workflows have clear boundaries.
-4. **Configurable** — deployment-specific choices are supplied as configuration.
-5. **Self-improving** — run evidence can propose improvements; changes to core and safety policies require review.
+1. **ベンダー非依存 (Vendor Agnostic)** — 特定のAIベンダーやAgent Runtimeへの依存を必須にしない。
+2. **プロジェクト非依存 (Project Agnostic)** — 特定の言語、フレームワーク、リポジトリへの依存を必須にしない。
+3. **モジュール化 (Modular)** — Coreのオーケストレーション、Adapter、Policy、Workflowの境界を明確にする。
+4. **設定可能 (Configurable)** — デプロイ固有の選択は設定で与える。
+5. **自己改善 (Self-improving)** — 実行の証跡から改善を提案できる。CoreやSafety Policyの変更にはレビューを必須とする。
 
-## Architecture
+## アーキテクチャ
 
-- **Factory Core**: workflow lifecycle, task state, policy enforcement, audit events, retries, approvals.
-- **Factory Adapters**: agent runtime, model provider, source control, execution environment, and observability integrations.
-- **Factory Configuration**: deployment-specific project, runtime, provider, workflow, and policy settings.
-- **Harness**: shared instructions, domain context, engineering standards, and tool-use constraints.
-- **Quality Gates**: deterministic checks and independent review before work can advance.
+- **Factory Core**: Workflowのライフサイクル、タスク状態、Policy適用、監査イベント、再試行、承認を担います。
+- **Factory Adapters**: Agent Runtime、Model Provider、ソース管理、実行環境、可観測性との連携を担います。
+- **Factory Configuration**: デプロイ固有のプロジェクト、Runtime、Provider、Workflow、Policyの設定を担います。
+- **Harness**: 共通の指示、ドメインの背景情報、エンジニアリング標準、ツール利用上の制約を提供します。
+- **Quality Gates**: 作業の次の段階への進行前に、決定的なチェックと独立したレビューを行います。
 
-See [Architecture](docs/architecture.md), [Configuration](docs/configuration.md), [Adapter Contracts](docs/adapter-contracts.md), [Security](docs/security.md), and [MVP Plan](docs/mvp-plan.md).
+[アーキテクチャ](docs/architecture.md)、[設定](docs/configuration.md)、[Adapter契約](docs/adapter-contracts.md)、[セキュリティ](docs/security.md)、[MVP計画](docs/mvp-plan.md)を参照してください。
 
-## Status
+## ステータス
 
-**v0.1 — specification-first scaffold.** The first implementation should prove one end-to-end workflow while keeping provider and project choices replaceable. The CLI and reference adapters are not implemented yet.
+**v0.1 — 仕様を先行させた初期構成。** 最初の実装では、Providerやプロジェクトの選択肢を置き換え可能に保ちながら、エンドツーエンドのWorkflowを1つ実証します。CLIとリファレンスAdapterはまだ実装されていません。
 
-## Planned CLI
+## CLIの予定
 
 ```bash
 sf init
@@ -39,30 +39,30 @@ sf status <run-id>
 sf cancel <run-id>
 ```
 
-These commands describe the intended interface; they are not implemented in this specification scaffold.
+これらのコマンドは予定しているインターフェースを示すもので、この仕様先行の初期構成ではまだ実装されていません。
 
-## Safety baseline
+## 安全性の基準
 
-- Run untrusted code only in an isolated execution environment.
-- Use least-privilege credentials and secret references; never store plaintext secrets in configuration.
-- Restrict network access by default.
-- Require human approval for merge, deployment, destructive operations, and policy changes.
-- Treat task input, repository content, tool output, and model output as untrusted data.
-- Require deterministic quality gates; an agent's self-review is not sufficient.
+- 信頼できないコードは、分離された実行環境内でのみ実行する。
+- 最小権限の認証情報とSecret参照を使い、平文のSecretを設定に保存しない。
+- ネットワークアクセスは既定で制限する。
+- マージ、デプロイ、破壊的操作、Policy変更には人の承認を必須とする。
+- タスク入力、リポジトリ内容、ツール出力、モデル出力は信頼できないデータとして扱う。
+- 決定的なQuality Gateを必須とする。エージェント自身によるレビューだけでは不十分。
 
-## Repository map
+## リポジトリ構成
 
 ```text
-core/          Core contracts and lifecycle specification
-adapters/      Integration contracts and adapter documentation
-harness/       Reusable instructions, policies, and knowledge templates
-agents/        Role definitions, independent of agent products
-workflows/     Reusable workflow definitions
-config/        Example deployment configuration
-quality/       Quality gate specifications and templates
-docs/          Architecture, security, configuration, roadmap, ADRs
+core/          Coreの契約とライフサイクル仕様
+adapters/      連携契約とAdapterのドキュメント
+harness/       再利用可能な指示、Policy、知識テンプレート
+agents/        Agent製品に依存しないRole定義
+workflows/     再利用可能なWorkflow定義
+config/        デプロイ設定の例
+quality/       Quality Gateの仕様とテンプレート
+docs/          アーキテクチャ、セキュリティ、設定、ロードマップ、ADR
 ```
 
-## Contributing
+## コントリビューション
 
-Changes to core contracts, security policies, and workflow semantics require an Architecture Decision Record (ADR).
+Core契約、セキュリティPolicy、Workflowの意味を変更する場合は、Architecture Decision Record (ADR)が必要です。
