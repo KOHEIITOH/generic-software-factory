@@ -23,6 +23,7 @@
 - **Quality Gates**: 作業の次の段階への進行前に、決定的なチェックと独立したレビューを行います。
 
 [アーキテクチャ](docs/architecture.md)、[設定](docs/configuration.md)、[Adapter契約](docs/adapter-contracts.md)、[セキュリティ](docs/security.md)、[MVP計画](docs/mvp-plan.md)を参照してください。
+初めての方向けに、[利用ガイド (HTML)](docs/user-guide.html)も用意しています。
 
 ## ステータス
 

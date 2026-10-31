@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Generic Software Factoryの目的、使い方、現在の状態を初めての方向けに説明します。">
+  <title>Generic Software Factory 利用ガイド</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172238;
+      --muted: #526078;
+      --paper: #f5f7fb;
+      --card: #ffffff;
+      --line: #dce3ef;
+      --blue: #2457d6;
+      --blue-soft: #edf3ff;
+      --amber: #6c4700;
+      --amber-soft: #fff4d6;
+      --green: #176344;
+      --green-soft: #e7f5ee;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--paper); color: var(--ink); line-height: 1.75; }
+    a { color: var(--blue); text-underline-offset: .18em; }
+    a:focus-visible { outline: 3px solid #f2a900; outline-offset: 3px; }
+    .page { width: min(1120px, calc(100% - 36px)); margin: 0 auto; }
+    .top { padding: 22px 0 12px; color: var(--muted); font-size: .9rem; }
+    .top a { font-weight: 700; text-decoration: none; }
+    .hero {
+      position: relative; overflow: hidden; padding: clamp(30px, 6vw, 68px);
+      border-radius: 24px; color: #fff;
+      background: linear-gradient(125deg, #142b59, #2457d6 70%, #5587f1);
+      box-shadow: 0 18px 46px #19356824;
+    }
+    .hero::after { content: ""; position: absolute; width: 260px; height: 260px; right: -90px; bottom: -150px; border: 1px solid #ffffff55; border-radius: 50%; box-shadow: 0 0 0 28px #ffffff12, 0 0 0 58px #ffffff0c; }
+    .eyebrow { margin: 0 0 10px; color: #d9e6ff; font-size: .82rem; font-weight: 800; letter-spacing: .12em; }
+    h1 { max-width: 760px; margin: 0; font-size: clamp(2rem, 5vw, 3.6rem); line-height: 1.2; letter-spacing: -.04em; }
+    .hero p { max-width: 740px; margin: 20px 0 0; color: #eff4ff; font-size: 1.08rem; }
+    .badge { display: inline-flex; align-items: center; gap: 8px; margin-top: 24px; padding: 7px 12px; border: 1px solid #ffffff70; border-radius: 999px; background: #ffffff18; font-size: .9rem; font-weight: 700; }
+    .badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #ffd166; }
+    .layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 28px; align-items: start; padding: 32px 0 64px; }
+    nav { position: sticky; top: 20px; padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); }
+    nav strong { display: block; margin-bottom: 10px; font-size: .9rem; }
+    nav ol { margin: 0; padding-left: 1.25rem; color: var(--muted); font-size: .88rem; }
+    nav li { padding: 3px 0; }
+    nav a { text-decoration: none; }
+    article { min-width: 0; }
+    section { margin: 0 0 22px; padding: clamp(20px, 3vw, 32px); border: 1px solid var(--line); border-radius: 18px; background: var(--card); box-shadow: 0 5px 18px #1b2b4510; scroll-margin-top: 20px; }
+    h2 { margin: 0 0 16px; font-size: clamp(1.3rem, 2.5vw, 1.65rem); line-height: 1.4; }
+    h3 { margin: 24px 0 8px; font-size: 1.08rem; }
+    p { margin: 10px 0; }
+    ul, ol { padding-left: 1.35rem; }
+    li + li { margin-top: 5px; }
+    .callout { margin: 18px 0; padding: 15px 18px; border-left: 4px solid #e6a700; border-radius: 8px; background: var(--amber-soft); color: var(--amber); }
+    .good { border-color: #3a9a71; background: var(--green-soft); color: var(--green); }
+    .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+    .mini { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: #fbfcff; }
+    .mini strong { display: block; margin-bottom: 4px; }
+    .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 20px 0; padding: 0; list-style: none; counter-reset: step; }
+    .flow li { position: relative; min-height: 112px; padding: 36px 13px 14px; border: 1px solid var(--line); border-radius: 12px; background: #fbfcff; font-weight: 700; line-height: 1.45; }
+    .flow li::before { counter-increment: step; content: counter(step, decimal-leading-zero); position: absolute; top: 10px; left: 13px; color: var(--blue); font-size: .78rem; font-weight: 900; letter-spacing: .08em; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+    th, td { padding: 12px 13px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { width: 25%; background: #f7f9fd; }
+    code { padding: .12em .38em; border-radius: 5px; background: #eef1f7; color: #263657; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9em; overflow-wrap: anywhere; }
+    .links { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
+    .links a { display: inline-block; padding: 8px 12px; border: 1px solid #c8d5ef; border-radius: 9px; background: var(--blue-soft); font-weight: 700; text-decoration: none; }
+    footer { padding: 0 0 38px; color: var(--muted); font-size: .88rem; }
+    @media (max-width: 760px) {
+      .layout { grid-template-columns: 1fr; gap: 18px; }
+      nav { position: static; }
+      nav ol { columns: 2; }
+      .flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 480px) {
+      .page { width: min(100% - 22px, 1120px); }
+      .cards { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: 1fr 1fr; }
+      th, td { padding: 9px; }
+    }
+    @media print {
+      body { background: #fff; font-size: 10.5pt; }
+      .page { width: 100%; }
+      .top, nav { display: none; }
+      .hero { padding: 25px; border-radius: 0; box-shadow: none; print-color-adjust: exact; }
+      .layout { display: block; padding: 18px 0; }
+      section { break-inside: avoid; box-shadow: none; }
+      a { color: inherit; }
+      .links a { border-color: #aaa; background: #fff; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="top"><a href="../README.md">← Generic Software Factory README</a></div>
+    <header class="hero">
+      <p class="eyebrow">はじめての方向けガイド</p>
+      <h1>AI開発チームを、<br>安全に動かすための設計図</h1>
+      <p>Generic Software Factoryは、AIエージェントに仕事を任せるときの進め方、権限、確認手順をそろえるための基盤です。このページでは、専門用語をできるだけかみ砕いて、目的と現状を説明します。</p>
+      <span class="badge">現在は仕様書中心の初期版 v0.1</span>
+    </header>
+
+    <div class="layout">
+      <nav aria-label="ページ内目次">
+        <strong>このページの内容</strong>
+        <ol>
+          <li><a href="#summary">まず概要</a></li>
+          <li><a href="#status">現在できること</a></li>
+          <li><a href="#flow">仕事の進み方</a></li>
+          <li><a href="#parts">構成要素</a></li>
+          <li><a href="#roles">担当する役割</a></li>
+          <li><a href="#start">導入時の準備</a></li>
+          <li><a href="#safety">安全に使うために</a></li>
+          <li><a href="#improvements">今後の改善候補</a></li>
+          <li><a href="#glossary">用語集</a></li>
+        </ol>
+      </nav>
+
+      <article>
+        <section id="summary">
+          <h2>1. まず概要</h2>
+          <p>一言でいうと、<strong>「AIに開発作業を頼むときの共通ルールと作業手順を定義する設計図」</strong>です。</p>
+          <p>特定のAI会社やプログラミング言語に固定されず、Planner（計画）、Developer（実装）、Tester（検証）、Reviewer（レビュー）などの役割を組み合わせて、依頼からPull Requestまでの流れを管理する構想です。</p>
+          <div class="cards">
+            <div class="mini"><strong>向いていること</strong>作業手順、責任分担、安全ルールを整理し、複数のAIツールやプロジェクトで共通化する。</div>
+            <div class="mini"><strong>これだけではできないこと</strong>このリポジトリを入手しただけで、AIエージェントやCLIがすぐ動くわけではありません。</div>
+          </div>
+        </section>
+
+        <section id="status">
+          <h2>2. 現在できること・できないこと</h2>
+          <div class="callout"><strong>大切な前提:</strong> v0.1は「仕様先行の初期構成」です。CLIとリファレンスAdapter（接続部品）はまだ実装されていません。文書にある <code>sf</code> コマンドは予定の例で、現時点では実行できません。</div>
+          <p>今すぐできるのは、設計を読み、チームの開発ルールや将来の実装方針を検討することです。実際にタスクを流すには、CLI、Agent RuntimeやGitなどのAdapter、隔離された実行環境を実装して接続する必要があります。</p>
+          <div class="callout good"><strong>このガイドの位置づけ:</strong> 現状を実際以上に見せず、「構想の理解」と「導入・実装に向けた準備」に役立つようにまとめています。</div>
+        </section>
+
+        <section id="flow">
+          <h2>3. 想定されている仕事の進み方</h2>
+          <p>実装後は、おおむね次の順で作業を進める設計です。人の承認が必要な箇所を途中に設けます。</p>
+          <ol class="flow">
+            <li>依頼を受け付け、設定を検証する</li>
+            <li>Plannerが計画と完了条件をまとめる</li>
+            <li>人が計画を確認・承認する</li>
+            <li>Developerが承認範囲を実装する</li>
+            <li>Testerがテストや品質チェックを行う</li>
+            <li>Reviewerが変更内容を独立して確認する</li>
+            <li>Pull Requestを作成する</li>
+            <li>人が確認し、必要ならマージを承認する</li>
+          </ol>
+          <p>チェックに失敗した場合や、要件が不明な場合は、無理に先へ進まず停止・質問する想定です。マージや本番デプロイをAIだけで完了させることは、v0.1の目標ではありません。</p>
+        </section>
+
+        <section id="parts">
+          <h2>4. 構成要素を身近な言葉で</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>名前</th><th>役割</th><th>たとえると</th></tr></thead>
+              <tbody>
+                <tr><th>Factory Core</th><td>仕事の状態、順序、承認、記録を管理する。</td><td>現場監督・進行管理</td></tr>
+                <tr><th>Adapters</th><td>FactoryとAI、Git、実行環境などをつなぐ。</td><td>機器ごとの変換アダプター</td></tr>
+                <tr><th>Configuration</th><td>使うAdapter、対象プロジェクト、コマンド、Policyを選ぶ。</td><td>現場ごとの設定票</td></tr>
+                <tr><th>Harness</th><td>Agentへの指示、作業規範、安全上の注意を渡す。</td><td>作業手順書・社内ルール</td></tr>
+                <tr><th>Quality Gates</th><td>テストやレビューなど、先へ進める条件を確認する。</td><td>工程ごとの検査ポイント</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="roles">
+          <h2>5. Agentが担当する役割</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Role</th><th>人向けの説明</th></tr></thead>
+              <tbody>
+                <tr><th>Planner</th><td>依頼を小さな作業に分け、完了条件やリスクを整理する。</td></tr>
+                <tr><th>Architect</th><td>設計への影響、制約、依存関係を確認する。</td></tr>
+                <tr><th>Developer</th><td>承認された範囲を実装する。</td></tr>
+                <tr><th>Tester</th><td>設定されたテストやチェックを実行し、結果を記録する。</td></tr>
+                <tr><th>Reviewer</th><td>実装者の説明だけに頼らず、変更と証拠を確認する。</td></tr>
+                <tr><th>Security Reviewer</th><td>セキュリティに関係する変更を確認する。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout"><strong>現状の注意:</strong> Role一覧はArchitectとSecurity Reviewerの指示ファイルを参照していますが、その2ファイルはまだリポジトリにありません。使う前にファイルを追加するか、Role一覧を実在する指示ファイルに合わせる必要があります。</div>
+        </section>
+
+        <section id="start">
+          <h2>6. 導入・実装に向けて準備すること</h2>
+          <p>現段階では実行手順ではなく、実装や試験運用の前に決めておく事項です。</p>
+          <ol>
+            <li><strong>対象プロジェクトを決める:</strong> 対象リポジトリ、主要言語、フレームワーク、既存の開発ルールを整理する。</li>
+            <li><strong>作業範囲を決める:</strong> 最初は小さく、受け入れ条件を明確にできるタスクに絞る。</li>
+            <li><strong>接続先を選ぶ:</strong> Agent Runtime、ソース管理、分離実行環境、必要であればモデルProviderを選ぶ。</li>
+            <li><strong>プロジェクト設定を用意する:</strong> test/lint/buildコマンドと完了条件を <code>project.yaml</code> にまとめる。</li>
+            <li><strong>Factory設定を用意する:</strong> Adapter、Workflow、承認条件、権限を <code>factory.yaml</code> にまとめる。</li>
+            <li><strong>安全性を確認する:</strong> Secretの受け渡し、ネットワーク、隔離、権限、ログの扱いを決める。</li>
+            <li><strong>人の承認点を決める:</strong> 計画、マージ、デプロイなど、誰が何を承認するか明確にする。</li>
+          </ol>
+          <p>設定ファイルの例は <a href="configuration.md">設定モデル</a>、全体像は <a href="architecture.md">アーキテクチャ</a>、実装の目標は <a href="mvp-plan.md">MVP計画</a>を参照してください。</p>
+        </section>
+
+        <section id="safety">
+          <h2>7. 安全に使うための基本</h2>
+          <ul>
+            <li>AIに渡す依頼文やリポジトリの内容は、誤りや悪意ある指示を含みうるデータとして扱う。</li>
+            <li>AIに必要以上の権限や認証情報を渡さない。Secretを設定ファイル、prompt、ログに書かない。</li>
+            <li>生成コードは隔離された環境で動かし、ネットワークやリソースを必要最小限に制限する。</li>
+            <li>テストやレビューを実行した証拠を残す。「Agentが大丈夫と言った」だけで合格にしない。</li>
+            <li>マージ、デプロイ、削除、権限変更は人の承認を必要とする。</li>
+          </ul>
+          <p>詳細は <a href="security.md">セキュリティ基準</a>と <a href="../harness/policies/SAFETY.md">Safety Policy</a>を確認してください。</p>
+        </section>
+
+        <section id="improvements">
+          <h2>8. 今後の改善候補</h2>
+          <ol>
+            <li><strong>Role参照の整合性:</strong> 不足している2つのHarness指示ファイルを追加するか、Role一覧との不一致を解消する。</li>
+            <li><strong>動く最小構成:</strong> 予定にあるCLIと1つのリファレンスAdapterを実装し、ひとつの安全なエンドツーエンド例を実際に動かす。</li>
+            <li><strong>初回セットアップ手順:</strong> 環境要件、設定方法、認証情報の登録、検証コマンド、想定結果を実装に合わせて記す。</li>
+            <li><strong>承認と失敗時の運用:</strong> 誰が承認するか、失敗・中断・再試行時にどう復旧するかを具体化する。</li>
+          </ol>
+          <p>この4点は、仕様書としての骨格を実際に試せる製品へ進めるための候補です。特にRole参照の整合性と、実行可能な縦切りのサンプルを優先すると利用者が試しやすくなります。</p>
+        </section>
+
+        <section id="glossary">
+          <h2>9. 用語集</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>用語</th><th>意味</th></tr></thead>
+              <tbody>
+                <tr><th>Agent Runtime</th><td>Agentを実行し、ツール利用やモデルアクセスを提供する実行基盤。</td></tr>
+                <tr><th>Adapter</th><td>異なる製品やサービスをFactoryの共通契約につなぐ部品。</td></tr>
+                <tr><th>Harness</th><td>Agentの役割、手順、制約を記した指示群。</td></tr>
+                <tr><th>Quality Gate</th><td>次の工程へ進む前に満たす必要がある検証条件。</td></tr>
+                <tr><th>Pull Request (PR)</th><td>変更を共有し、レビューやマージ承認を受けるための提案。</td></tr>
+                <tr><th>Secret</th><td>API Tokenやパスワードなど、外部に漏らしてはいけない認証情報。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="links">
+            <a href="../README.md">README</a>
+            <a href="architecture.md">アーキテクチャ</a>
+            <a href="configuration.md">設定モデル</a>
+            <a href="security.md">セキュリティ基準</a>
+            <a href="mvp-plan.md">MVP計画</a>
+          </div>
+        </section>
+      </article>
+    </div>
+
+    <footer>Generic Software Factory v0.1 — このガイドは現在の仕様と実装状況に基づいています。実装状況が進んだら、記載内容も更新してください。</footer>
+  </div>
+</body>
+</html>
