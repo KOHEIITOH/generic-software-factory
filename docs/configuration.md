@@ -1,15 +1,15 @@
-# Configuration model — v0.1
+# 設定モデル — v0.1
 
-Configuration is deployment-specific. The package ships examples and schemas; users provide actual runtime, repository, provider, and project choices.
+設定はデプロイごとに異なります。パッケージは例とスキーマを提供し、実際のRuntime、リポジトリ、Provider、プロジェクトの選択は利用者が指定します。
 
-## Configuration layers
+## 設定レイヤー
 
-1. `factory.yaml`: deployment-level wiring and policy.
-2. `project.yaml`: project-specific commands, conventions, and paths.
-3. Harness files: instructions and knowledge documents.
-4. Secret store/environment: credentials (never plaintext in YAML).
+1. `factory.yaml`: デプロイ単位の接続設定とPolicy。
+2. `project.yaml`: プロジェクト固有のコマンド、規約、パス。
+3. Harnessファイル: 指示と知識を記した文書。
+4. Secret Store／環境変数: 認証情報 (YAMLに平文で記載しない)。
 
-## Example `factory.yaml`
+## `factory.yaml` の例
 
 ```yaml
 apiVersion: generic-software-factory/v1alpha1
@@ -69,7 +69,7 @@ spec:
     retentionDays: 30
 ```
 
-## Example `project.yaml`
+## `project.yaml` の例
 
 ```yaml
 apiVersion: generic-software-factory/v1alpha1
@@ -86,20 +86,20 @@ spec:
     lint: "<project-lint-command>"
     build: "<project-build-command>"
   conventions:
-    - "Follow existing patterns before introducing new abstractions."
-    - "Do not change public APIs without an explicit requirement."
+    - "新しい抽象化を導入する前に、既存のパターンに従ってください。"
+    - "明示的な要件がない限り、公開APIを変更しないでください。"
   definitionOfDone:
-    - "Acceptance criteria are satisfied."
-    - "Required quality gates pass."
-    - "Known limitations are documented."
+    - "受け入れ条件を満たしている。"
+    - "必須のQuality Gateを通過している。"
+    - "既知の制約が文書化されている。"
 ```
 
-## Validation rules
+## 検証ルール
 
-- Unknown API versions or kinds are rejected.
-- Required adapter references must resolve.
-- Adapter configuration validates against that adapter's schema.
-- Credentials must be references, not literal secrets.
-- Isolation cannot silently fall back to host execution.
-- Production access and destructive operations are denied unless explicitly authorized.
-- Project commands run only inside the configured execution boundary.
+- 未知のAPI versionまたはkindは拒否します。
+- 必須のAdapter参照先が解決できることを確認します。
+- Adapterの設定を、そのAdapterのスキーマに照らして検証します。
+- 認証情報は参照として指定し、値を直接記載してはいけません。
+- 分離実行からホスト実行へ暗黙にフォールバックしてはいけません。
+- 本番アクセスと破壊的操作は、明示的に許可されない限り拒否します。
+- プロジェクトのコマンドは、設定された実行境界内でのみ実行します。

@@ -1,53 +1,59 @@
-# Architecture — Generic Software Factory v0.1
+# アーキテクチャ — Generic Software Factory v0.1
 
-## 1. Product definition
+## 1. 製品の定義
 
-Generic Software Factory is a reusable development-factory package. It is not a single coding agent, model gateway, IDE extension, or project template. It coordinates a governed workflow across pluggable capabilities.
+Generic Software Factoryは、再利用可能な開発ファクトリーのパッケージです。単一のCoding Agent、モデルゲートウェイ、IDE拡張機能、プロジェクトテンプレートではありません。差し替え可能な機能を組み合わせ、統制されたWorkflowを調整します。
 
-A deployment supplies:
-- one or more agent runtimes;
-- optional direct model-provider access;
-- a source-control repository;
-- an isolated execution backend;
-- project-specific context and quality commands;
-- approval and security policies.
+デプロイ時には、次を指定します。
 
-The package must not assume these choices are known at build time.
+- 1つ以上のAgent Runtime
+- 任意のモデルProviderへの直接アクセス
+- ソース管理対象のリポジトリ
+- 分離された実行バックエンド
+- プロジェクト固有のコンテキストと品質チェック用コマンド
+- 承認PolicyとセキュリティPolicy
 
-## 2. Architectural principles
+パッケージは、ビルド時にこれらの選択肢が決まっていることを前提にしてはいけません。
 
-| Principle | Required property |
+## 2. アーキテクチャ原則
+
+| 原則 | 必須の性質 |
 |---|---|
-| Vendor Agnostic | Provider- and runtime-specific behavior stays behind adapters. |
-| Project Agnostic | Language/framework commands and conventions are configuration or project context. |
-| Modular | Components communicate through versioned contracts. |
-| Configurable | No project-specific secrets or assumptions are embedded in core. |
-| Self-improving | Run evidence can propose improvements; changes to core and safety policy require review. |
+| ベンダー非依存 (Vendor Agnostic) | ProviderやRuntime固有の動作はAdapterの内側に置く。 |
+| プロジェクト非依存 (Project Agnostic) | 言語／フレームワークのコマンドや規約は、設定またはプロジェクトのコンテキストとする。 |
+| モジュール化 (Modular) | コンポーネントはバージョン付き契約を介して連携する。 |
+| 設定可能 (Configurable) | Coreにプロジェクト固有のSecretや前提を埋め込まない。 |
+| 自己改善 (Self-improving) | 実行の証跡から改善を提案できる。CoreやSafety Policyの変更にはレビューを必須とする。 |
 
-## 3. Package boundaries
+## 3. パッケージの境界
 
 ### Factory Core
-Owns task lifecycle, workflow transitions, policy enforcement, approvals, audit events, retry, timeout, and cancellation. Core must not import provider SDKs or project-specific code.
+
+タスクのライフサイクル、Workflowの遷移、Policy適用、承認、監査イベント、再試行、タイムアウト、キャンセルを担います。CoreはProvider SDKやプロジェクト固有のコードをimportしてはいけません。
 
 ### Factory Adapters
-Translate stable Factory contracts into vendor/product-specific APIs:
+
+安定したFactory契約を、ベンダー／製品固有のAPIへ変換します。
+
 - AgentRuntime
-- ModelProvider (optional)
+- ModelProvider (任意)
 - SourceControl
 - Execution
 - Observability
 
 ### Factory Configuration
-Selects and wires adapter implementations, project profiles, workflows, and policies for a deployment.
+
+デプロイで使うAdapter実装、プロジェクトプロファイル、Workflow、Policyを選択して接続します。
 
 ### Harness
-Supplies shared principles, role instructions, project context, engineering standards, constraints, and tool-use guidance. Harness is not the orchestrator.
 
-## 4. Logical architecture
+共通原則、Roleの指示、プロジェクトのコンテキスト、エンジニアリング標準、制約、ツール利用の指針を提供します。Harnessはオーケストレーターではありません。
+
+## 4. 論理アーキテクチャ
 
 ```text
                     HUMAN / OPERATOR
-             goals, approvals, policy decisions
+              目標、承認、Policyの判断
                             |
                             v
 +-------------------------------------------------------+
@@ -58,7 +64,7 @@ Supplies shared principles, role instructions, project context, engineering stan
                             v
 +-------------------------------------------------------+
 |                    FACTORY CORE                       |
-| Orchestrator | Task State | Policy Engine | Audit Log |
+| オーケストレーター | Task State | Policy Engine | Audit Log |
 | Workflow Engine | Approval Gate | Retry / Recovery    |
 +-------------------------------------------------------+
            |                |                 |
@@ -69,49 +75,49 @@ Supplies shared principles, role instructions, project context, engineering stan
      Agent Runtime      Git Provider      Isolated Sandbox
            |
            v
-    Model Provider Adapter (optional; runtime may own model access)
+    Model Provider Adapter (任意。Runtimeがモデルアクセスを担う場合あり)
 
-Harness: role instructions, project context, standards, constraints.
-Quality Gates: deterministic checks and independently recorded review.
+Harness: Roleの指示、プロジェクトのコンテキスト、標準、制約。
+Quality Gates: 決定的なチェックと、独立して記録されたレビュー。
 ```
 
-## 5. Workflow lifecycle
+## 5. Workflowのライフサイクル
 
-Minimum states:
+最小限の状態:
 
 `CREATED → VALIDATING → PLANNING → PLAN_REVIEW → IMPLEMENTING → TESTING → REVIEWING → PR_READY → APPROVAL_PENDING → COMPLETED`
 
-Control states: `BLOCKED`, `FAILED`, `CANCELLED`, `RETRYING`.
+制御状態: `BLOCKED`、`FAILED`、`CANCELLED`、`RETRYING`。
 
-Every transition records run/task ID, previous and next state, actor, timestamp, reason, evidence/artifact references, and policy decision.
+すべての遷移について、run/task ID、遷移前後の状態、実行者、タイムスタンプ、理由、証拠／成果物への参照、Policyの判断を記録します。
 
-## 6. Logical agent roles
+## 6. 論理Agent Role
 
-- **Planner** — turns request into scoped tasks and acceptance criteria.
-- **Architect** — identifies constraints, dependencies, and design implications.
-- **Developer** — implements approved work.
-- **Tester** — creates/runs tests and reports evidence.
-- **Reviewer** — independently reviews diff and evidence.
-- **Security Reviewer** — checks security-sensitive changes.
+- **Planner** — リクエストをスコープ付きのタスクと受け入れ条件に整理します。
+- **Architect** — 制約、依存関係、設計上の影響を特定します。
+- **Developer** — 承認された作業を実装します。
+- **Tester** — テストを作成／実行し、証拠を報告します。
+- **Reviewer** — diffと証拠を独立してレビューします。
+- **Security Reviewer** — セキュリティに関わる変更を確認します。
 
-These are role definitions, not product names. A deployment may map several roles to one runtime or one role to multiple agents.
+これらはRoleの定義であり、製品名ではありません。デプロイ時に、複数のRoleを1つのRuntimeに割り当てたり、1つのRoleを複数のAgentに割り当てたりできます。
 
-## 7. Quality gates
+## 7. Quality Gate
 
-Configuration validation; plan approval; tests/lint/type checks/build; secret/dependency/security checks; diff review; human approval for merge/deploy/destructive actions.
+設定の検証、計画の承認、test/lint/type check/build、Secret／依存関係／セキュリティのチェック、diffのレビュー、マージ／デプロイ／破壊的操作に対する人の承認を行います。
 
-Agent assertions are evidence, not authoritative gate results. Prefer deterministic command outputs and independently recorded review outcomes.
+Agentの申告は証拠の一部であり、Gateの確定結果ではありません。決定的なコマンド出力と、独立して記録されたレビュー結果を優先します。
 
-## 8. Extension model
+## 8. 拡張モデル
 
-Each adapter declares its ID, type, contract version, supported capabilities, configuration schema, required permissions, health-check behavior, normalized errors, and retryability.
+各Adapterは、ID、type、契約バージョン、対応機能、設定スキーマ、必要な権限、ヘルスチェックの動作、正規化されたエラー、再試行可否を宣言します。
 
-Unknown capabilities fail closed. Core rejects incompatible contract versions during validation.
+不明な機能が要求された場合は、許可せずに失敗させます。Coreは検証時に互換性のない契約バージョンを拒否します。
 
-## 9. Non-goals for v0.1
+## 9. v0.1の対象外
 
-- Fully autonomous production deployment.
-- Mandatory multi-agent debate/swarm behavior.
-- Built-in support for every provider/runtime.
-- A universal IDE or project generator.
-- Self-modification of core code or security policy without human review.
+- 完全自律型の本番デプロイ
+- 複数Agentによる議論／swarm動作の必須化
+- あらゆるProvider／Runtimeへの組み込み対応
+- 汎用IDEまたはプロジェクト生成ツール
+- 人のレビューを経ないCoreコードまたはセキュリティPolicyの自己変更

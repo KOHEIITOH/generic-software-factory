@@ -1,3 +1,3 @@
 # Quality Gates
 
-Quality gates are independently recorded checks. Prefer deterministic test/build/lint/security tools. Agent reviews supplement, but do not replace, deterministic gates.
+Quality Gateは、個別に記録するチェックです。決定的なtest/build/lint/securityツールを優先してください。Agentによるレビューは補助として使い、決定的なGateの代わりにはしません。

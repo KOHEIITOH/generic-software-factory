@@ -1,44 +1,45 @@
-# Adapter contracts — v0.1
+# Adapter契約 (Adapter contracts) — v0.1
 
-This document defines language-neutral contracts. Concrete SDK interfaces will be specified with the first implementation.
+この文書では、言語に依存しない契約を定義します。具体的なSDKインターフェースは、最初の実装時に仕様化します。
 
-## Common requirements
+## 共通要件
 
-Every adapter:
-- declares `id`, `type`, and `contractVersion`;
-- exposes a configuration schema and supported capabilities;
-- implements `healthCheck`;
-- reports required permissions;
-- returns normalized errors: `AUTH`, `RATE_LIMIT`, `TIMEOUT`, `UNAVAILABLE`, `INVALID_CONFIG`, `PERMISSION_DENIED`, `EXECUTION_FAILED`, `UNKNOWN`;
-- identifies retryable errors;
-- emits structured events without leaking secrets.
+すべてのAdapterは次を満たします。
+
+- `id`、`type`、`contractVersion`を宣言する。
+- 設定スキーマと対応機能を公開する。
+- `healthCheck`を実装する。
+- 必要な権限を報告する。
+- 正規化されたエラーを返す: `AUTH`、`RATE_LIMIT`、`TIMEOUT`、`UNAVAILABLE`、`INVALID_CONFIG`、`PERMISSION_DENIED`、`EXECUTION_FAILED`、`UNKNOWN`。
+- 再試行可能なエラーを識別する。
+- Secretを漏えいさせずに構造化イベントを出力する。
 
 ## AgentRuntime
 
-**Purpose:** execute a logical agent role using a selected agent product/runtime.
+**目的:** 選択されたAgent製品／Runtimeを使って、論理Agent Roleを実行します。
 
-Input: run/task IDs, role and role instructions, task description and acceptance criteria, scoped context/artifact references, allowed tools and permissions, timeout and resource limits.
+入力: run/task ID、RoleとRoleの指示、タスクの説明と受け入れ条件、スコープを限定したコンテキスト／成果物への参照、許可されたツールと権限、タイムアウトとリソース制限。
 
-Output: status (`SUCCEEDED`, `NEEDS_INPUT`, `BLOCKED`, `FAILED`), structured summary, artifact references, usage metadata when available, warnings and unresolved questions.
+出力: status (`SUCCEEDED`、`NEEDS_INPUT`、`BLOCKED`、`FAILED`)、構造化された要約、成果物への参照、利用可能な場合は使用量のメタデータ、警告、未解決の質問。
 
-The adapter must not receive broader permissions than the run policy grants.
+Adapterに与える権限は、run Policyで許可された範囲を超えてはいけません。
 
-## ModelProvider (optional)
+## ModelProvider (任意)
 
-Used for direct model inference only when the chosen AgentRuntime does not own model access. Output includes response, provider/model identity, usage, finish reason and normalized errors. Factory must work when this adapter is disabled.
+選択したAgentRuntimeがモデルアクセスを担わない場合に限り、モデルを直接推論するために使います。出力には、response、provider/modelの識別情報、usage、finish reason、正規化されたエラーが含まれます。このAdapterが無効でもFactoryは動作しなければなりません。
 
 ## SourceControl
 
-Capabilities may include repository inspection, branch/worktree creation, diff retrieval, commit creation, and PR creation. Merge is separately permissioned and human-approved by default.
+対応機能には、リポジトリの調査、branch/worktreeの作成、diffの取得、commitの作成、PRの作成などがあります。マージには別途権限が必要であり、既定では人の承認を必須とします。
 
 ## Execution
 
-Create isolated workspace, mount scoped repository/artifacts, run allowlisted commands, capture output, enforce CPU/memory/time/network limits, destroy workspace and report cleanup. Host execution is not an implicit fallback.
+分離されたworkspaceを作成し、スコープを限定したリポジトリ／成果物をマウントし、許可リストにあるコマンドを実行します。出力を取得し、CPU／メモリ／時間／ネットワークの制限を適用し、workspaceを破棄してクリーンアップ結果を報告します。ホスト上での実行へ暗黙にフォールバックしてはいけません。
 
 ## Observability
 
-Accept structured lifecycle events, metrics, traces and artifact references. Secret redaction occurs before persistence/export.
+構造化されたライフサイクルイベント、メトリクス、トレース、成果物への参照を受け取ります。Secretのマスキングは、永続化またはエクスポートの前に行います。
 
-## Compatibility
+## 互換性
 
-Adapters declare a semantic contract version. Core rejects incompatible major versions and validates required capabilities at startup.
+Adapterはセマンティックな契約バージョンを宣言します。Coreは互換性のないメジャーバージョンを拒否し、起動時に必要な機能を検証します。

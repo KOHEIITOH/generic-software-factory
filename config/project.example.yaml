@@ -13,6 +13,6 @@ spec:
   architectureDocs: []
   conventions: []
   definitionOfDone:
-    - "Acceptance criteria are satisfied."
-    - "Required quality gates pass."
-    - "Known limitations are documented."
+    - "受け入れ条件を満たしている。"
+    - "必須のQuality Gateを通過している。"
+    - "既知の制約が文書化されている。"
