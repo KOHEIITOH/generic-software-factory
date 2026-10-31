@@ -1,0 +1,39 @@
+apiVersion: generic-software-factory/v1alpha1
+kind: Factory
+metadata:
+  name: example-factory
+spec:
+  runtime:
+    agent:
+      adapter: "<configure-agent-runtime>"
+      config: {}
+    modelProvider:
+      enabled: false
+      adapter: null
+      config: {}
+  sourceControl:
+    adapter: "<configure-source-control>"
+    config:
+      repository: "<owner>/<repository>"
+      baseBranch: main
+      credentialRef: "env:FACTORY_GIT_TOKEN"
+  execution:
+    adapter: "<configure-isolated-execution>"
+    config:
+      isolation: required
+      networkAccess: restricted
+      workspaceTtlMinutes: 60
+  workflow:
+    definition: workflows/issue-to-pr.yaml
+    requirePlanApproval: true
+    requireHumanApprovalBeforeMerge: true
+    maxRetries: 1
+  harness:
+    path: harness
+  policy:
+    allowProductionAccess: false
+    requireApprovalFor:
+      - git.merge
+      - deployment
+      - destructive-command
+      - policy-change
