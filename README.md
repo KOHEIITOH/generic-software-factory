@@ -32,11 +32,11 @@ Generic Software Factoryは、ソフトウェア開発の計画・実行・品�
 
 - Factory Core / Local CLI: Python 3.11+（初期開発はPython 3.13）
 - Dependency / quality tools: uv、pytest、Ruff、Pyright、pip-audit
-- Agent Runtime Adapter: Codex CLI、Grok Build CLI（いずれもread-only smoke test段階）
+- Agent Runtime Adapter: Codex CLI、Grok Build CLI（read-only smoke test対応。Codexは隔離されたサンプルに限りworkspace-write smoke testにも対応）
 - 追加予定: Claude Code、GitHub Copilot、Gemini CLI
 - Model Provider: AWS Bedrock、xAI API等を将来の独立した接続先として追加
 - 将来のWeb UI: TypeScript（React / Next.js候補）
-- 初期検証: 一時ディレクトリ内のread-only smoke test。会社のソースコードは使用しない。
+- 初期検証: 一時ディレクトリ内のread-only / サンプル限定code-edit smoke test。会社のソースコードは使用しない。
 
 ## Quickstart — macOS
 
@@ -50,6 +50,7 @@ uv sync --python 3.13 --extra dev
 codex login
 uv run sf doctor
 uv run sf codex-smoke
+uv run sf dev-smoke
 ```
 
 Grok Buildを追加で試す場合は、[公式CLIガイド](https://docs.x.ai/build/cli)に従ってインストール・ログインします:
@@ -73,7 +74,7 @@ uv run sf copilot-smoke
 
 ## 現在のステータス
 
-**v0.5 — Multiple read-only Agent Runtime adapters.** 最小Agent Runtime契約、Codex CLI Adapter、Grok Build CLI Adapter、read-only smoke testを追加しています。Factory Workflow、Repository編集の隔離実行、独立レビュー、PR作成、MCP Server、Web UIはまだ実装していません。
+**実験的MVP（PR #8まで）** — ローカルSQLiteによるTask/Run/Audit記録、Codex/Grok Runtime Adapter、read-only smoke test、Codexによるサンプル限定のコード編集と単体テストを実装しています。`uv run sf dev-smoke` は使い捨て一時ディレクトリ内の同梱サンプルだけを編集します。任意のGitHubリポジトリの取得・編集、独立レビュー、PR自動作成、MCP Server、Web UIは未実装です。OSレベルの安全な隔離環境を保証するものではありません。
 
 ## セキュリティの基準
 
@@ -101,3 +102,8 @@ src/           Python Core / CLI / Runtime Adapter
 ## コントリビューション
 
 Core契約、セキュリティPolicy、Workflowの意味を変更する場合は、Architecture Decision Record (ADR)が必要です。
+
+## 公開と利用条件
+
+このリポジトリはソースコードの閲覧・評価を目的として公開する予定です。**公開はオープンソースライセンスの付与を意味しません。** 著作権者から別途許可を得ない限り、複製・改変・再配布等の権利は付与されません。適用法令により認められる範囲を除きます。社内利用や業務コードへの適用には、所属組織の承認とAIサービス利用規程の確認が必要です。
+
