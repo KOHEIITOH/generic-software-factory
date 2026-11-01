@@ -44,7 +44,7 @@ cd generic-software-factory
 
 ```bash
 uv python install 3.13
-uv sync --extra dev
+uv sync --python 3.13 --extra dev
 uv run sf doctor
 ```
 
@@ -72,7 +72,7 @@ The test uses codex exec with JSONL output, ephemeral session storage, and the r
 The Copilot SDK is not required for the default setup. To install and use it:
 
 ```bash
-uv sync --extra dev --extra copilot
+uv sync --python 3.13 --extra dev --extra copilot
 copilot login
 uv run sf copilot-smoke
 ```

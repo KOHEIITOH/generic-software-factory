@@ -46,7 +46,7 @@ Python 3.13、uv、Git、Codex CLIを用意し、Codexにログインしたう�
 git clone https://github.com/KOHEIITOH/generic-software-factory.git
 cd generic-software-factory
 uv python install 3.13
-uv sync --extra dev
+uv sync --python 3.13 --extra dev
 codex login
 uv run sf doctor
 uv run sf codex-smoke
@@ -55,7 +55,7 @@ uv run sf codex-smoke
 Copilot SDK smoke testも試す場合は、追加依存をインストールします:
 
 ```bash
-uv sync --extra dev --extra copilot
+uv sync --python 3.13 --extra dev --extra copilot
 copilot login
 uv run sf copilot-smoke
 ```
