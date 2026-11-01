@@ -10,7 +10,7 @@ Generic Software Factoryは、ソフトウェア開発の計画・実行・品�
 
 - **Factory is Independent** — Factoryは特定のAIサービスやAIホストの内部に依存しない。
 - **Human & AI Accessible** — 人間はCLI / Slack / APIから、AIはMCP / APIからFactoryを利用できる。
-- **AI is Pluggable** — Codex、Claude Code、GitHub Copilot、Gemini CLI等を共通Adapter経由で利用する。
+- **AI is Pluggable** — Codex、Claude Code、GitHub Copilot、Gemini CLI、Grok Build等を共通Adapter経由で利用する。
 - **Core Owns Orchestration** — Task、Workflow、Policy、Approval、Auditの正本はFactory Coreが持つ。
 - **Development First** — まずソフトウェア開発に特化し、汎用業務自動化への拡張は実証後に検討する。
 
@@ -19,7 +19,7 @@ Generic Software Factoryは、ソフトウェア開発の計画・実行・品�
 - **Inbound Interface**: CLI、MCP Server、API / SDKなど、Factoryを操作する入口。
 - **Factory Core**: Task / Workflow / Run / Release、Policy、Approval、Retry、Auditを管理。
 - **Agent Runtime Adapter**: FactoryからCoding AgentやCustom Agentへ開発作業を委譲。
-- **Model Provider Adapter**: 必要な場合にCustom Agent等からモデル推論を利用する接続先。AWS Bedrock等を想定。
+- **Model Provider Adapter**: 必要な場合にCustom Agent等からモデル推論を利用する接続先。AWS Bedrock、xAI API等を想定。
 - **Other Adapters**: Source Control、Execution、Knowledge、Observability等。
 - **Project Bootstrapper / Harness**: 既存プロジェクトの分析、Project Profile、Requirements、Architecture、開発規約を管理。
 
@@ -33,8 +33,8 @@ Generic Software Factoryは、ソフトウェア開発の計画・実行・品�
 - Factory Core / Local CLI: Python 3.11+（初期開発はPython 3.13）
 - Dependency / quality tools: uv、pytest、Ruff、Pyright、pip-audit
 - 初期Agent Runtime: Codex CLI Adapter
-- 追加予定: Claude Code、GitHub Copilot、Gemini CLI
-- Model Provider: AWS Bedrockを将来の独立した接続先として追加
+- 追加予定: Claude Code、GitHub Copilot、Gemini CLI、Grok Build
+- Model Provider: AWS Bedrock、xAI API等を将来の独立した接続先として追加
 - 将来のWeb UI: TypeScript（React / Next.js候補）
 - 初期検証: 一時ディレクトリ内の安全なCodex read-only smoke test。会社のソースコードは使用しない。
 

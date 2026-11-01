@@ -56,7 +56,7 @@ CLI → Task → Validate → Load Harness / Project Context → Plan → Implem
 
 ### M4 — Model Provider / External Interfaces
 
-- AWS BedrockをCustom Agentからモデル推論を利用するModel Provider Adapterとして追加する。
+- AWS Bedrock / xAI APIをCustom Agentからモデル推論を利用するModel Provider Adapterとして必要に応じて追加する。
 - 必要に応じて他社Model APIを追加する。
 - MCP Server、API / SDK、Slack等は開発Workflowの実証後に追加する。
 
@@ -66,7 +66,7 @@ CLI → Task → Validate → Load Harness / Project Context → Plan → Implem
 - Agent Swarmや複数Agent同時協調はMVP対象外。
 - すべてのRuntimeが同じcapabilityを持つ前提にしない。
 - Agent Runtimeが内包するモデル接続をFactory側で無理に置き換えない。
-- BedrockをCoding Agent Runtimeと同じ種類のAdapterにしない。
+- BedrockやxAI APIをCoding Agent Runtimeと同じ種類のAdapterにしない。\n- Grok BuildはAgent Runtimeとして扱い、GrokモデルAPIとは区別する。
 - 新しい抽象化は、2つ目の実装や具体的な利用要件が現れたときに追加する。
 
 ## 5. MVPの受け入れ条件

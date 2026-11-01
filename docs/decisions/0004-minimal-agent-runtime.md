@@ -15,8 +15,8 @@ The project needs a practical first Runtime without building a generic orchestra
 - Start with one minimal Agent Runtime contract: execute a prompt in a supplied workspace and return a normalized result.
 - Implement Codex CLI as the first executable Runtime Adapter, using its non-interactive exec interface.
 - Keep GitHub Copilot SDK as an optional dependency and preserve its smoke test.
-- Plan Claude Code, GitHub Copilot Runtime integration, and Gemini CLI as additional Runtime Adapters.
-- Treat AWS Bedrock as a Model Provider for Custom Agent use cases, not as a Coding Agent Runtime.
+- Plan Claude Code, GitHub Copilot Runtime integration, Gemini CLI, and Grok Build as additional Runtime Adapters. Grok Build can be integrated through its headless CLI or Agent Client Protocol (ACP).
+- Treat AWS Bedrock and the xAI API as Model Providers for Custom Agent use cases, not as Coding Agent Runtimes. Grok Build is the separate xAI Agent Runtime option.
 - Do not implement automatic model routing, cross-provider model substitution, Agent Swarms, or a large capability framework in the MVP.
 
 ## Rationale
