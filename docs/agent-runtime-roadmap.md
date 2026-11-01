@@ -8,11 +8,11 @@
 
 | 対象 | 分類 | 方針 | 状態 |
 |---|---|---|---|
-| OpenAI Codex CLI | Agent Runtime | 最初の実装・ローカル実証対象 | 初期Adapter |
+| OpenAI Codex CLI | Agent Runtime | 最初の実装・ローカル実証対象 | Read-only Adapter |
+| Grok Build CLI (xAI) | Agent Runtime | headless CLI経由。ACPは必要になった段階で検討 | Read-only Adapter |
 | Claude Code | Agent Runtime | 次のRuntime候補 | Planned |
 | GitHub Copilot | Agent Runtime | 既存SDK smoke testを共通契約へ接続 | Planned |
 | Gemini CLI | Agent Runtime | 次段階で追加 | Planned |
-| Grok Build (xAI) | Agent Runtime | headless CLI / ACP経由で接続 | Planned |
 | AWS Bedrock | Model Provider | Custom Agentからモデル推論を利用する場合に追加 | Planned |
 | xAI API (Grok models) | Model Provider | Custom AgentからGrokモデルを直接利用する場合に追加 | Planned |
 
@@ -38,15 +38,15 @@ BedrockはCodex / Claude Code等と同じ種類のAgent Runtimeではない。�
 
 1. 最小Agent Runtime契約とCodex CLI Adapter
 2. Codexを使った安全なローカルSmoke Test
-3. 実タスク実行とworkspace / sandbox / approval境界の検証
-4. Claude Code Adapter
-5. Copilot Adapterの共通契約への接続
-6. Gemini CLI Adapter
-7. Grok Build Adapter（headless CLI / ACPの実行・権限境界を検証）
+3. Grok Build CLI Adapterとread-only smoke test
+4. 実タスク実行に向けたworkspace / sandbox / approval境界の検証
+5. Claude Code Adapter
+6. Copilot Adapterの共通契約への接続
+7. Gemini CLI Adapter
 8. AWS Bedrock / xAI API Model Provider（Custom Agentから直接推論を利用する必要が出た段階）
 
 ## 初期契約
 
 Python実装では、最初は同期的な execute(prompt, workspace, timeout) と正規化された RuntimeResult のみを持つ。Coreは製品固有のイベント形式、SDKオブジェクト、CLI引数を知らない。
 
-最初の実装で保証するのは、AdapterがCodex CLIを起動し、実行結果・終了コード・session IDを返せることまで。Factory Workflow、永続化、独立レビュー、隔離実行基盤は別の実装段階である。
+CodexとGrok Buildの初期Adapterで保証するのは、各CLIをread-only設定で起動し、実行結果・終了コード・session IDを返せることまで。Factory Workflow、永続化、独立レビュー、隔離実行基盤は別の実装段階である。
