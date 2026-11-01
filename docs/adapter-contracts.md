@@ -64,7 +64,15 @@ Toolの公開範囲は認証主体・Role・Project Policyで制御します。M
 
 **目的:** 選択されたAgent製品またはCustom Agentに、論理Agent Roleの作業を委譲します。
 
-### 4.1 操作契約
+### 4.1 初期実装の最小契約
+
+最初のPython実装では、早すぎる抽象化を避けるため、次の同期的な契約から開始します。
+
+- `execute(prompt, workspace, timeout) -> RuntimeResult`: 指定workspaceで1回の非対話実行を行い、正規化された結果を返す。
+
+RuntimeごとのSDK型、CLI引数、JSONLイベント形式はAdapter内部に閉じ込めます。2つ目のRuntimeを追加する際に具体的な共通要件が確認できた場合に限り、status / events / cancel / resume等を段階的に追加します。
+
+### 4.2 将来の拡張候補
 
 - `start(input) -> runHandle`: 実行を開始し、Factory側のrun IDとRuntime側のrun/session IDを関連付ける。
 - `getStatus(runHandle) -> status`: 実行状態を取得する。
@@ -75,7 +83,7 @@ Toolの公開範囲は認証主体・Role・Project Policyで制御します。M
 
 状態の正規化候補: `QUEUED`、`RUNNING`、`WAITING_FOR_INPUT`、`SUCCEEDED`、`BLOCKED`、`FAILED`、`CANCELLED`、`UNKNOWN`。
 
-### 4.2 入力
+### 4.3 入力
 
 - Factory task / run IDとcorrelation ID。
 - Agent Roleと指示。
@@ -85,7 +93,7 @@ Toolの公開範囲は認証主体・Role・Project Policyで制御します。M
 - timeout、resource limit、cancel signal。
 - 必要に応じてresume token / prior session reference。
 
-### 4.3 出力
+### 4.4 出力
 
 - Runtime run / session handle。
 - 正規化されたstatusとevent stream。
@@ -93,7 +101,7 @@ Toolの公開範囲は認証主体・Role・Project Policyで制御します。M
 - 終了理由と利用可能なusage metadata。
 - 実行した操作・tool callの監査用参照（Runtimeが提供する範囲）。
 
-### 4.4 Capabilities
+### 4.5 Capabilities
 
 Runtimeは少なくとも以下を明示します。
 
@@ -109,7 +117,7 @@ Runtimeは少なくとも以下を明示します。
 
 Coreは必要なcapabilityを実行前に検証します。未対応機能を無視して続行してはいけません。機能差を共通化のために捏造せず、Runtime固有の拡張情報を保持します。
 
-### 4.5 Adapter実装方式
+### 4.6 Adapter実装方式
 
 Runtime Adapterは、SDK、CLI subprocess、HTTP API、Framework埋め込みのいずれでも実装できます。Coreから接続方式を見せません。
 

@@ -38,6 +38,7 @@ FactoryはAgent Runtime Adapterを通じて、Coding Agentや独自Agentに作�
 - OpenAI Codex SDK / CLI
 - Claude Code / Claude Agent SDK
 - Gemini CLI / Google Agent系Runtime
+- Grok Build (xAI) — headless CLI / Agent Client Protocol (ACP)
 - OpenHands、Devin等の外部Coding Agent
 - Strands Agents、LangGraph等で構築したCustom Agent
 - 将来のAWS BedrockベースのCustom Agent
@@ -87,7 +88,7 @@ SDK、CLI、HTTP API、Framework組み込みなど接続方式は異なります
        |
        v
  Model Provider (optional / runtime-owned)
- Bedrock / OpenAI / Anthropic / Gemini
+ Bedrock / OpenAI / Anthropic / Gemini / xAI
 
  Project Bootstrapper:
  repository discovery, project profile and harness proposals
@@ -213,16 +214,18 @@ Autonomous by Default / Human-on-the-loopを目指します。AIが判断でき�
 最初の実証では、全Adapterや全Interfaceを実装しません。
 
 - Inbound: Local CLIのみ。
-- Outbound: まず1つのCoding Agent Runtime。
-- Runtime候補: GitHub Copilot SDK / CLIを第一実証候補とする。実際のSDK利用条件・会社の利用許可・実行方式を確認して選択する。
-- Project: 既存のKotlin / Spring Boot Backend repositoryを1つ。
-- Execution: Dockerまたは承認された隔離workspace。
+- Outbound: まずCodex CLI Runtime Adapterを実装する。
+- 追加Runtime: Claude Code、GitHub Copilot、Gemini CLI、Grok Buildを順次追加する。
+- Grok Buildはheadless CLIまたはACPを接続方式の候補とし、Runtime固有の機能・権限・出力形式をAdapter内に閉じ込める。
+- Model Provider: AWS Bedrock / xAI APIはCustom Agentからモデル推論を直接利用する必要が出た段階で追加する。
+- Project: 既存のKotlin / Spring Boot Backend repositoryを1つ（初期smoke testでは使用しない）。
+- Execution: 実タスク実行前にDockerまたは承認された隔離workspaceを用意する。
 - Source Control: 既存Git providerの最低限のbranch / diff操作。
-- Quality: 既存Gradle test等の決定的コマンドとAI review。
+- Quality: 既存Gradle test等の決定的コマンドと独立レビュー。
 - Delivery: PR作成可能な状態まで。自動Merge / Deployは行わない。
-- MCP Server、Slack、Jira、複数Repository、複数Runtimeの同時実行は次段階。
+- 自動Runtime / Model routing、Agent Swarm、MCP Server、Slack、Jira、複数Repositoryの同時実行は次段階。
 
-実装言語はまだ確定しません。Copilot SDK、Codex SDK、Claude Agent SDK、Strands、CLI/API接続の実証結果、会社PCの制約、保守性を比較してから決定します。Runtime Adapterの境界は言語非依存で先に定義します。
+PythonをFactory Core / CLIの初期実装言語とします。Runtime Adapterの境界は言語やベンダーSDKに依存させません。
 
 ## 9. 対象外
 
