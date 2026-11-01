@@ -1,13 +1,13 @@
 # Local Smoke Test — macOS / Python
 
-This guide verifies that the local Factory package can call Codex CLI. The smoke test uses an empty temporary directory and Codex's read-only sandbox. It does not connect to a company repository, edit files, or create a PR.
+This guide verifies that the local Factory package can call the installed Agent Runtime CLIs. Both smoke tests use empty temporary directories and read-only tool access. They do not connect to a company repository, edit files, or create a PR.
 
 ## 0. Before starting
 
-- Use an approved Codex account and follow your organization's AI usage policy.
-- Do not use company source code, credentials, production endpoints, or customer data in this first test.
-- The smoke test asks Codex not to inspect or modify files and uses a fresh temporary directory with the read-only sandbox.
-- Codex CLI must already be installed and authenticated.
+- Use approved accounts and follow your organization's AI usage policy.
+- Do not use company source code, credentials, production endpoints, or customer data in these first tests.
+- The smoke tests use fresh temporary directories and explicitly restricted read-only tool access.
+- The selected CLI must already be installed and authenticated.
 
 ## 1. Install prerequisites
 
@@ -24,6 +24,13 @@ codex login
 codex login status
 ```
 
+To additionally test Grok Build, install it using the [official xAI CLI guide](https://docs.x.ai/build/cli):
+
+```bash
+curl -fsSL https://x.ai/cli/install.sh | bash
+grok login
+```
+
 Check versions:
 
 ```bash
@@ -31,6 +38,7 @@ python3.13 --version
 uv --version
 git --version
 codex --version
+grok --version
 ```
 
 ## 2. Get the project
@@ -48,7 +56,7 @@ uv sync --python 3.13 --extra dev
 uv run sf doctor
 ```
 
-Codex CLI and Git are required. Copilot CLI / SDK, Docker, and GitHub CLI are optional.
+Codex CLI and Git are required for the initial setup. Grok Build and Copilot CLI / SDK, Docker, and GitHub CLI are optional.
 
 ## 4. Run the Codex smoke test
 
@@ -67,7 +75,24 @@ Codex smoke test completed.
 
 The test uses codex exec with JSONL output, ephemeral session storage, and the read-only sandbox in a temporary directory. It does not grant write access to the repository.
 
-## 5. Optional: run the Copilot SDK smoke test
+## 5. Optional: run the Grok Build smoke test
+
+```bash
+uv run sf grok-smoke
+```
+
+Expected successful output:
+
+```text
+Grok Build response:
+FACTORY_GROK_SMOKE_OK
+
+Grok Build smoke test completed.
+```
+
+The adapter uses Grok's headless JSON output and an explicit allowlist containing only `read_file`, `grep`, and `list_dir`. It also blocks subagent spawning and MCP tool calls. It does not enable always-approve mode, shell access, file editing, or writing. The optional OS-level sandbox is not configured by this adapter yet; this smoke test only validates a harmless read-only prompt in an empty temporary directory.
+
+## 6. Optional: run the Copilot SDK smoke test
 
 The Copilot SDK is not required for the default setup. To install and use it:
 
@@ -79,7 +104,7 @@ uv run sf copilot-smoke
 
 Use an organization-approved GitHub Copilot account and confirm that SDK / CLI use is permitted.
 
-## 6. Run local quality checks
+## 7. Run local quality checks
 
 ```bash
 uv run pytest
@@ -90,12 +115,12 @@ uv run pip-audit
 
 ## Troubleshooting
 
-- **Codex not found**: confirm codex --version works in the same terminal and that the CLI is on PATH.
-- **Authentication error**: run codex login and codex login status. Do not paste credentials or tokens into chat.
+- **CLI not found**: confirm the relevant CLI version command works in the same terminal and that it is on PATH.
+- **Authentication error**: authenticate using the relevant CLI login command. Do not paste credentials or tokens into chat.
 - **Runtime / network error**: check network and proxy policy. Do not bypass corporate TLS or network controls.
 - **Python version error**: use Python 3.11 or later; Python 3.13 is the baseline used for this spike.
-- **Smoke test timeout**: retry after checking Codex CLI authentication and network connectivity.
+- **Smoke test timeout**: retry after checking CLI authentication and network connectivity.
 
 ## Scope boundary
 
-Passing this smoke test proves only that the Codex CLI can start and return a response in this local environment. It does not prove that the Factory can safely edit a repository, run project tests in a sandbox, orchestrate workflows, perform independent review, or create a PR.
+Passing a smoke test proves only that the corresponding CLI can start and return a response in this local environment. It does not prove that the Factory can safely edit a repository, run project tests in a sandbox, orchestrate workflows, perform independent review, or create a PR.

@@ -22,6 +22,7 @@ def collect_checks() -> list[Check]:
     python_ok = sys.version_info >= (3, 11)
     codex_path = shutil.which("codex")
     git_path = shutil.which("git")
+    grok_path = shutil.which("grok")
     copilot_path = shutil.which("copilot")
     copilot_sdk_installed = importlib.util.find_spec("copilot") is not None
 
@@ -42,6 +43,12 @@ def collect_checks() -> list[Check]:
             name="Codex CLI",
             ok=codex_path is not None,
             detail=codex_path or "not found (required for the initial Runtime)",
+        ),
+        Check(
+            name="Grok Build CLI",
+            ok=grok_path is not None,
+            detail=grok_path or "not found (optional)",
+            required=False,
         ),
         Check(
             name="Copilot CLI",

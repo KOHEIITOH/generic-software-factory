@@ -32,11 +32,11 @@ Generic Software Factoryは、ソフトウェア開発の計画・実行・品�
 
 - Factory Core / Local CLI: Python 3.11+（初期開発はPython 3.13）
 - Dependency / quality tools: uv、pytest、Ruff、Pyright、pip-audit
-- 初期Agent Runtime: Codex CLI Adapter
-- 追加予定: Claude Code、GitHub Copilot、Gemini CLI、Grok Build
+- Agent Runtime Adapter: Codex CLI、Grok Build CLI（いずれもread-only smoke test段階）
+- 追加予定: Claude Code、GitHub Copilot、Gemini CLI
 - Model Provider: AWS Bedrock、xAI API等を将来の独立した接続先として追加
 - 将来のWeb UI: TypeScript（React / Next.js候補）
-- 初期検証: 一時ディレクトリ内の安全なCodex read-only smoke test。会社のソースコードは使用しない。
+- 初期検証: 一時ディレクトリ内のread-only smoke test。会社のソースコードは使用しない。
 
 ## Quickstart — macOS
 
@@ -52,6 +52,15 @@ uv run sf doctor
 uv run sf codex-smoke
 ```
 
+Grok Buildを追加で試す場合は、[公式CLIガイド](https://docs.x.ai/build/cli)に従ってインストール・ログインします:
+
+```bash
+curl -fsSL https://x.ai/cli/install.sh | bash
+grok login
+grok --version
+uv run sf grok-smoke
+```
+
 Copilot SDK smoke testも試す場合は、追加依存をインストールします:
 
 ```bash
@@ -64,7 +73,7 @@ uv run sf copilot-smoke
 
 ## 現在のステータス
 
-**v0.4 — Codex CLI Runtime spike.** 最小Agent Runtime契約、Codex CLI Adapter、read-only smoke testを追加しています。Factory Workflow、Repository編集の隔離実行、独立レビュー、PR作成、MCP Server、Web UIはまだ実装していません。
+**v0.5 — Multiple read-only Agent Runtime adapters.** 最小Agent Runtime契約、Codex CLI Adapter、Grok Build CLI Adapter、read-only smoke testを追加しています。Factory Workflow、Repository編集の隔離実行、独立レビュー、PR作成、MCP Server、Web UIはまだ実装していません。
 
 ## セキュリティの基準
 

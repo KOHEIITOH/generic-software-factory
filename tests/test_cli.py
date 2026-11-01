@@ -14,3 +14,8 @@ def test_codex_smoke_command_parses() -> None:
 def test_copilot_smoke_command_parses() -> None:
     args = build_parser().parse_args(["copilot-smoke"])
     assert args.command == "copilot-smoke"
+
+
+def test_grok_smoke_command_parses() -> None:
+    args = build_parser().parse_args(["grok-smoke"])
+    assert args.command == "grok-smoke"
