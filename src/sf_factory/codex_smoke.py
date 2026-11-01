@@ -30,8 +30,12 @@ def run_smoke_test() -> int:
         print(result.output)
     if result.status != "succeeded" or result.output.strip() != EXPECTED_RESPONSE:
         print("\nCodex smoke test failed.")
+        if result.error_kind:
+            print(f"Error category: {result.error_kind}")
+        if result.error_message:
+            print(f"Reason: {result.error_message}")
         if result.stderr:
-            print(result.stderr)
+            print(f"Details: {result.stderr}")
         return 1
 
     print("\nCodex smoke test completed.")
