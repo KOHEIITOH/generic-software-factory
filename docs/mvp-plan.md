@@ -1,60 +1,140 @@
-# MVP計画 — v0.1
+# MVP計画 — v0.2
 
-## 目標
+## 1. MVPの目的
 
-利用者が任意の対応Agent Runtimeと対象リポジトリを設定し、範囲を限定したタスクを1つ投入して、Factory Coreを変更することなく、テスト済みのPull Requestを受け取れることを実証します。
+ローカルCLIからFactoryに開発タスクを依頼し、Factoryが既存プロジェクトのHarnessとコードを読み込み、Coding Agent Runtimeに実装を委譲し、隔離workspace内でテスト・レビューを実行して、PR作成可能な状態まで進められることを実証します。
 
-## MVP Workflow
+最初の対象は、既存のKotlin / Spring Boot Backend repositoryを1つとします。
 
-`Task → Validate → Plan → Human plan approval → Implement → Test → Review → PR creation → Human merge approval`
+**MVPは「FactoryがAIを使って開発する」縦切りを優先します。** MCP Server、Slack、Jira、複数Runtime、複数Repositoryの同時実行は初期実証の必須条件にしません。ただし、後から人間とAIの両方がFactoryを操作できるよう、Inbound InterfaceとOutbound Agent Runtimeを分離した設計にします。
 
-## マイルストーン
+## 2. 最初の縦切りWorkflow
 
-### M0 — 仕様と契約
+`CLI → Task → Validate → Load Harness / Project Context → Plan → Implement → Test → Review → Delivery Ready`
 
-- Coreの用語と境界を確定する。
-- 設定スキーマとAdapter契約を定義する。
-- Workflowの状態機械とイベント形式を定義する。
-- セキュリティ基準を文書化する。
+- CLIから自然言語の開発依頼を受け付ける。
+- Project Profile、Requirements、Architecture、Harnessを読み込む。
+- Agent Runtimeが作業計画を作成する。
+- Policyに従って必要な場合のみ計画承認を待つ。
+- 専用branch / worktreeと隔離workspace内で実装する。
+- プロジェクトの決定的なtest / lint / buildを実行する。
+- 独立したレビュー工程を実行し、指摘と証拠を記録する。
+- 変更差分、実行ログ、テスト結果、レビュー結果を人間に提示する。
+- PR作成は利用可能なSource Control AdapterとPolicyが整った場合に有効化する。初期実証の最低条件はPR作成可能な差分を安全に残せること。
 
-### M1 — 最小の垂直スライス
+## 3. 実装スコープ
 
-- CLIを実装する: `init`、`validate`、`doctor`、`run`、`status`、`cancel`。
-- 1つのAgentRuntime Adapterと1つのSourceControl Adapterをリファレンス実装としてサポートする。
-- 1つの分離実行用Execution Adapterをサポートする。
-- タスク入力からPR作成までのWorkflowを1つ実行する。
-- Runtime／Provider／プロジェクトの選択は設定可能に保ち、Coreにハードコードしない。
+### M0 — Architecture / Contract
 
-### M2 — 信頼性
+- FactoryをAIサービスの一部ではなく独立した開発プラットフォームと定義する。
+- Inbound Interface（CLI / MCP / API）とOutbound Agent Runtimeを分離する。
+- CoreがTask / Workflow / Policy / Approval / Auditを所有する。
+- Agent Runtimeの共通契約とcapabilitiesを定義する。
+- 実装言語はSDK検証後に決定する。
 
-- 再試行、タイムアウト、キャンセル、中断からの再開を追加する。
-- 監査ログと成果物マニフェストを追加する。
-- 決定的なQuality Gateと失敗の証拠を追加する。
-- 権限テストとSecretのマスキングを追加する。
+### M1 — Local CLI Vertical Slice
 
-### M3 — 置き換え可能性の実証
+- CLI: `sf doctor`、`sf init`、`sf validate`、`sf run`、`sf status`、`sf cancel`。
+- Project Bootstrap / Harness Loader: 既存プロジェクトの最低限の検出とコンテキスト読込。
+- Agent Runtime Adapter: 最初のCoding Agentを1つ接続する。GitHub Copilot SDK / CLIを第一候補とし、利用条件と会社の利用許可を確認する。
+- Source Control Adapter: status、diff、専用branch / worktree等の最低限の操作。
+- Execution Adapter: Dockerまたは会社で承認された隔離実行環境。
+- Workflow / Task: 状態遷移、Task作成、実行、停止、結果参照。
+- Quality: 既存プロジェクトのGradle test / build等と独立レビュー。
+- Audit: run、Agentイベント、実行コマンド、成果物参照を記録する。
 
-- 2つ目のAgentRuntime Adapter、または契約テスト済みのMockを追加する。
-- Runtimeを切り替える際に必要なのが設定／Adapterの変更だけで、Coreの変更が不要であることを実証する。
-- Adapterの適合性テストを追加する。
+### M2 — Reliability / Safety
 
-## 受け入れ条件
+- 実行状態の永続化とプロセス再起動後の状態確認。
+- timeout、retry、cancel、可能な場合のresume。
+- Secret redaction、最小権限、ネットワーク制限。
+- Docker / workspaceのcleanupと失敗時の安全停止。
+- 決定的なQuality Gateと失敗証拠。
+- Policyに基づくApproval Gate。
 
-1. 手順書に従い、クリーンなcheckoutを初期化できる。
-2. `validate`が、実行前に設定の不足や不正を検出する。
-3. `doctor`がAdapterへの接続と必要な機能を確認する。
-4. 範囲を限定したタスクを分離workspaceで実行する。
-5. 各runについてAgent Roleの指示とHarnessのバージョンを記録する。
-6. test/lint/securityのGateが機械可読な証拠を生成する。
-7. 失敗、タイムアウト、キャンセル、再試行の状態を記録する。
-8. PRを作成できる。マージと本番デプロイは引き続き承認を必須とする。
-9. Secretがログ、prompt、成果物、commit済みファイルに現れない。
-10. AgentRuntime Adapterの置き換えにFactory Coreの変更が不要である。
+### M3 — Runtime Portability
 
-## 対象外
+- 2つ目のRuntime Adapterを追加する（候補: Codex SDK / CLI、Claude Agent SDK / CLI）。
+- Adapter contract testを作成する。
+- 同一Taskを異なるRuntimeで実行し、Core変更なしで切り替えられることを検証する。
+- AWS Bedrock / Strands等のCustom Agent Runtimeを追加候補として評価する。
 
-自律的なマージ／デプロイ、Core Policyの動的な自己編集、終わりのないAgentループ、複数リポジトリのオーケストレーション、汎用ダッシュボード。
+### M4 — AI / External System Interface
 
-## 実装前の未決事項
+- MCP Serverを実装し、外部AIからTask作成、run状態参照、承認などの認可された操作を可能にする。
+- API / SDKを追加する。
+- Slack、Jira、Sentry、AWS Deployment等は実証ニーズに応じてAdapter化する。
 
-実装言語と配布方式、最初のリファレンスAgentRuntime、最初のSourceControl Provider、実行バックエンド、状態ストア、Workflow定義形式、ライセンス、リポジトリの公開範囲。
+## 4. 最初のRuntime選定
+
+最初はGitHub Copilotを有力候補とします。ただし、Copilot SDKを前提にFactory全体の設計・言語を固定しません。
+
+実装着手前に次を確認します。
+
+1. 会社アカウント・会社PCでCopilot SDK / CLIの利用が許可されているか。
+2. SDKの利用条件、認証方式、利用可能な機能。
+3. Factoryから実行・キャンセル・イベント取得・結果取得が可能か。
+4. ファイル編集・コマンド実行・権限確認をどこまで制御できるか。
+5. Copilot以外（Codex、Claude Code、Bedrock系）を追加する際に必要な共通契約。
+6. 会社のソースコードを対象Agentに渡すことが社内Policy上許可されているか。
+
+SDKで必要な制御ができない場合、CLI Adapterを代替候補とします。SDKとCLIのどちらも使える前提にはしません。
+
+## 5. 言語選定ゲート
+
+Python / TypeScriptを中心に、必要に応じてGo / Kotlinも比較します。個別SDKの対応言語だけで決めず、次の小さなSpikeで評価します。
+
+- Copilot SDK / CLIの起動・認証・イベント取得・キャンセル。
+- CodexまたはClaudeのSDK / CLIを同じRuntime契約で接続できるか。
+- Bedrock / Strandsへの接続方法。
+- subprocess、Docker、ファイルシステムの安全な制御。
+- CLI開発、型安全性、テスト、配布、保守性。
+- 会社PCの実行制約とチームの運用可能性。
+
+評価後にADRで実装言語と初期Runtimeを決定します。言語選定が完了するまでは、ドメイン契約とアーキテクチャを言語非依存で維持します。
+
+## 6. MVPの受け入れ条件
+
+1. クリーンなcheckoutからローカル環境を診断できる。
+2. 既存プロジェクトを登録し、HarnessとProject Contextを読み込める。
+3. CLIからTaskを作成・実行できる。
+4. FactoryがAgent Runtimeにタスクを委譲し、進捗と結果を追跡できる。
+5. Agentが専用workspace内で変更を行う。
+6. テスト等の決定的なQuality Gateが機械可読な証拠を生成する。
+7. 独立レビューの結果を保存・表示できる。
+8. run / task / artifact / Agent実行の関係を追跡できる。
+9. cancel、timeout、失敗を安全に扱える。
+10. MergeとProduction Deployは人間の承認なしに実行されない。
+11. Runtime Adapterを交換するためにFactory Coreを変更する必要がない。
+12. 会社のAI利用Policy・Secret管理・ネットワーク制約を満たす。
+
+## 7. 初期実証で後回しにするもの
+
+- MCP ServerとSlackからのTrigger。
+- Jira等の外部Ticket連携。
+- 複数Repositoryの同時実行。
+- 複数Runtimeの同時協調・Agent Swarm。
+- Release orchestrationの完全実装。
+- 自動Merge、本番Deploy。
+- 汎用Web Dashboard。
+- Greenfieldプロジェクトの完全自動生成。
+
+## 8. 明日のローカル実証チェック
+
+### 事前確認
+
+- [ ] 会社のAI利用Policyで対象リポジトリとAgent Runtimeの利用が許可されている。
+- [ ] Gitのread / branch作成権限がある。
+- [ ] Copilot SDKまたはCLIを会社アカウントで利用できる。
+- [ ] Dockerまたは承認済み隔離実行環境が使える。
+- [ ] AWS Bedrockは初期実証の必須条件にしない。
+- [ ] 本番Secret・本番接続先を実行環境に渡さない。
+- [ ] 作業対象はBEの専用branch / worktreeに限定する。
+
+### 実証タスク
+
+小さく、既存テストで検証可能で、外部影響のない変更を1件選びます。最初はDBスキーマ変更、決済フロー変更、Production接続を避けます。
+
+### 成功条件
+
+CLIから依頼し、Agentが変更を作成し、テスト・レビューの証拠をFactoryが記録し、人間が差分を確認できること。PR作成や完全自律実行は、環境・Policy・Adapterが整っている場合にのみ追加します。

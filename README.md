@@ -1,67 +1,68 @@
 # Generic Software Factory
 
-**汎用AIソフトウェア開発プラットフォーム (Generic AI Software Development Platform)**
+**AI-Native Software Development Platform — 汎用AIソフトウェア開発プラットフォーム**
 
-設定可能なAIエージェント、モデルプロバイダー、リポジトリ、実行環境を横断して、統制されたソフトウェア開発ワークフローを実行するための、再利用可能でベンダーやプロジェクトに依存しないパッケージです。
+Generic Software Factoryは、ソフトウェア開発の計画・実行・品質・承認・成果物を統制する独立した開発プラットフォームです。人間とAIの両方がFactoryを利用でき、Factory自身も複数のAI Agent Runtimeを交換可能な実行手段として利用します。
 
-> Factoryは**作業をどのように統制し、届けるか**を定義します。デプロイ時に、**どのエージェント、モデル、リポジトリ、ツールで作業するか**を指定します。
+> Factoryが開発プロセスの制御主体です。AIはFactoryの一部ではなく、Factoryが利用・統制する交換可能な能力です。
 
-## 設計原則
+## 基本コンセプト
 
-1. **ベンダー非依存 (Vendor Agnostic)** — 特定のAIベンダーやAgent Runtimeへの依存を必須にしない。
-2. **プロジェクト非依存 (Project Agnostic)** — 特定の言語、フレームワーク、リポジトリへの依存を必須にしない。
-3. **モジュール化 (Modular)** — Coreのオーケストレーション、Adapter、Policy、Workflowの境界を明確にする。
-4. **設定可能 (Configurable)** — デプロイ固有の選択は設定で与える。
-5. **自己改善 (Self-improving)** — 実行の証跡から改善を提案できる。CoreやSafety Policyの変更にはレビューを必須とする。
+- **Factory is Independent** — Factoryは特定のAIサービスやAIホストの内部に依存しない。
+- **Human & AI Accessible** — 人間はCLI / Slack / APIから、AIはMCP / APIからFactoryを利用できる。
+- **AI is Pluggable** — Copilot、Codex、Claude、BedrockベースのCustom AgentなどをAdapter経由で利用する。
+- **Core Owns Orchestration** — Task、Workflow、Policy、Approval、Auditの正本はFactory Coreが持つ。
+- **Development First** — まずソフトウェア開発に特化し、汎用業務自動化への拡張は実証後に検討する。
 
 ## アーキテクチャ
 
-- **Factory Core**: Workflowのライフサイクル、タスク状態、Policy適用、監査イベント、再試行、承認を担います。
-- **Factory Adapters**: Agent Runtime、Model Provider、ソース管理、実行環境、可観測性との連携を担います。
-- **Factory Configuration**: デプロイ固有のプロジェクト、Runtime、Provider、Workflow、Policyの設定を担います。
-- **Harness**: 共通の指示、ドメインの背景情報、エンジニアリング標準、ツール利用上の制約を提供します。
-- **Quality Gates**: 作業の次の段階への進行前に、決定的なチェックと独立したレビューを行います。
+- **Inbound Interface**: CLI、MCP Server、API / SDKなど、Factoryを操作する入口。
+- **Factory Core**: Task / Workflow / Run / Release、Policy、Approval、Retry、Auditを管理。
+- **Agent Runtime Adapter**: FactoryからCoding AgentやCustom Agentへ開発作業を委譲。
+- **Other Adapters**: Source Control、Execution、Knowledge、Observability、Model Provider等。
+- **Project Bootstrapper / Harness**: 既存プロジェクトの分析、Project Profile、Requirements、Architecture、開発規約を管理。
 
-[アーキテクチャ](docs/architecture.md)、[設定](docs/configuration.md)、[Adapter契約](docs/adapter-contracts.md)、[セキュリティ](docs/security.md)、[MVP計画](docs/mvp-plan.md)を参照してください。
-初めての方向けに、[利用ガイド (HTML)](docs/user-guide.html)も用意しています。
+重要な設計境界は、**Factoryへの入口（Inbound Interface）** と **FactoryからAIへの委譲（Outbound Agent Runtime）** を分離することです。MCP ServerはAIがFactoryを操作する入口であり、Copilot / Codex / Claude等はFactoryが作業を委譲するRuntimeです。
 
-## ステータス
+詳しくは[アーキテクチャ](docs/architecture.md)、[Adapter・Interface契約](docs/adapter-contracts.md)、[設定](docs/configuration.md)、[セキュリティ](docs/security.md)、[MVP計画](docs/mvp-plan.md)を参照してください。
+初めての方向けに[利用ガイド (HTML)](docs/user-guide.html)も用意しています。
 
-**v0.1 — 仕様を先行させた初期構成。** 最初の実装では、Providerやプロジェクトの選択肢を置き換え可能に保ちながら、エンドツーエンドのWorkflowを1つ実証します。CLIとリファレンスAdapterはまだ実装されていません。
+## MVPの方向性
 
-## CLIの予定
+最初はローカルCLIから既存のBackend repositoryを対象に、1つのCoding Agent Runtimeを使って実装・テスト・レビューまで進める縦切りを作ります。
 
-```bash
-sf init
-sf validate --config factory.yaml
-sf doctor --config factory.yaml
-sf run --config factory.yaml --task "Implement the requested change"
-sf status <run-id>
-sf cancel <run-id>
-```
+- 最初のRuntime候補: GitHub Copilot SDK / CLI
+- 将来の候補: OpenAI Codex、Claude Code、Gemini、AWS BedrockベースのCustom Agent
+- 初期対象: Kotlin / Spring Boot Backend
+- 初期入口: Local CLI
+- 次段階: MCP Server、API / SDK、Slack等
 
-これらのコマンドは予定しているインターフェースを示すもので、この仕様先行の初期構成ではまだ実装されていません。
+**実装言語は未確定です。** Copilot、Codex、Claude、Bedrock / Strands等の接続Spikeと、会社PCの制約・保守性を比較してから決定します。
 
-## 安全性の基準
+## 現在のステータス
 
-- 信頼できないコードは、分離された実行環境内でのみ実行する。
-- 最小権限の認証情報とSecret参照を使い、平文のSecretを設定に保存しない。
+**v0.2 — Architecture / MVP specification updated.** Factoryの独立性、Inbound / Outbound境界、Agent Runtimeの交換可能性、Copilot先行のローカル縦切り方針を文書化しています。CLI、MCP Server、Reference Adapter、実行Workflowはまだ実装済みとは限りません。実行可能性は実装・環境検証で確認します。
+
+## セキュリティの基準
+
+- 信頼できないコードは分離された実行環境内でのみ実行する。
+- 最小権限の認証情報とSecret参照を使い、平文Secretを設定に保存しない。
 - ネットワークアクセスは既定で制限する。
-- マージ、デプロイ、破壊的操作、Policy変更には人の承認を必須とする。
+- Merge、本番Deploy、破壊的操作、Policy変更には人間の承認を必須とする。
 - タスク入力、リポジトリ内容、ツール出力、モデル出力は信頼できないデータとして扱う。
-- 決定的なQuality Gateを必須とする。エージェント自身によるレビューだけでは不十分。
+- 決定的なQuality Gateを必須とする。Agent自身によるレビューだけでは不十分。
 
 ## リポジトリ構成
 
 ```text
 core/          Coreの契約とライフサイクル仕様
-adapters/      連携契約とAdapterのドキュメント
+adapters/      外部Runtime・サービスとのAdapter契約
 harness/       再利用可能な指示、Policy、知識テンプレート
 agents/        Agent製品に依存しないRole定義
 workflows/     再利用可能なWorkflow定義
 config/        デプロイ設定の例
 quality/       Quality Gateの仕様とテンプレート
-docs/          アーキテクチャ、セキュリティ、設定、ロードマップ、ADR
+docs/          アーキテクチャ、契約、セキュリティ、ADR、ロードマップ
 ```
 
 ## コントリビューション
