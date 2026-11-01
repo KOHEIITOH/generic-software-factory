@@ -15,6 +15,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("codex-smoke", help="read-only Codex test")
     sub.add_parser("copilot-smoke", help="Copilot SDK test")
     sub.add_parser("grok-smoke", help="read-only Grok test")
+    sub.add_parser("dev-smoke", help="isolated fixture code-editing smoke test")
     task = sub.add_parser("task", help="manage tasks")
     task_sub = task.add_subparsers(dest="task_command", required=True)
     create = task_sub.add_parser("create")
@@ -44,6 +45,10 @@ def main() -> int:
     if args.command == "grok-smoke":
         from sf_factory.grok_smoke import run_smoke_test
         return run_smoke_test()
+    if args.command == "dev-smoke":
+        from sf_factory.dev_smoke import run_dev_smoke
+
+        return run_dev_smoke()
     from sf_factory.factory import Factory
     factory = Factory(__import__("pathlib").Path(".sf-factory"))
     try:
