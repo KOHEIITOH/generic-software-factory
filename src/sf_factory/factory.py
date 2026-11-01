@@ -3,14 +3,15 @@ from __future__ import annotations
 
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sf_factory.codex_cli import CodexCliRuntime
 from sf_factory.grok_cli import GrokBuildCliRuntime
 
+
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 class Factory:
     def __init__(self, root: Path):
@@ -57,8 +58,10 @@ class Factory:
             task = db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
             if task is None:
                 raise ValueError("task not found")
-            runs = db.execute("SELECT id,runtime,status,started_at FROM runs WHERE task_id=? ORDER BY started_at",
-                              (task_id,)).fetchall()
+            runs = db.execute(
+                "SELECT id,runtime,status,started_at FROM runs WHERE task_id=? ORDER BY started_at",
+                (task_id,),
+            ).fetchall()
             return {"task": dict(task), "runs": [dict(row) for row in runs]}
 
     def show_run(self, run_id: str) -> dict:
@@ -81,12 +84,17 @@ class Factory:
         workspace = self.workspaces / run_id
         workspace.mkdir(mode=0o700)
         with self._connect() as db:
-            db.execute("INSERT INTO runs(id,task_id,runtime,status,workspace,started_at) VALUES (?,?,?,?,?,?)",
+            db.execute(
+                "INSERT INTO runs(id,task_id,runtime,status,workspace,started_at) VALUES (?,?,?,?,?,?)",
                        (run_id, task_id, runtime_name, "running", str(workspace), _now()))
             db.execute("INSERT INTO audit(run_id,task_id,event,at) VALUES (?,?,?,?)",
                        (run_id, task_id, "run.started", _now()))
         try:
-            runtime = CodexCliRuntime(sandbox="read-only") if runtime_name == "codex" else GrokBuildCliRuntime()
+            runtime = (
+                CodexCliRuntime(sandbox="read-only")
+                if runtime_name == "codex"
+                else GrokBuildCliRuntime()
+            )
             result = runtime.execute(prompt=task["prompt"], workspace=workspace,
                                      timeout_seconds=timeout_seconds)
             status = result.status
