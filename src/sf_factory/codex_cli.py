@@ -16,7 +16,7 @@ SandboxMode = Literal["read-only", "workspace-write"]
 class CodexCliRuntime:
     """Run Codex through its supported non-interactive codex exec command."""
 
-    def __init__(self, executable: str = "codex", sandbox: SandboxMode = "workspace-write"):
+    def __init__(self, executable: str = "codex", sandbox: SandboxMode = "read-only"):
         self.executable = executable
         self.sandbox = sandbox
 

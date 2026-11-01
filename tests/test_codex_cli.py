@@ -41,7 +41,7 @@ def test_codex_cli_builds_safe_non_interactive_command(tmp_path: Path, monkeypat
     assert "--ephemeral" in command
     assert "--skip-git-repo-check" in command
     assert "--sandbox" in command
-    assert command[command.index("--sandbox") + 1] == "workspace-write"
+    assert command[command.index("--sandbox") + 1] == "read-only"
     assert result.status == "succeeded"
     assert result.output == "hello from codex"
     assert result.session_id == "thread-123"
