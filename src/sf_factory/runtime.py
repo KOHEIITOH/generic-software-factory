@@ -7,6 +7,14 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 RuntimeStatus = Literal["succeeded", "failed", "timed_out"]
+RuntimeErrorKind = Literal[
+    "usage_limit",
+    "rate_limit",
+    "authentication",
+    "model_not_found",
+    "timeout",
+    "runtime_error",
+]
 
 
 @dataclass(frozen=True)
@@ -19,6 +27,8 @@ class RuntimeResult:
     exit_code: int | None
     session_id: str | None = None
     stderr: str = ""
+    error_kind: RuntimeErrorKind | None = None
+    error_message: str | None = None
 
 
 class AgentRuntime(Protocol):
