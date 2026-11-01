@@ -6,7 +6,7 @@ def test_accepts_expected_token() -> None:
 
 
 def test_ignores_surrounding_whitespace() -> None:
-    assert is_expected_response("\\n FACTORY_SMOKE_OK \\t")
+    assert is_expected_response("\n FACTORY_SMOKE_OK \t")
 
 
 def test_rejects_unexpected_response() -> None:
