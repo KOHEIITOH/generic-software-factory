@@ -1,14 +1,13 @@
 """Local persistent task/run orchestration (read-only MVP)."""
 from __future__ import annotations
 
-import json
 import sqlite3
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 from sf_factory.codex_cli import CodexCliRuntime
-from sf_factory.grok_cli import GrokCliRuntime
+from sf_factory.grok_cli import GrokBuildCliRuntime
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -87,7 +86,7 @@ class Factory:
             db.execute("INSERT INTO audit(run_id,task_id,event,at) VALUES (?,?,?,?)",
                        (run_id, task_id, "run.started", _now()))
         try:
-            runtime = CodexCliRuntime(sandbox="read-only") if runtime_name == "codex" else GrokCliRuntime()
+            runtime = CodexCliRuntime(sandbox="read-only") if runtime_name == "codex" else GrokBuildCliRuntime()
             result = runtime.execute(prompt=task["prompt"], workspace=workspace,
                                      timeout_seconds=timeout_seconds)
             status = result.status
