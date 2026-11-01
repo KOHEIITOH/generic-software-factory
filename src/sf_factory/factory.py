@@ -85,7 +85,8 @@ class Factory:
         workspace.mkdir(mode=0o700)
         with self._connect() as db:
             db.execute(
-                "INSERT INTO runs(id,task_id,runtime,status,workspace,started_at) VALUES (?,?,?,?,?,?)",
+                "INSERT INTO runs(id,task_id,runtime,status,workspace,started_at) "
+                "VALUES (?,?,?,?,?,?)",
                        (run_id, task_id, runtime_name, "running", str(workspace), _now()))
             db.execute("INSERT INTO audit(run_id,task_id,event,at) VALUES (?,?,?,?)",
                        (run_id, task_id, "run.started", _now()))
