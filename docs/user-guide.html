@@ -101,7 +101,7 @@
       <p class="eyebrow">はじめての方向けガイド</p>
       <h1>AI開発チームを、<br>安全に動かすための設計図</h1>
       <p>Generic Software Factoryは、AIエージェントに仕事を任せるときの進め方、権限、確認手順をそろえるための基盤です。このページでは、専門用語をできるだけかみ砕いて、目的と現状を説明します。</p>
-      <span class="badge">現在は仕様書中心の初期版 v0.1</span>
+      <span class="badge">現在は実験的MVP（PR #8まで）</span>
     </header>
 
     <div class="layout">
@@ -127,14 +127,14 @@
           <p>特定のAI会社やプログラミング言語に固定されず、Planner（計画）、Developer（実装）、Tester（検証）、Reviewer（レビュー）などの役割を組み合わせて、依頼からPull Requestまでの流れを管理する構想です。</p>
           <div class="cards">
             <div class="mini"><strong>向いていること</strong>作業手順、責任分担、安全ルールを整理し、複数のAIツールやプロジェクトで共通化する。</div>
-            <div class="mini"><strong>これだけではできないこと</strong>このリポジトリを入手しただけで、AIエージェントやCLIがすぐ動くわけではありません。</div>
+            <div class="mini"><strong>これだけではできないこと</strong>Python、uv、対応するAgent CLIのインストールと認証が必要です。業務コードへの安全な適用は未対応です。</div>
           </div>
         </section>
 
         <section id="status">
           <h2>2. 現在できること・できないこと</h2>
-          <div class="callout"><strong>大切な前提:</strong> v0.1は「仕様先行の初期構成」です。CLIとリファレンスAdapter（接続部品）はまだ実装されていません。文書にある <code>sf</code> コマンドは予定の例で、現時点では実行できません。</div>
-          <p>今すぐできるのは、設計を読み、チームの開発ルールや将来の実装方針を検討することです。実際にタスクを流すには、CLI、Agent RuntimeやGitなどのAdapter、隔離された実行環境を実装して接続する必要があります。</p>
+          <div class="callout"><strong>大切な前提:</strong> ローカルCLI、Task/Run/Audit管理、Codex/Grok Adapter、サンプル限定のコード編集テストを実装済みです。ただし任意リポジトリへの開発、PR自動作成、安全なOS隔離は未対応です。</div>
+          <p>今すぐできるのは、CLIによるTaskの作成・実行・結果参照、read-only接続確認、同梱サンプルへのCodexコード編集と単体テストです。GitHubリポジトリ連携やPR作成は今後実装予定です。</p>
           <div class="callout good"><strong>このガイドの位置づけ:</strong> 現状を実際以上に見せず、「構想の理解」と「導入・実装に向けた準備」に役立つようにまとめています。</div>
         </section>
 
@@ -151,7 +151,7 @@
             <li>Pull Requestを作成する</li>
             <li>人が確認し、必要ならマージを承認する</li>
           </ol>
-          <p>チェックに失敗した場合や、要件が不明な場合は、無理に先へ進まず停止・質問する想定です。マージや本番デプロイをAIだけで完了させることは、v0.1の目標ではありません。</p>
+          <p>チェックに失敗した場合や、要件が不明な場合は、無理に先へ進まず停止・質問する想定です。マージや本番デプロイをAIだけで完了させることは、現段階の目標ではありません。</p>
         </section>
 
         <section id="parts">
@@ -190,7 +190,7 @@
 
         <section id="start">
           <h2>6. 導入・実装に向けて準備すること</h2>
-          <p>現段階では実行手順ではなく、実装や試験運用の前に決めておく事項です。</p>
+          <p>以下は試験運用や今後の拡張に向けて決めておく事項です。</p>
           <ol>
             <li><strong>対象プロジェクトを決める:</strong> 対象リポジトリ、主要言語、フレームワーク、既存の開発ルールを整理する。</li>
             <li><strong>作業範囲を決める:</strong> 最初は小さく、受け入れ条件を明確にできるタスクに絞る。</li>
