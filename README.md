@@ -27,21 +27,34 @@ Generic Software Factoryは、ソフトウェア開発の計画・実行・品�
 詳しくは[アーキテクチャ](docs/architecture.md)、[Adapter・Interface契約](docs/adapter-contracts.md)、[設定](docs/configuration.md)、[セキュリティ](docs/security.md)、[MVP計画](docs/mvp-plan.md)を参照してください。
 初めての方向けに[利用ガイド (HTML)](docs/user-guide.html)も用意しています。
 
-## MVPの方向性
+## 現在の実装方針
 
-最初はローカルCLIから既存のBackend repositoryを対象に、1つのCoding Agent Runtimeを使って実装・テスト・レビューまで進める縦切りを作ります。
+- Factory Core / Local CLI: Python 3.11+（初期開発はPython 3.13）
+- Dependency / quality tools: uv、pytest、Ruff、Pyright、pip-audit
+- 初期Agent Runtime: GitHub Copilot Python SDK（組織の利用許可が前提）
+- 将来のWeb UI: TypeScript（React / Next.js候補）
+- 初期対象: 安全なローカルSmoke Test。会社のソースコードはまだ使用しない。
 
-- 最初のRuntime候補: GitHub Copilot SDK / CLI
-- 将来の候補: OpenAI Codex、Claude Code、Gemini、AWS BedrockベースのCustom Agent
-- 初期対象: Kotlin / Spring Boot Backend
-- 初期入口: Local CLI
-- 次段階: MCP Server、API / SDK、Slack等
+## Quickstart — macOS
 
-**実装言語は未確定です。** Copilot、Codex、Claude、Bedrock / Strands等の接続Spikeと、会社PCの制約・保守性を比較してから決定します。
+Python 3.11+、uv、Git、Copilot CLIを用意したうえで:
+
+```bash
+git clone https://github.com/KOHEIITOH/generic-software-factory.git
+cd generic-software-factory
+git switch feat/python-copilot-smoke
+copilot login
+# Complete login, then verify the active account with /user inside Copilot CLI.
+uv sync --extra dev
+uv run sf doctor
+uv run sf copilot-smoke
+```
+
+詳細は[Mac向けローカルSmoke Test](docs/local-smoke-test.md)を参照してください。
 
 ## 現在のステータス
 
-**v0.2 — Architecture / MVP specification updated.** Factoryの独立性、Inbound / Outbound境界、Agent Runtimeの交換可能性、Copilot先行のローカル縦切り方針を文書化しています。CLI、MCP Server、Reference Adapter、実行Workflowはまだ実装済みとは限りません。実行可能性は実装・環境検証で確認します。
+**v0.3 — Python local smoke-test scaffold.** Python CLIの環境診断とCopilot SDK接続確認を追加しました。Factory Workflow、Repository編集、Sandbox、Slack / Google Chat、Web UIはまだ実装していません。
 
 ## セキュリティの基準
 
