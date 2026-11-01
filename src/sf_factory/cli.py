@@ -7,6 +7,7 @@ import sys
 
 from sf_factory.doctor import run_doctor
 
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sf", description="Generic Software Factory CLI")
     sub = parser.add_subparsers(dest="command", required=True)
