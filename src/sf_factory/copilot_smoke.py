@@ -41,13 +41,13 @@ async def run_smoke_test() -> int:
         print("Copilot did not return an assistant message.")
         return 1
 
-    print("\\nCopilot response:")
+    print("\nCopilot response:")
     print(response.data.content)
     if not is_expected_response(response.data.content):
-        print(f"\\nUnexpected response; expected {EXPECTED_RESPONSE}.")
+        print(f"\nUnexpected response; expected {EXPECTED_RESPONSE}.")
         return 1
 
-    print("\\nSmoke test completed.")
+    print("\nSmoke test completed.")
     return 0
 
 
@@ -55,5 +55,5 @@ def main() -> int:
     try:
         return asyncio.run(run_smoke_test())
     except KeyboardInterrupt:
-        print("\\nSmoke test interrupted.")
+        print("\nSmoke test interrupted.")
         return 130
