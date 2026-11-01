@@ -31,4 +31,4 @@ class AgentRuntime(Protocol):
         workspace: Path,
         timeout_seconds: int = 600,
     ) -> RuntimeResult:
-        """Execute a task within the supplied workspace."""
+        ...

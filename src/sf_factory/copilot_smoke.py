@@ -21,8 +21,8 @@ def is_expected_response(content: str) -> bool:
 async def run_smoke_test() -> int:
     """Start a tool-restricted Copilot session in an empty temporary directory."""
     try:
-        from copilot import CopilotClient
-        from copilot.session_events import AssistantMessageData
+        from copilot import CopilotClient  # type: ignore[reportMissingImports]
+        from copilot.session_events import AssistantMessageData  # type: ignore[reportMissingImports]
     except ImportError:
         print("Copilot SDK is optional. Install it with: uv sync --extra dev --extra copilot")
         return 1
