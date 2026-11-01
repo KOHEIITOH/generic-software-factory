@@ -3,6 +3,7 @@ from pathlib import Path
 from sf_factory.factory import Factory
 from sf_factory.runtime import RuntimeResult
 
+
 def test_task_persists_across_instances(tmp_path: Path) -> None:
     task_id = Factory(tmp_path).create_task("Explain this project")
     assert Factory(tmp_path).show_task(task_id)["task"]["prompt"] == "Explain this project"
