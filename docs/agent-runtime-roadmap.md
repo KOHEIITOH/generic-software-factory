@@ -11,8 +11,10 @@
 | OpenAI Codex CLI | Agent Runtime | 最初の実装・ローカル実証対象 | 初期Adapter |
 | Claude Code | Agent Runtime | 次のRuntime候補 | Planned |
 | GitHub Copilot | Agent Runtime | 既存SDK smoke testを共通契約へ接続 | Planned |
-| Gemini CLI | Agent Runtime | 次段階で追加 | Planned |\n| Grok Build (xAI) | Agent Runtime | headless CLI / ACP経由で接続 | Planned |
-| AWS Bedrock | Model Provider | Custom Agentからモデル推論を利用する場合に追加 | Planned |\n| xAI API (Grok models) | Model Provider | Custom AgentからGrokモデルを直接利用する場合に追加 | Planned |
+| Gemini CLI | Agent Runtime | 次段階で追加 | Planned |
+| Grok Build (xAI) | Agent Runtime | headless CLI / ACP経由で接続 | Planned |
+| AWS Bedrock | Model Provider | Custom Agentからモデル推論を利用する場合に追加 | Planned |
+| xAI API (Grok models) | Model Provider | Custom AgentからGrokモデルを直接利用する場合に追加 | Planned |
 
 ## 役割を分ける
 
@@ -40,7 +42,8 @@ BedrockはCodex / Claude Code等と同じ種類のAgent Runtimeではない。�
 4. Claude Code Adapter
 5. Copilot Adapterの共通契約への接続
 6. Gemini CLI Adapter
-7. Grok Build Adapter（headless CLI / ACPの実行・権限境界を検証）\n8. AWS Bedrock / xAI API Model Provider（Custom Agentから直接推論を利用する必要が出た段階）
+7. Grok Build Adapter（headless CLI / ACPの実行・権限境界を検証）
+8. AWS Bedrock / xAI API Model Provider（Custom Agentから直接推論を利用する必要が出た段階）
 
 ## 初期契約
 

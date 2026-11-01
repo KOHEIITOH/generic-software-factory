@@ -66,7 +66,8 @@ CLI → Task → Validate → Load Harness / Project Context → Plan → Implem
 - Agent Swarmや複数Agent同時協調はMVP対象外。
 - すべてのRuntimeが同じcapabilityを持つ前提にしない。
 - Agent Runtimeが内包するモデル接続をFactory側で無理に置き換えない。
-- BedrockやxAI APIをCoding Agent Runtimeと同じ種類のAdapterにしない。\n- Grok BuildはAgent Runtimeとして扱い、GrokモデルAPIとは区別する。
+- BedrockやxAI APIをCoding Agent Runtimeと同じ種類のAdapterにしない。
+- Grok BuildはAgent Runtimeとして扱い、GrokモデルAPIとは区別する。
 - 新しい抽象化は、2つ目の実装や具体的な利用要件が現れたときに追加する。
 
 ## 5. MVPの受け入れ条件
