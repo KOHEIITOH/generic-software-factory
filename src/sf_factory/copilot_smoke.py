@@ -5,9 +5,6 @@ from __future__ import annotations
 import asyncio
 import tempfile
 
-from copilot import CopilotClient
-from copilot.session_events import AssistantMessageData
-
 EXPECTED_RESPONSE = "FACTORY_SMOKE_OK"
 
 PROMPT = (
@@ -23,6 +20,13 @@ def is_expected_response(content: str) -> bool:
 
 async def run_smoke_test() -> int:
     """Start a tool-restricted Copilot session in an empty temporary directory."""
+    try:
+        from copilot import CopilotClient
+        from copilot.session_events import AssistantMessageData
+    except ImportError:
+        print("Copilot SDK is optional. Install it with: uv sync --extra dev --extra copilot")
+        return 1
+
     print("Starting GitHub Copilot SDK...")
     print("The first run may download and verify the Copilot runtime.")
 

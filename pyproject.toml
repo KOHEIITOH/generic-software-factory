@@ -9,11 +9,12 @@ description = "AI-native software development factory"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Proprietary" }
-dependencies = [
-  "github-copilot-sdk",
-]
+dependencies = []
 
 [project.optional-dependencies]
+copilot = [
+  "github-copilot-sdk",
+]
 dev = [
   "pip-audit>=2.9",
   "pyright>=1.1",
