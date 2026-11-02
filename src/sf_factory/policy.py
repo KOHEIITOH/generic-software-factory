@@ -58,12 +58,16 @@ class ExecutionPolicy:
             if not self.allow_workspace_write:
                 return PolicyResult(PolicyDecision.DENY, "workspace write disabled by policy")
             if not request.approved:
-                return PolicyResult(PolicyDecision.REQUIRE_APPROVAL, "workspace write requires approval")
+                return PolicyResult(
+                    PolicyDecision.REQUIRE_APPROVAL, "workspace write requires approval"
+                )
             return PolicyResult(PolicyDecision.ALLOW, "approved workspace write")
         if request.capability is Capability.EXTERNAL_ACTION:
             if not self.allow_external_actions:
                 return PolicyResult(PolicyDecision.DENY, "external actions disabled by policy")
             if not request.approved:
-                return PolicyResult(PolicyDecision.REQUIRE_APPROVAL, "external action requires approval")
+                return PolicyResult(
+                    PolicyDecision.REQUIRE_APPROVAL, "external action requires approval"
+                )
             return PolicyResult(PolicyDecision.ALLOW, "approved external action")
         return PolicyResult(PolicyDecision.DENY, "unknown capability")
