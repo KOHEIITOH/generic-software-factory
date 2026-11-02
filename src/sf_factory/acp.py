@@ -56,12 +56,15 @@ class AcpRuntime:
         except OSError:
             return self._failed("Unable to start ACP agent")
         events: queue.Queue[str | None] = queue.Queue()
-        assert process.stdout is not None
-        assert process.stdin is not None
+        stdout = process.stdout
+        stdin = process.stdin
+        if stdout is None or stdin is None:
+            process.kill()
+            return self._failed("ACP stdio pipes unavailable")
 
         def reader() -> None:
             try:
-                for line in process.stdout:
+                for line in stdout:
                     events.put(line)
             finally:
                 events.put(None)
@@ -78,8 +81,8 @@ class AcpRuntime:
                     "jsonrpc": "2.0", "id": current_id,
                     "method": method, "params": params,
                 }
-                process.stdin.write(json.dumps(message) + "\n")
-                process.stdin.flush()
+                stdin.write(json.dumps(message) + "\n")
+                stdin.flush()
                 while True:
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
@@ -107,8 +110,8 @@ class AcpRuntime:
                                 "jsonrpc": "2.0", "id": response["id"],
                                 "error": {"code": -32601, "message": "Denied by Factory"},
                             }
-                            process.stdin.write(json.dumps(denied) + "\n")
-                            process.stdin.flush()
+                            stdin.write(json.dumps(denied) + "\n")
+                            stdin.flush()
                         continue
                     if response.get("id") != current_id:
                         raise RuntimeError("Unexpected ACP response ID")
