@@ -1,11 +1,11 @@
 """Provider-neutral, read-only workflow runner with injected runtime adapters."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
-from sf_factory.policy import Capability, ExecutionPolicy
+from sf_factory.policy import Capability, ExecutionPolicy, ExecutionRequest
 from sf_factory.runtime import AgentRuntime, RuntimeResult
 from sf_factory.workflow import StepState, WorkflowDefinition, evaluate_workflow
 
@@ -37,8 +37,8 @@ def run_workflow(
 
     This is an in-process MVP. The caller must provide a sandboxed adapter.
     """
-    if timeout_seconds < 1:
-        raise ValueError("timeout_seconds must be positive")
+    if timeout_seconds < 1 or timeout_seconds > (policy.max_timeout_seconds if policy is not None else ExecutionPolicy().max_timeout_seconds):
+        raise ValueError("timeout_seconds outside policy limits")
     workflow.validate()
     policy = policy if policy is not None else ExecutionPolicy()
     completed: set[str] = set()
@@ -55,6 +55,12 @@ def run_workflow(
             return WorkflowRun(tuple(records), False)
         step_id = ready[0].id
         step = next(item for item in workflow.steps if item.id == step_id)
+        decision = policy.evaluate(
+            ExecutionRequest(capability=step.capability, timeout_seconds=timeout_seconds)
+        )
+        if not decision.allowed:
+            records.append(StepRun(step_id, "blocked", reason=decision.reason))
+            return WorkflowRun(tuple(records), False)
         if step.capability is not Capability.READ_ONLY:
             records.append(StepRun(step_id, "blocked", reason="write execution is not supported"))
             return WorkflowRun(tuple(records), False)
