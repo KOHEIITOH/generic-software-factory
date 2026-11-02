@@ -78,7 +78,9 @@ def run_improvement_loop(
         elapsed = clock() - started
         remaining = limits.timeout_seconds - elapsed
         if remaining <= 0:
-            return LoopResult(LoopStatus.TIMED_OUT, tuple(attempts), last_output, "time budget exhausted")
+            return LoopResult(
+                LoopStatus.TIMED_OUT, tuple(attempts), last_output, "time budget exhausted"
+            )
         decision = policy.evaluate(
             ExecutionRequest(
                 capability=capability,
