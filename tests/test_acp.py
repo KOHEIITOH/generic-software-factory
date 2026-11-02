@@ -3,7 +3,6 @@ from pathlib import Path
 
 from sf_factory.acp import AcpCommand, AcpRuntime
 
-
 FAKE_AGENT = """
 import json, sys
 for line in sys.stdin:
