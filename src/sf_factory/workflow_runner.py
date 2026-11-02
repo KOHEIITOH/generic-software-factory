@@ -37,10 +37,10 @@ def run_workflow(
 
     This is an in-process MVP. The caller must provide a sandboxed adapter.
     """
-    if timeout_seconds < 1 or timeout_seconds > (policy.max_timeout_seconds if policy is not None else ExecutionPolicy().max_timeout_seconds):
+    policy = policy if policy is not None else ExecutionPolicy()
+    if not 1 <= timeout_seconds <= policy.max_timeout_seconds:
         raise ValueError("timeout_seconds outside policy limits")
     workflow.validate()
-    policy = policy if policy is not None else ExecutionPolicy()
     completed: set[str] = set()
     records: list[StepRun] = []
     while len(completed) < len(workflow.steps):
