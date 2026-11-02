@@ -13,6 +13,7 @@ Factory CoreはAI製品名を知らず、**1つのAgentRuntime契約**を通し�
 - Registryは**接続先の選択機構**であり、通信プロトコルの自動変換ではない
 
 ```python
+from pathlib import Path
 from sf_factory.agent_registry import AgentRuntimeRegistry
 from sf_factory.factory import Factory
 
@@ -21,7 +22,7 @@ registry.register("my-agent", MyAgentRuntime)  # AgentRuntime契約を満たす�
 factory = Factory(Path(".sf-factory"), runtime_registry=registry)
 ```
 
-上の例では `MyAgentRuntime` と `Path` のimport / 実装を利用者側で用意します。CLIから設定ファイルを読み込んで任意のCustom Agentを登録する機能はまだありません。
+上の例では `MyAgentRuntime` の実装・importを利用者側で用意します。CLIから設定ファイルを読み込んで任意のCustom Agentを登録する機能はまだありません。
 
 ## 次の段階
 
