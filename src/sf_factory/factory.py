@@ -9,6 +9,7 @@ from pathlib import Path
 from sf_factory.codex_cli import CodexCliRuntime
 from sf_factory.copilot_sdk import CopilotSdkRuntime
 from sf_factory.grok_cli import GrokBuildCliRuntime
+from sf_factory.policy import Capability, ExecutionPolicy, ExecutionRequest
 
 
 def _now() -> str:
@@ -75,8 +76,11 @@ class Factory:
     def run_task(self, task_id: str, runtime_name: str, timeout_seconds: int = 120) -> dict:
         if runtime_name not in ("codex", "grok", "copilot"):
             raise ValueError("unsupported runtime")
-        if timeout_seconds < 1:
-            raise ValueError("timeout must be positive")
+        policy_result = ExecutionPolicy().evaluate(
+            ExecutionRequest(capability=Capability.READ_ONLY, timeout_seconds=timeout_seconds)
+        )
+        if not policy_result.allowed:
+            raise ValueError(f"execution denied by policy: {policy_result.reason}")
         with self._connect() as db:
             task = db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
         if task is None:
