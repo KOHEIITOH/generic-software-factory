@@ -20,7 +20,8 @@ def test_side_effects_denied_by_default_even_when_approved() -> None:
 
 def test_opted_in_side_effect_requires_approval() -> None:
     policy = ExecutionPolicy(allow_workspace_write=True)
-    assert policy.evaluate(ExecutionRequest(Capability.WORKSPACE_WRITE)).decision is PolicyDecision.REQUIRE_APPROVAL
+    result = policy.evaluate(ExecutionRequest(Capability.WORKSPACE_WRITE))
+    assert result.decision is PolicyDecision.REQUIRE_APPROVAL
     assert policy.evaluate(ExecutionRequest(Capability.WORKSPACE_WRITE, approved=True)).allowed
 
 
