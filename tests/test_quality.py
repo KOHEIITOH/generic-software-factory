@@ -62,3 +62,8 @@ def test_gate_order_is_configuration_order() -> None:
         (QualityEvidence("tests", True), QualityEvidence("lint", False)),
     )
     assert [item.id for item in report.gates] == ["lint", "tests"]
+
+
+def test_no_required_gates_is_rejected() -> None:
+    with pytest.raises(ValueError, match="at least one required"):
+        evaluate_quality((QualityGate("docs", required=False),), ())
