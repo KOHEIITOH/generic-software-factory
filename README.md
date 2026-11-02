@@ -69,7 +69,9 @@ uv run sf doctor
 
 ### 3. 任意：AI Runtime接続テスト
 
-利用するRuntimeだけを[公式の導入手順](https://developers.openai.com/codex/cli/)でインストール・認証してください。Codex CLIを利用する場合:
+**接続候補を網羅した一覧（実装済み・未実装・Model Providerの区別、公式リンク、認証方法）は[オンボーディングのAI接続ガイド](ONBOARDING.md#4-接続するaiを選ぶ任意)を参照してください。**
+
+利用するRuntimeだけを公式手順でインストール・認証してください。[Codex CLI](https://developers.openai.com/codex/cli/)を利用する場合:
 
 ```text
 codex login
