@@ -15,7 +15,9 @@ def _now() -> str:
 
 class Factory:
     def __init__(self, root: Path, *, runtime_registry: AgentRuntimeRegistry | None = None):
-        self.runtime_registry = runtime_registry if runtime_registry is not None else default_runtime_registry()
+        self.runtime_registry = (
+            runtime_registry if runtime_registry is not None else default_runtime_registry()
+        )
         self.root = root.expanduser().resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self.workspaces = self.root / "workspaces"
