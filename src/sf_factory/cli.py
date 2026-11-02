@@ -1,9 +1,11 @@
 """Command-line entry point for Generic Software Factory."""
+
 from __future__ import annotations
 
 import argparse
 import json
 import sys
+from pathlib import Path
 
 from sf_factory.doctor import run_doctor
 
@@ -16,6 +18,14 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("copilot-smoke", help="Copilot SDK test")
     sub.add_parser("grok-smoke", help="read-only Grok test")
     sub.add_parser("dev-smoke", help="isolated fixture code-editing smoke test")
+    analyze = sub.add_parser("analyze", help="analyze a local Git repository read-only")
+    analyze.add_argument("repository", type=Path, help="path to the local repository root")
+    analyze.add_argument(
+        "--confirm-send",
+        action="store_true",
+        help="confirm that the selected repository text may be sent to GitHub Copilot",
+    )
+    analyze.add_argument("--timeout", type=int, default=120)
     task = sub.add_parser("task", help="manage tasks")
     task_sub = task.add_subparsers(dest="task_command", required=True)
     create = task_sub.add_parser("create")
@@ -32,25 +42,60 @@ def build_parser() -> argparse.ArgumentParser:
     run_show.add_argument("run_id")
     return parser
 
+
 def main() -> int:
     args = build_parser().parse_args()
     if args.command == "doctor":
         return run_doctor()
     if args.command == "codex-smoke":
         from sf_factory.codex_smoke import run_smoke_test
+
         return run_smoke_test()
     if args.command == "copilot-smoke":
         from sf_factory.copilot_smoke import main as smoke_main
+
         return smoke_main()
     if args.command == "grok-smoke":
         from sf_factory.grok_smoke import run_smoke_test
+
         return run_smoke_test()
     if args.command == "dev-smoke":
         from sf_factory.dev_smoke import run_dev_smoke
 
         return run_dev_smoke()
+    if args.command == "analyze":
+        from sf_factory.repo_analysis import analyze_repository
+
+        try:
+            analysis = analyze_repository(
+                args.repository,
+                timeout_seconds=args.timeout,
+                confirm_send=args.confirm_send,
+            )
+        except (OSError, ValueError) as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 2
+        print(
+            json.dumps(
+                {
+                    "files_included": analysis.files_included,
+                    "exclusions": analysis.exclusions,
+                    "limits_reached": analysis.limits_reached,
+                    "bytes_included": analysis.bytes_included,
+                },
+                indent=2,
+            )
+        )
+        result = analysis.runtime_result
+        if result.status != "succeeded":
+            message = result.error_message or "Copilot analysis failed."
+            print(f"Analysis failed: {message}", file=sys.stderr)
+            return 1
+        print("\nAnalysis:\n" + result.output)
+        return 0
     from sf_factory.factory import Factory
-    factory = Factory(__import__("pathlib").Path(".sf-factory"))
+
+    factory = Factory(Path(".sf-factory"))
     try:
         if args.command == "task":
             if args.task_command == "create":
@@ -67,6 +112,7 @@ def main() -> int:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -22,3 +22,9 @@ Software Factoryはコードを実行し、Agentに操作を委任します。�
 ## 自己改善の境界
 
 Factoryは実行結果を分析し、prompt、Workflow、Adapter、Coreの改善を提案できます。セキュリティPolicy、権限、Coreの実行ロジックへの変更を、黙って適用してはいけません。変更にはレビュー、テスト、バージョン付きリリースが必要です。
+
+## ローカルリポジトリの読み取り専用解析
+
+`sf analyze` は利用者が明示したGitリポジトリrootだけを走査し、対象ファイルを制限したsnapshotとしてCopilotへ送信します。送信前に `--confirm-send` が必要です。隠し・生成物directory、symlink、unsupported / binary file、名前から機密の可能性があるfileを除外し、件数・深さ・byte数に上限を設けます。実際に含めたfile、除外数、上限到達は解析結果に表示し、FactoryのTask/Run/Audit DBにはソース内容を保存しません。
+
+ファイル名の除外はsecret検出ではなく、コードや設定内の秘密情報を完全には防げません。利用者は送信先の利用規程を確認してください。Copilot SDKのtool allowlistは空ですが、OS-level process isolationではありません。この機能はソース編集、shell実行、PR作成、隔離保証を提供しません。
