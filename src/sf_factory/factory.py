@@ -6,9 +6,7 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sf_factory.codex_cli import CodexCliRuntime
-from sf_factory.copilot_sdk import CopilotSdkRuntime
-from sf_factory.grok_cli import GrokBuildCliRuntime
+from sf_factory.agent_registry import AgentRuntimeRegistry, default_runtime_registry
 from sf_factory.policy import Capability, ExecutionPolicy, ExecutionRequest
 
 
@@ -16,7 +14,10 @@ def _now() -> str:
     return datetime.now(UTC).isoformat()
 
 class Factory:
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, *, runtime_registry: AgentRuntimeRegistry | None = None):
+        self.runtime_registry = (
+            runtime_registry if runtime_registry is not None else default_runtime_registry()
+        )
         self.root = root.expanduser().resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self.workspaces = self.root / "workspaces"
@@ -74,7 +75,7 @@ class Factory:
             return dict(row)
 
     def run_task(self, task_id: str, runtime_name: str, timeout_seconds: int = 120) -> dict:
-        if runtime_name not in ("codex", "grok", "copilot"):
+        if runtime_name not in self.runtime_registry.names():
             raise ValueError("unsupported runtime")
         policy_result = ExecutionPolicy().evaluate(
             ExecutionRequest(capability=Capability.READ_ONLY, timeout_seconds=timeout_seconds)
@@ -96,12 +97,7 @@ class Factory:
             db.execute("INSERT INTO audit(run_id,task_id,event,at) VALUES (?,?,?,?)",
                        (run_id, task_id, "run.started", _now()))
         try:
-            if runtime_name == "codex":
-                runtime = CodexCliRuntime(sandbox="read-only")
-            elif runtime_name == "grok":
-                runtime = GrokBuildCliRuntime()
-            else:
-                runtime = CopilotSdkRuntime()
+            runtime = self.runtime_registry.create(runtime_name)
             result = runtime.execute(prompt=task["prompt"], workspace=workspace,
                                      timeout_seconds=timeout_seconds)
             status = result.status
