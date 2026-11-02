@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from sf_factory.codex_cli import CodexCliRuntime
+from sf_factory.copilot_sdk import CopilotSdkRuntime
 from sf_factory.grok_cli import GrokBuildCliRuntime
 
 
@@ -72,7 +73,7 @@ class Factory:
             return dict(row)
 
     def run_task(self, task_id: str, runtime_name: str, timeout_seconds: int = 120) -> dict:
-        if runtime_name not in ("codex", "grok"):
+        if runtime_name not in ("codex", "grok", "copilot"):
             raise ValueError("unsupported runtime")
         if timeout_seconds < 1:
             raise ValueError("timeout must be positive")
@@ -91,11 +92,12 @@ class Factory:
             db.execute("INSERT INTO audit(run_id,task_id,event,at) VALUES (?,?,?,?)",
                        (run_id, task_id, "run.started", _now()))
         try:
-            runtime = (
-                CodexCliRuntime(sandbox="read-only")
-                if runtime_name == "codex"
-                else GrokBuildCliRuntime()
-            )
+            if runtime_name == "codex":
+                runtime = CodexCliRuntime(sandbox="read-only")
+            elif runtime_name == "grok":
+                runtime = GrokBuildCliRuntime()
+            else:
+                runtime = CopilotSdkRuntime()
             result = runtime.execute(prompt=task["prompt"], workspace=workspace,
                                      timeout_seconds=timeout_seconds)
             status = result.status

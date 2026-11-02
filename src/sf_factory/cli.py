@@ -24,7 +24,7 @@ def build_parser() -> argparse.ArgumentParser:
     show.add_argument("task_id")
     run = task_sub.add_parser("run")
     run.add_argument("task_id")
-    run.add_argument("--runtime", choices=("codex", "grok"), default="codex")
+    run.add_argument("--runtime", choices=("codex", "grok", "copilot"), default="codex")
     run.add_argument("--timeout", type=int, default=120)
     run_group = sub.add_parser("run", help="inspect runs")
     run_sub = run_group.add_subparsers(dest="run_command", required=True)

@@ -6,6 +6,7 @@ Local persistent orchestration. From repository root:
 uv run sf task create "Reply with exactly HELLO"
 uv run sf task show <task-id>
 uv run sf task run <task-id> --runtime codex
+# Optional runtimes: --runtime grok or --runtime copilot
 uv run sf run show <run-id>
 ```
 
@@ -15,7 +16,9 @@ rules if needed. Do not commit its contents.
 
 **Safety boundary:** Codex is read-only. Grok uses the existing adapter's
 read-only tool policy; neither OS-level sandbox isolation nor network isolation
-is guaranteed. Workspaces are empty, not copies of the target repository.
+is guaranteed. Copilot SDK uses the local Copilot CLI authentication and an
+empty tool allowlist, but does not provide equivalent isolation guarantees.
+Workspaces are empty, not copies of the target repository.
 Do not use this MVP to process company source, secrets, or untrusted tasks.
 No repository mutation, PR creation, approval, or autonomous recovery yet.
 A process crash may leave a run marked `running`; future recovery work
