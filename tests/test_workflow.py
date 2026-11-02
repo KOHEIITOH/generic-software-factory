@@ -10,11 +10,15 @@ from sf_factory.workflow import (
 
 
 def test_can_start_from_implementation_without_planning_stage() -> None:
-    workflow = WorkflowDefinition((WorkflowStep("implement"), WorkflowStep("test", depends_on=("implement",))))
+    workflow = WorkflowDefinition((
+        WorkflowStep("implement"),
+        WorkflowStep("test", depends_on=("implement",)),
+    ))
     assert [item.state for item in evaluate_workflow(workflow)] == [
         StepState.READY, StepState.WAITING
     ]
-    assert evaluate_workflow(workflow, completed=frozenset({"implement"}))[1].state is StepState.READY
+    next_steps = evaluate_workflow(workflow, completed=frozenset({"implement"}))
+    assert next_steps[1].state is StepState.READY
 
 
 def test_can_start_from_discovery_and_parallel_steps() -> None:
