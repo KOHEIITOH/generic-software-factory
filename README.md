@@ -26,7 +26,7 @@ Generic Software Factoryは、ソフトウェア開発の計画・実行・品�
 入口（Inbound Interface）とAIへの委譲（Outbound Agent Runtime）は分離します。MCP ServerはAIがFactoryを操作する入口であり、Codex / Claude Code等はFactoryが作業を委譲するRuntimeです。
 
 詳しくは[アーキテクチャ](docs/architecture.md)、[Adapter・Interface契約](docs/adapter-contracts.md)、[Agent対応ロードマップ](docs/agent-runtime-roadmap.md)、[設定](docs/configuration.md)、[セキュリティ](docs/security.md)、[MVP計画](docs/mvp-plan.md)を参照してください。
-初めての方向けに[利用ガイド (HTML)](docs/user-guide.html)も用意しています。
+初めての方向けに[利用ガイド (HTML)](USER_GUIDE.html) と [初回オンボーディング](ONBOARDING.md)も用意しています。
 [ローカルリポジトリの読み取り専用解析](docs/local-repository-analysis.md)も利用できます。
 
 ## 現在の実装方針
@@ -39,46 +39,56 @@ Generic Software Factoryは、ソフトウェア開発の計画・実行・品�
 - 将来のWeb UI: TypeScript（React / Next.js候補）
 - 初期検証: 一時ディレクトリ内のread-only / サンプル限定code-edit smoke test。会社のソースコードは使用しない。
 
-## Quickstart — macOS
+## Quickstart — macOS / Windows / Linux
 
-Python 3.13、uv、Git、Codex CLIを用意し、Codexにログインしたうえで:
+必要なものは **Git、uv、Python 3.11以上** です（以下は3.13を使用）。最初の確認はAIアカウント不要の `sf --help` とPythonテストから始められます。Codex / Grok / Copilotの接続テストには、各ツールの別途インストールと認証が必要です。
 
-```bash
+### 1. ツールの準備
+
+| OS | Git / uv の導入 |
+| --- | --- |
+| macOS | Homebrewがある場合: `brew install git uv` |
+| Windows | PowerShell: `winget install --id Git.Git -e`、`winget install --id astral-sh.uv -e` |
+| Linux | ディストリビューションのパッケージマネージャーでGitを導入。uvは[公式インストール手順](https://docs.astral.sh/uv/getting-started/installation/)を参照 |
+
+Windowsは**PowerShell**、macOS / Linuxは通常のターミナルで実行します。導入後はターミナルを開き直し、`git --version` と `uv --version` を確認してください。Pythonはuvがインストールします。
+
+### 2. 共通セットアップ（3 OS）
+
+```text
 git clone https://github.com/KOHEIITOH/generic-software-factory.git
 cd generic-software-factory
 uv python install 3.13
 uv sync --python 3.13 --extra dev
-codex login
+uv run sf --help
+uv run pytest
 uv run sf doctor
+```
+
+上記はターミナルに**1行ずつ**入力します。WindowsでもPowerShellで同じコマンドを使用できます。`doctor` は追加のAgent CLIが未導入の場合、その不足を報告することがあります。
+
+### 3. 任意：AI Runtime接続テスト
+
+**接続候補を網羅した一覧（実装済み・未実装・Model Providerの区別、公式リンク、認証方法）は[オンボーディングのAI接続ガイド](ONBOARDING.md#4-接続するaiを選ぶ任意)を参照してください。**
+
+利用するRuntimeだけを公式手順でインストール・認証してください。[Codex CLI](https://developers.openai.com/codex/cli/)を利用する場合:
+
+```text
+codex login
 uv run sf codex-smoke
-uv run sf dev-smoke
 ```
 
-Grok Buildを追加で試す場合は、[公式CLIガイド](https://docs.x.ai/build/cli)に従ってインストール・ログインします:
+Grok Buildは[公式CLIガイド](https://docs.x.ai/build/cli)、CopilotはGitHub Copilot CLIの公式ガイドに従って導入・認証してください。Copilot SDKを利用する場合:
 
-```bash
-curl -fsSL https://x.ai/cli/install.sh | bash
-grok login
-grok --version
-uv run sf grok-smoke
-```
-
-Copilot SDK smoke testも試す場合は、追加依存をインストールします:
-
-```bash
+```text
 uv sync --python 3.13 --extra dev --extra copilot
 copilot login
 uv run sf copilot-smoke
 ```
 
-CopilotをFactory Taskから使う場合は、Taskを作成して`--runtime copilot`を指定します:
+`uv run sf task create "Explain this project"` でTaskを作成し、返されたIDを `uv run sf task run <task-id> --runtime copilot` に指定できます（Copilotの準備が必要）。初回は機密情報や業務コードを使わないでください。
 
-```bash
-uv run sf task create "Explain this project"
-uv run sf task run <task-id> --runtime copilot
-```
-
-現時点ではFactoryの空workspaceに対して実行し、対象リポジトリの取り込み・編集は行いません。SDKセッションでは利用可能ツールを空にしますが、OSレベルの隔離などCodex/Grokと同等の安全性は保証しません。Copilotの認証情報はローカル認証に委ね、Factory設定やDBには保存しません。詳細は[Mac向けローカルSmoke Test](docs/local-smoke-test.md)を参照してください。
+**対応状況:** Pythonベースのセットアップ手順を3 OS向けに記載していますが、Windows / Linuxでの全Runtime・全機能の実機動作保証ではありません。特にOS依存のCLI、サンドボックス機能、ファイル操作は環境ごとの検証が必要です。まず[オンボーディング](ONBOARDING.md)を確認してください。
 
 ## 現在のステータス
 
