@@ -11,7 +11,7 @@
 | OpenAI Codex CLI | Agent Runtime | 最初の実装・ローカル実証対象 | Read-only Adapter |
 | Grok Build CLI (xAI) | Agent Runtime | headless CLI経由。ACPは必要になった段階で検討 | Read-only Adapter |
 | Claude Code | Agent Runtime | 次のRuntime候補 | Planned |
-| GitHub Copilot | Agent Runtime | 既存SDK smoke testを共通契約へ接続 | Planned |
+| GitHub Copilot SDK | Agent Runtime | 共通契約へ接続。空workspace・ツール無効で実行 | SDK Adapter |
 | Gemini CLI | Agent Runtime | 次段階で追加 | Planned |
 | AWS Bedrock | Model Provider | Custom Agentからモデル推論を利用する場合に追加 | Planned |
 | xAI API (Grok models) | Model Provider | Custom AgentからGrokモデルを直接利用する場合に追加 | Planned |
@@ -41,7 +41,7 @@ BedrockはCodex / Claude Code等と同じ種類のAgent Runtimeではない。�
 3. Grok Build CLI Adapterとread-only smoke test
 4. 実タスク実行に向けたworkspace / sandbox / approval境界の検証
 5. Claude Code Adapter
-6. Copilot Adapterの共通契約への接続
+6. Copilot SDK Adapterの共通契約への接続
 7. Gemini CLI Adapter
 8. AWS Bedrock / xAI API Model Provider（Custom Agentから直接推論を利用する必要が出た段階）
 
@@ -49,4 +49,4 @@ BedrockはCodex / Claude Code等と同じ種類のAgent Runtimeではない。�
 
 Python実装では、最初は同期的な execute(prompt, workspace, timeout) と正規化された RuntimeResult のみを持つ。Coreは製品固有のイベント形式、SDKオブジェクト、CLI引数を知らない。
 
-CodexとGrok Buildの初期Adapterで保証するのは、各CLIをread-only設定で起動し、実行結果・終了コード・session IDを返せることまで。Factory Workflow、永続化、独立レビュー、隔離実行基盤は別の実装段階である。
+CodexとGrok BuildのAdapterで保証するのは、各CLIを既定のread-only設定で起動し、実行結果・終了コード・session IDを返せることまで。Copilot SDK AdapterはローカルCopilot認証を利用し、空workspaceで利用可能ツールを無効にして応答を得る。これはCodex/Grokと同等のsandboxやOSレベルの隔離を保証せず、現在のFactory run workspaceにも対象リポジトリは取り込まれない。Factory Workflow、永続化、独立レビュー、隔離実行基盤は別の実装段階である。

@@ -1,6 +1,6 @@
 # Local Smoke Test — macOS / Python
 
-This guide verifies that the local Factory package can call the installed Agent Runtime CLIs. Both smoke tests use empty temporary directories and read-only tool access. They do not connect to a company repository, edit files, or create a PR.
+This guide verifies that the local Factory package can call the installed Agent Runtimes. Smoke tests use empty temporary directories and restricted or disabled tool access. They do not connect to a company repository, edit files, or create a PR.
 
 ## 0. Before starting
 
@@ -94,7 +94,7 @@ The adapter uses Grok's headless JSON output and an explicit allowlist containin
 
 ## 6. Optional: run the Copilot SDK smoke test
 
-The Copilot SDK is not required for the default setup. To install and use it:
+The Copilot SDK is not required for the default setup. It uses the local Copilot CLI authentication; credentials are not stored in Factory configuration or its database. To install and use it:
 
 ```bash
 uv sync --python 3.13 --extra dev --extra copilot
@@ -103,6 +103,15 @@ uv run sf copilot-smoke
 ```
 
 Use an organization-approved GitHub Copilot account and confirm that SDK / CLI use is permitted.
+
+The Factory Runtime Adapter can also run a persisted Task with `--runtime copilot`:
+
+```bash
+uv run sf task create "Explain this project"
+uv run sf task run <task-id> --runtime copilot
+```
+
+This currently runs against the Factory-created empty workspace, not a cloned or imported repository. The SDK session is configured with an empty tool allowlist and file-change tracking disabled. This does not establish OS-level process isolation or prove safety equivalent to Codex or Grok; repository intake, editing, and workflow execution are not included.
 
 ## 7. Run local quality checks
 

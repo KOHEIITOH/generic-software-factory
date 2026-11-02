@@ -32,8 +32,8 @@ Generic Software Factoryは、ソフトウェア開発の計画・実行・品�
 
 - Factory Core / Local CLI: Python 3.11+（初期開発はPython 3.13）
 - Dependency / quality tools: uv、pytest、Ruff、Pyright、pip-audit
-- Agent Runtime Adapter: Codex CLI、Grok Build CLI（read-only smoke test対応。Codexは隔離されたサンプルに限りworkspace-write smoke testにも対応）
-- 追加予定: Claude Code、GitHub Copilot、Gemini CLI
+- Agent Runtime Adapter: Codex CLI、Grok Build CLI、GitHub Copilot SDK（Task/Runから選択可能。Copilotは空workspace・tools無効の現段階に限る）
+- 追加予定: Claude Code、Gemini CLI
 - Model Provider: AWS Bedrock、xAI API等を将来の独立した接続先として追加
 - 将来のWeb UI: TypeScript（React / Next.js候補）
 - 初期検証: 一時ディレクトリ内のread-only / サンプル限定code-edit smoke test。会社のソースコードは使用しない。
@@ -70,11 +70,18 @@ copilot login
 uv run sf copilot-smoke
 ```
 
-詳細は[Mac向けローカルSmoke Test](docs/local-smoke-test.md)を参照してください。
+CopilotをFactory Taskから使う場合は、Taskを作成して`--runtime copilot`を指定します:
+
+```bash
+uv run sf task create "Explain this project"
+uv run sf task run <task-id> --runtime copilot
+```
+
+現時点ではFactoryの空workspaceに対して実行し、対象リポジトリの取り込み・編集は行いません。SDKセッションでは利用可能ツールを空にしますが、OSレベルの隔離などCodex/Grokと同等の安全性は保証しません。Copilotの認証情報はローカル認証に委ね、Factory設定やDBには保存しません。詳細は[Mac向けローカルSmoke Test](docs/local-smoke-test.md)を参照してください。
 
 ## 現在のステータス
 
-**実験的MVP（PR #8まで）** — ローカルSQLiteによるTask/Run/Audit記録、Codex/Grok Runtime Adapter、read-only smoke test、Codexによるサンプル限定のコード編集と単体テストを実装しています。`uv run sf dev-smoke` は使い捨て一時ディレクトリ内の同梱サンプルだけを編集します。任意のGitHubリポジトリの取得・編集、独立レビュー、PR自動作成、MCP Server、Web UIは未実装です。OSレベルの安全な隔離環境を保証するものではありません。
+**実験的MVP（PR #8まで）** — ローカルSQLiteによるTask/Run/Audit記録、Codex/Grok/Copilot Runtime Adapter、read-only smoke test、Codexによるサンプル限定のコード編集と単体テストを実装しています。Copilot SDK Adapterはローカル認証を使い、空workspaceで利用可能ツールを無効にして実行します。`uv run sf dev-smoke` は使い捨て一時ディレクトリ内の同梱サンプルだけを編集します。任意のGitHubリポジトリの取得・編集、独立レビュー、PR自動作成、MCP Server、Web UIは未実装です。OSレベルの安全な隔離環境を保証するものではありません。
 
 ## セキュリティの基準
 
@@ -106,4 +113,3 @@ Core契約、セキュリティPolicy、Workflowの意味を変更する場合�
 ## 公開と利用条件
 
 このリポジトリはソースコードの閲覧・評価を目的として公開する予定です。**公開はオープンソースライセンスの付与を意味しません。** 著作権者から別途許可を得ない限り、GitHubの利用規約や適用法令で認められる範囲を超える複製・改変・再配布等の権利は付与されません。社内利用や業務コードへの適用には、所属組織の承認とAIサービス利用規程の確認が必要です。
-

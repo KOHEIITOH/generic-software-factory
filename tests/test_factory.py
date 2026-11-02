@@ -22,6 +22,29 @@ def test_run_isolated_and_persisted(tmp_path: Path, monkeypatch) -> None:
     assert Factory(tmp_path).show_run(run["id"])["output"] == "OK"
     assert len(factory.show_task(task_id)["runs"]) == 1
 
+def test_copilot_runtime_can_run_and_persist_result(tmp_path: Path, monkeypatch) -> None:
+    def fake_execute(self, *, prompt, workspace, timeout_seconds=120):
+        assert workspace.is_dir()
+        assert prompt == "hello"
+        return RuntimeResult(
+            runtime="copilot",
+            status="succeeded",
+            output="Copilot response",
+            exit_code=0,
+            session_id="copilot-session",
+        )
+
+    monkeypatch.setattr("sf_factory.copilot_sdk.CopilotSdkRuntime.execute", fake_execute)
+    factory = Factory(tmp_path)
+    task_id = factory.create_task("hello")
+
+    run = factory.run_task(task_id, "copilot")
+
+    assert run["runtime"] == "copilot"
+    assert run["status"] == "succeeded"
+    assert run["output"] == "Copilot response"
+    assert Factory(tmp_path).show_run(run["id"])["output"] == "Copilot response"
+
 def test_unknown_task_does_not_create_workspace(tmp_path: Path) -> None:
     factory = Factory(tmp_path)
     try:
