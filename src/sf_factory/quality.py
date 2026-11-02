@@ -55,6 +55,8 @@ def evaluate_quality(
     evidence: tuple[QualityEvidence, ...],
 ) -> QualityReport:
     """Match evidence by check ID; required checks without evidence fail closed."""
+    if not any(gate.required for gate in gates):
+        raise ValueError("at least one required quality gate must be configured")
     ids = [gate.id for gate in gates]
     if any(not item.strip() for item in ids) or len(ids) != len(set(ids)):
         raise ValueError("gate IDs must be non-empty and unique")
