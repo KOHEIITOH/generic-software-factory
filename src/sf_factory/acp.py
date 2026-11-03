@@ -72,6 +72,7 @@ class AcpRuntime:
         threading.Thread(target=reader, daemon=True).start()
         request_id = 0
         output: list[str] = []
+        stage = "initialize"
         try:
             def call(method: str, params: dict) -> dict:
                 nonlocal request_id
@@ -127,12 +128,14 @@ class AcpRuntime:
                 "clientCapabilities": {"fs": {"readTextFile": False, "writeTextFile": False}},
                 "clientInfo": {"name": "generic-software-factory", "version": "0.1.0"},
             })
+            stage = "session/new"
             session = call("session/new", {
                 "cwd": str(workspace), "mcpServers": [],
             })
             session_id = session.get("sessionId")
             if not isinstance(session_id, str) or not session_id:
                 raise RuntimeError("ACP session ID missing")
+            stage = "session/prompt"
             response = call("session/prompt", {
                 "sessionId": session_id,
                 "prompt": [{"type": "text", "text": prompt}],
@@ -149,8 +152,10 @@ class AcpRuntime:
                 runtime=self.name, status="timed_out", output="",
                 exit_code=None, error_kind="timeout", error_message="ACP timed out",
             )
-        except (OSError, ValueError, RuntimeError, json.JSONDecodeError):
-            return self._failed("ACP protocol or execution failed")
+        except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
+            # Report only the failure category and stage; never expose agent data,
+            # remote error messages, file paths, or authentication details.
+            return self._failed(f"ACP {stage} failed ({type(exc).__name__})")
         finally:
             process.kill()
             try:
