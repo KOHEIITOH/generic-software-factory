@@ -26,6 +26,14 @@ class AcpCommand:
             raise ValueError("ACP command must be a non-empty argv sequence")
 
 
+class AcpRemoteError(RuntimeError):
+    """Redacted JSON-RPC failure with only a numeric error code."""
+
+    def __init__(self, code: int | None) -> None:
+        self.code = code
+        super().__init__("ACP agent returned a JSON-RPC error")
+
+
 class AcpRuntime:
     """Run one ACP session via newline-delimited JSON-RPC over stdio."""
 
@@ -117,7 +125,10 @@ class AcpRuntime:
                     if response.get("id") != current_id:
                         raise RuntimeError("Unexpected ACP response ID")
                     if "error" in response:
-                        raise RuntimeError("ACP agent returned an error")
+                        remote_error = response["error"]
+                        code = remote_error.get("code") if isinstance(remote_error, dict) else None
+                        safe_code = code if type(code) is int else None
+                        raise AcpRemoteError(safe_code)
                     result = response.get("result")
                     if not isinstance(result, dict):
                         raise RuntimeError("Malformed ACP response")
@@ -152,6 +163,9 @@ class AcpRuntime:
                 runtime=self.name, status="timed_out", output="",
                 exit_code=None, error_kind="timeout", error_message="ACP timed out",
             )
+        except AcpRemoteError as exc:
+            code = str(exc.code) if exc.code is not None else "unknown"
+            return self._failed(f"ACP {stage} remote JSON-RPC error (code={code})")
         except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
             # Report only the failure category and stage; never expose agent data,
             # remote error messages, file paths, or authentication details.
