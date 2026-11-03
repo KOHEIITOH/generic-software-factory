@@ -57,5 +57,5 @@ for line in sys.stdin:
     runtime = AcpRuntime(AcpCommand((sys.executable, "-u", "-c", agent)))
     result = runtime.execute(prompt="hello", workspace=tmp_path, timeout_seconds=5)
     assert result.status == "failed"
-    assert result.error_message == "ACP initialize failed (RuntimeError)"
+    assert result.error_message == "ACP initialize remote JSON-RPC error (code=-32600)"
     assert "secret" not in result.error_message
