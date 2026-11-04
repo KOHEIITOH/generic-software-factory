@@ -42,7 +42,8 @@ def collect_checks() -> list[Check]:
         Check(
             name="Codex CLI",
             ok=codex_path is not None,
-            detail=codex_path or "not found (required for the initial Runtime)",
+            detail=codex_path or "not found (optional)",
+            required=False,
         ),
         Check(
             name="Grok Build CLI",

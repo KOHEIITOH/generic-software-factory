@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 from sf_factory.cli import build_parser, main
 
 
@@ -95,3 +97,9 @@ def test_task_run_dispatches_to_copilot_runtime(tmp_path, monkeypatch, capsys) -
     assert main() == 0
     assert calls == [("task-id", "copilot", 45)]
     assert '"status": "succeeded"' in capsys.readouterr().out
+
+
+def test_task_run_requires_explicit_runtime() -> None:
+    with pytest.raises(SystemExit) as exc:
+        build_parser().parse_args(["task", "run", "task-id"])
+    assert exc.value.code == 2
