@@ -69,6 +69,8 @@ uv run sf doctor
 
 ### 3. 任意：AI Runtime接続テスト
 
+`uv run sf runtime list` で登録済みRuntimeとローカルの実行前提を一覧できます。認証状態や実際の実行成功は判定しません。
+
 **接続候補を網羅した一覧（実装済み・未実装・Model Providerの区別、公式リンク、認証方法）は[オンボーディングのAI接続ガイド](ONBOARDING.md#4-接続するaiを選ぶ任意)を参照してください。**
 
 利用するRuntimeだけを公式手順でインストール・認証してください。[Codex CLI](https://developers.openai.com/codex/cli/)を利用する場合:

@@ -14,6 +14,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sf", description="Generic Software Factory CLI")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("doctor", help="check local prerequisites")
+    runtime = sub.add_parser("runtime", help="inspect registered runtimes")
+    runtime.add_subparsers(dest="runtime_command", required=True).add_parser("list")
     sub.add_parser("codex-smoke", help="read-only Codex test")
     sub.add_parser("copilot-smoke", help="Copilot SDK test")
     sub.add_parser("grok-smoke", help="read-only Grok test")
@@ -51,6 +53,11 @@ def main() -> int:
     args = build_parser().parse_args()
     if args.command == "doctor":
         return run_doctor()
+    if args.command == "runtime":
+        from sf_factory.runtime_status import list_runtimes
+
+        print(json.dumps(list_runtimes(), indent=2))
+        return 0
     if args.command == "codex-smoke":
         from sf_factory.codex_smoke import run_smoke_test
 
