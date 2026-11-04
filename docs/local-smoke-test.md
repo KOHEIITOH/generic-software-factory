@@ -123,6 +123,10 @@ uv run sf task run <task-id> --runtime copilot
 
 This currently runs against the Factory-created empty workspace, not a cloned or imported repository. The SDK session is configured with an empty tool allowlist and file-change tracking disabled. This does not establish OS-level process isolation or prove safety equivalent to Codex or Grok; repository intake, editing, and workflow execution are not included.
 
+Each Task execution requires an explicit runtime selection, for example
+`uv run sf task run <task-id> --runtime copilot`. Omitting `--runtime` is an
+error; Factory does not automatically select Codex or any other agent.
+
 ## 7. Run local quality checks
 
 ```bash
