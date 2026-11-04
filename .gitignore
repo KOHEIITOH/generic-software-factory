@@ -4,3 +4,7 @@ __pycache__/
 .ruff_cache/
 .venv/
 *.pyc
+
+web/node_modules/
+web/dist/
+web/.vite/
