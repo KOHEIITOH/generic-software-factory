@@ -17,7 +17,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("codex-smoke", help="read-only Codex test")
     sub.add_parser("copilot-smoke", help="Copilot SDK test")
     sub.add_parser("grok-smoke", help="read-only Grok test")
-    sub.add_parser("dev-smoke", help="isolated fixture code-editing smoke test")
+    dev = sub.add_parser("dev-smoke", help="opt-in fixture code-editing smoke test")
+    dev.add_argument("--runtime", required=True, choices=("codex",))
     analyze = sub.add_parser("analyze", help="analyze a local Git repository read-only")
     analyze.add_argument("repository", type=Path, help="path to the local repository root")
     analyze.add_argument(
@@ -63,9 +64,13 @@ def main() -> int:
 
         return run_smoke_test()
     if args.command == "dev-smoke":
+        from sf_factory.codex_cli import CodexCliRuntime
         from sf_factory.dev_smoke import run_dev_smoke
 
-        return run_dev_smoke()
+        # Editing capabilities require explicit per-adapter review. Only Codex
+        # workspace-write has been verified; other adapters are not promoted
+        # from read-only just because they implement AgentRuntime.
+        return run_dev_smoke(runtime=CodexCliRuntime(sandbox="workspace-write"))
     if args.command == "analyze":
         from sf_factory.repo_analysis import analyze_repository
 
