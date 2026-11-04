@@ -41,11 +41,11 @@ grok --version
 grok login
 ```
 
-For Copilot, install the optional SDK dependency, then authenticate with the
-local Copilot CLI:
+For Copilot, install the optional SDK dependency **after cloning the project**
+(see step 6). Install the Copilot CLI using its official instructions, then
+check its version and authenticate:
 
 ```bash
-uv sync --python 3.13 --extra dev --extra copilot
 copilot --version
 copilot login
 ```
@@ -68,7 +68,7 @@ uv run sf doctor
 Git is required for the initial setup. Codex, Grok Build, and Copilot CLI / SDK are optional;
 install and authenticate only the Runtime you intend to use. Docker and GitHub CLI are also optional.
 
-## 4. Run the Codex smoke test
+## 4. Optional: run the Codex smoke test
 
 ```bash
 uv run sf codex-smoke
