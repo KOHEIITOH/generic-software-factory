@@ -1,26 +1,23 @@
 # Software Factory ローカル管理画面
 
-このReact + TypeScript画面はローカルのFastAPIを参照します。GitHub Pages公開は不要です。
+React + TypeScript と FastAPI のローカル管理画面です。GitHub Pagesへの公開は不要です。
 
-## 起動
+## 普段の起動（ワンコマンド）
 
-ターミナル1（リポジトリのルート）:
+初回のみ Python 依存関係をセットアップします。
 
 ```bash
 uv sync --extra web
-uv run --extra web uvicorn sf_factory.web_api:app --host 127.0.0.1 --port 8000
 ```
 
-ターミナル2:
+その後はリポジトリ直下で以下を実行します。
 
 ```bash
-cd web
-npm install
-npm run dev
+uv run sf web
 ```
 
-ブラウザで http://127.0.0.1:5173 を開きます。
+初回起動時だけ Node.js/npm を使ってフロントエンドをインストール・ビルドします。2回目以降はビルド済みファイルをFastAPIから直接配信するため、Node.jsの開発サーバーは不要です。ブラウザは http://127.0.0.1:8000 で開きます。画面を更新したい場合は `uv run sf web --rebuild` を使います。
 
-現段階は読み取り専用です。Runtimeの「登録済み」はローカルインストールや認証の成功を意味しません。タスク実行・マージ機能はまだありません。
+開発中にホットリロードが必要なら従来通りFastAPIと `cd web && npm run dev` を別々に起動できます。
 
-Viteの開発サーバーが `/api` をlocalhost:8000に転送します。両サーバーともローカル専用で起動し、外部公開しないでください。
+現段階は読み取り専用です。Runtimeの「登録済み」はローカルインストールや認証の成功を意味しません。タスク実行・マージ機能はまだありません。サーバーは127.0.0.1のみで起動します。
