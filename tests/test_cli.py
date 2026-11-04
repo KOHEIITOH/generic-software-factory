@@ -1,7 +1,7 @@
 import sys
+from pathlib import Path
 
 import pytest
-from pathlib import Path
 
 from sf_factory.cli import build_parser, main
 
