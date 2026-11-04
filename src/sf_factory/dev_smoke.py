@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from sf_factory.codex_cli import CodexCliRuntime
+from sf_factory.runtime import AgentRuntime
 
 FIXTURE = Path(__file__).resolve().parents[2] / "fixtures" / "calculator"
 PROMPT = (
@@ -28,7 +28,7 @@ def _snapshot(root: Path) -> dict[str, str]:
     }
 
 
-def run_dev_smoke(*, runtime: CodexCliRuntime | None = None) -> int:
+def run_dev_smoke(*, runtime: AgentRuntime) -> int:
     """Copy only our fixture to a temporary workspace and run a bounded edit/test cycle."""
     if not FIXTURE.is_dir():
         print("Bundled calculator fixture missing.")
@@ -37,7 +37,7 @@ def run_dev_smoke(*, runtime: CodexCliRuntime | None = None) -> int:
         workspace = Path(directory)
         shutil.copytree(FIXTURE, workspace, dirs_exist_ok=True)
         before = _snapshot(workspace)
-        adapter = runtime or CodexCliRuntime(sandbox="workspace-write")
+        adapter = runtime
         try:
             result = adapter.execute(prompt=PROMPT, workspace=workspace, timeout_seconds=180)
         except (OSError, ValueError) as exc:

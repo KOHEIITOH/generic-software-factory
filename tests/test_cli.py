@@ -103,3 +103,20 @@ def test_task_run_requires_explicit_runtime() -> None:
     with pytest.raises(SystemExit) as exc:
         build_parser().parse_args(["task", "run", "task-id"])
     assert exc.value.code == 2
+
+
+def test_dev_smoke_requires_explicit_editing_runtime() -> None:
+    with pytest.raises(SystemExit) as exc:
+        build_parser().parse_args(["dev-smoke"])
+    assert exc.value.code == 2
+
+
+def test_dev_smoke_rejects_unverified_editing_runtime() -> None:
+    with pytest.raises(SystemExit) as exc:
+        build_parser().parse_args(["dev-smoke", "--runtime", "copilot"])
+    assert exc.value.code == 2
+
+
+def test_dev_smoke_accepts_reviewed_codex_runtime() -> None:
+    args = build_parser().parse_args(["dev-smoke", "--runtime", "codex"])
+    assert args.runtime == "codex"
