@@ -17,28 +17,37 @@ Install Python 3.13 (recommended baseline), uv, and Git:
 brew install python@3.13 uv git
 ```
 
-Install Codex CLI using the [official installation guide](https://chatgpt.com/codex/cli), then authenticate:
-
-```bash
-codex login
-codex login status
-```
-
-To additionally test Grok Build, install it using the [official xAI CLI guide](https://docs.x.ai/build/cli):
-
-```bash
-curl -fsSL https://x.ai/cli/install.sh | bash
-grok login
-```
-
-Check versions:
+Check the base tool versions:
 
 ```bash
 python3.13 --version
 uv --version
 git --version
+```
+
+Install and authenticate only the Runtime you intend to test. For Codex, use the
+[official installation guide](https://chatgpt.com/codex/cli):
+
+```bash
 codex --version
+codex login
+codex login status
+```
+
+For Grok Build, use the [official xAI CLI guide](https://docs.x.ai/build/cli):
+
+```bash
 grok --version
+grok login
+```
+
+For Copilot, install the optional SDK dependency, then authenticate with the
+local Copilot CLI:
+
+```bash
+uv sync --python 3.13 --extra dev --extra copilot
+copilot --version
+copilot login
 ```
 
 ## 2. Get the project
@@ -56,7 +65,8 @@ uv sync --python 3.13 --extra dev
 uv run sf doctor
 ```
 
-Codex CLI and Git are required for the initial setup. Grok Build and Copilot CLI / SDK, Docker, and GitHub CLI are optional.
+Git is required for the initial setup. Codex, Grok Build, and Copilot CLI / SDK are optional;
+install and authenticate only the Runtime you intend to use. Docker and GitHub CLI are also optional.
 
 ## 4. Run the Codex smoke test
 
