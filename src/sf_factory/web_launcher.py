@@ -31,6 +31,7 @@ def launch_web(*, rebuild: bool = False) -> int:
                 return result.returncode
     try:
         import uvicorn
+
         from sf_factory.web_api import create_app
     except ImportError:
         print("Web dependencies missing. Run: uv sync --extra web", file=sys.stderr)
