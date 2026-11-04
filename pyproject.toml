@@ -12,10 +12,15 @@ license = { text = "Proprietary" }
 dependencies = []
 
 [project.optional-dependencies]
+web = [
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.30,<1",
+]
 copilot = [
   "github-copilot-sdk",
 ]
 dev = [
+  "httpx>=0.27,<1",
   "pip-audit>=2.9",
   "pyright>=1.1",
   "pytest>=8.0",
