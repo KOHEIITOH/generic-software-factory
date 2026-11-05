@@ -129,7 +129,7 @@ export default function App() {
         <div className="sidebar-footer"><span className="sidebar-dot" /> LOCAL WORKSPACE <small>Factory Core · v0.1</small></div>
       </aside>
       <main>
-        <header><div><span className="eyebrow">OVERVIEW / WORKSPACE</span><h1 id="overview">開発コントロールセンター <span className="title-spark">✦</span></h1><p>AIによる開発タスクと実行状況を、ひとつの画面で。</p></div><span role="status" className={"status " + state}>{state === "connected" ? "● ローカルAPI接続中" : state === "loading" ? "◌ 接続確認中" : "● API未接続"}</span></header><div className="hero-banner"><div><span className="eyebrow">SOFTWARE FACTORY / LOCAL</span><h2>アイデアから、実装へ。</h2><p>タスクの取り込みからAI開発・品質確認まで。現在は閲覧専用のダッシュボードです。</p></div><span className="hero-mark" aria-hidden="true">⌘</span></div>
+        <header><div><span className="eyebrow">OVERVIEW / WORKSPACE</span><h1 id="overview">開発コントロールセンター <span className="title-spark">✦</span></h1><p>AIによる開発タスクと実行状況を、ひとつの画面で。</p></div><span role="status" className={"status " + state}>{state === "connected" ? "● ローカルAPI接続中" : state === "loading" ? "◌ 接続確認中" : "● API未接続"}</span></header><div className="hero-banner"><div><span className="eyebrow">SOFTWARE FACTORY / LOCAL</span><h2>アイデアから、実装へ。</h2><p>タスクの取り込みからAI開発・品質確認まで。現在はIssueの閲覧・Taskへの明示的な取り込みに対応しています。</p></div><span className="hero-mark" aria-hidden="true">⌘</span></div>
         <section className="metrics" aria-label="Summary">
           <article className="metric"><span>接続状態</span><strong>{state === "connected" ? "Online" : state === "loading" ? "Checking" : "Offline"}</strong><small>localhost:8000</small></article>
           <article className="metric"><span>登録済みAI Runtime</span><strong>{state === "connected" ? runtimes.length : "—"}</strong><small>登録済みのアダプタ</small></article>
@@ -163,7 +163,7 @@ export default function App() {
           {issueListMessage && <p role="status">{issueListMessage}</p>}
           {issueList.length > 0 && <div className="runtime-list" aria-label="公開GitHub Issue一覧">
             {issueList.map(issue => <div className="runtime" key={issue.number}>
-              <span><strong>#{issue.number} · {issue.prompt.split("\\n")[0]}</strong></span>
+              <span><strong>#{issue.number} · {issue.prompt.split("\n")[0]}</strong></span>
               <button type="button" disabled={issueBusy} onClick={() => {
                 setIssueNumber(issue.number); setIssuePreview(issue); setIssueMessage("");
               }}>選択</button>
