@@ -1,7 +1,7 @@
 """Opt-in localhost API for the Software Factory dashboard.
 
-This module deliberately exposes read-only endpoints first. No agent execution,
-filesystem browsing, or task mutation is available over HTTP.
+Local dashboard endpoints. Mutations require same-origin browser requests.
+Agent execution and arbitrary filesystem browsing are not exposed over HTTP.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from sf_factory.factory import Factory
 from sf_factory.github_issue_web import install_github_issue_routes
 from sf_factory.local_project_registry import LocalProjectRegistry
 from sf_factory.repository_contracts import Project, Repository, Visibility
+from sf_factory.repo_discovery import discover_git_root
 
 
 class CreateTaskRequest(BaseModel):
@@ -48,7 +49,7 @@ def _check_local_origin(request: Request) -> None:
 def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> FastAPI:
     app = FastAPI(
         title="Software Factory Local API",
-        description="Read-only local dashboard API (experimental)",
+        description="Local dashboard API (experimental)",
         version="0.1.0",
         docs_url="/docs",
     )
@@ -56,6 +57,16 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
     @app.get("/api/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/api/quick/repository")
+    def quick_repository() -> dict[str, str | bool | None]:
+        # Only the directory where the server was launched is considered.
+        # No user-supplied filesystem path or repository content is accepted.
+        try:
+            root = discover_git_root(Path.cwd())
+        except (OSError, ValueError):
+            return {"detected": False, "repository_root": None, "provider": None}
+        return {"detected": True, "repository_root": str(root), "provider": "local-git"}
 
     @app.get("/api/runtimes")
     def runtimes() -> dict[str, list[str]]:
