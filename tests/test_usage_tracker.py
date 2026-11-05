@@ -1,5 +1,7 @@
 """Usage tracker tests."""
 
+import pytest
+
 from sf_factory.model_provider import ModelResponse
 from sf_factory.usage import TokenUsage
 from sf_factory.usage_tracker import UsageTracker
@@ -32,3 +34,11 @@ def test_uses_normalized_usage_when_available():
     )
     tracker.record("task", response)
     assert tracker.totals("task").cache_read_tokens == 1
+
+
+@pytest.mark.parametrize("attempt", [0, -1, True, 1.5])
+def test_rejects_invalid_attempt(attempt):
+    tracker = UsageTracker()
+    with pytest.raises(ValueError):
+        tracker.record("task", ModelResponse("bedrock", "a", "ok"), attempt=attempt)
+    assert tracker.records == []
