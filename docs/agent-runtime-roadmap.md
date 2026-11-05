@@ -80,3 +80,19 @@ AWS実環境での接続確認には利用者のAWS権限・モデルIDが必要
 `sf provider list` はこれらの設定と任意依存 `boto3` の存在のみを表示する。
 AWSに通信せず、認証・IAM権限・モデル利用可否・推論成功は確認しない。
 資格情報をコマンド出力やリポジトリへ保存しないこと。
+
+## Bedrock実接続のSmoke Test（明示実行）
+
+AWS側でモデル利用権限と `bedrock:InvokeModel` を準備し、
+ローカルで `pip install -e '.[bedrock]'` を実行する。
+AWS標準のprofile / IAM Role等で認証した上で、
+`SF_BEDROCK_MODEL_ID` と `SF_BEDROCK_REGION` を設定する。
+
+```bash
+sf provider list
+sf bedrock-smoke --confirm-invoke
+```
+
+Smoke Testは実際にBedrockへ短いプロンプトを1回送信し、**AWS利用料金が発生し得る**。
+`--confirm-invoke` なしでは実行しない。認証情報やプロンプト本文は出力しない。
+Factory Taskの自動実行やファイル編集は行わない。
