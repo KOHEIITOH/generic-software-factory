@@ -46,3 +46,13 @@ def test_bedrock_error_redacted(monkeypatch):
     with pytest.raises(RuntimeError, match="AWS Bedrock inference failed") as exc:
         BedrockModelProvider("test-model", "ap-northeast-1").generate("Hi")
     assert "sensitive" not in str(exc.value)
+
+
+def test_bedrock_client_creation_error_redacted(monkeypatch):
+    def fail_client(*args, **kwargs):
+        raise RuntimeError("sensitive AWS credentials")
+
+    monkeypatch.setitem(sys.modules, "boto3", SimpleNamespace(client=fail_client))
+    with pytest.raises(RuntimeError, match="AWS Bedrock inference failed") as exc:
+        BedrockModelProvider("test-model", "ap-northeast-1").generate("Hi")
+    assert "sensitive" not in str(exc.value)
