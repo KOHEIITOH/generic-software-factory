@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from sf_factory.agent_registry import default_runtime_registry
 from sf_factory.factory import Factory
+from sf_factory.github_issue_web import install_github_issue_routes
 
 
 def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> FastAPI:
@@ -39,6 +40,8 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
     @app.get('/api/runs')
     def runs() -> dict[str, list[dict]]:
         return {'runs': Factory(data_dir or Path('.sf-factory')).list_runs()}
+
+    install_github_issue_routes(app, data_dir)
 
     if static_dir is not None:
         project_root = Path(__file__).resolve().parents[2]

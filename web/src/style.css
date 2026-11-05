@@ -56,3 +56,5 @@ h1{font-size:clamp(26px,3vw,38px);line-height:1.2}
 /* Planned runtimes are informational, never presented as executable adapters. */
 .planned-runtime{border-style:dashed;opacity:.8}
 .planned-tag{border-color:#5b6477;color:#b2bdcc;background:#28324755}
+
+.issue-form{display:flex;gap:12px;align-items:end;flex-wrap:wrap}.issue-form label{display:grid;gap:7px;flex:1;min-width:170px;color:#b7c8e2;font-size:12px}.issue-form input{width:100%;border:1px solid #385074;border-radius:9px;background:#0c1626;color:#edf3ff;padding:11px;font:inherit}.issue-form button,.issue-preview button{border:0;border-radius:9px;padding:12px 17px;background:#386ce0;color:white;cursor:pointer;font-weight:700}.issue-form button:disabled,.issue-preview button:disabled{opacity:.45;cursor:not-allowed}.issue-preview{margin-top:20px;border:1px solid #385074;border-radius:12px;padding:18px;display:flex;flex-wrap:wrap;gap:14px;align-items:center}.issue-preview pre{width:100%;white-space:pre-wrap;overflow-wrap:anywhere;max-height:280px;overflow:auto;font:inherit;color:#c9d5e7;line-height:1.6}

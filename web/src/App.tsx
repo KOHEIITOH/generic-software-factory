@@ -16,6 +16,41 @@ export default function App() {
   const [error, setError] = useState("");
   const [tasks, setTasks] = useState<Task[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
+  const [repository, setRepository] = useState("KOHEIITOH/generic-software-factory");
+  const [issueNumber, setIssueNumber] = useState("");
+  const [issuePreview, setIssuePreview] = useState<{ repository: string; number: string; prompt: string; url: string } | null>(null);
+  const [issueBusy, setIssueBusy] = useState(false);
+  const [issueMessage, setIssueMessage] = useState("");
+
+  async function previewIssue() {
+    setIssueBusy(true); setIssueMessage(""); setIssuePreview(null);
+    try {
+      const params = new URLSearchParams({ repository: repository.trim(), number: issueNumber.trim() });
+      const response = await fetch("/api/github/issue?" + params);
+      if (!response.ok) throw new Error("Issueを取得できませんでした。リポジトリと番号を確認してください。");
+      const data = await response.json();
+      setIssuePreview(data.issue);
+    } catch (error) { setIssueMessage(error instanceof Error ? error.message : "取得エラー"); }
+    finally { setIssueBusy(false); }
+  }
+
+  async function importIssue() {
+    if (!issuePreview) return;
+    setIssueBusy(true); setIssueMessage("");
+    try {
+      const response = await fetch("/api/github/import", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repository: issuePreview.repository, number: Number(issuePreview.number) }),
+      });
+      if (!response.ok) throw new Error("取り込みに失敗しました。");
+      const data = await response.json();
+      setIssueMessage("取り込み完了: Task " + data.task_id);
+      setIssuePreview(null);
+      const tasksResponse = await fetch("/api/tasks");
+      if (tasksResponse.ok) setTasks((await tasksResponse.json()).tasks);
+    } catch (error) { setIssueMessage(error instanceof Error ? error.message : "取り込みエラー"); }
+    finally { setIssueBusy(false); }
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -65,7 +100,7 @@ export default function App() {
     <div className="layout">
       <aside className="sidebar">
         <div className="brand"><span className="brand-icon">SF</span><span>Software Factory<small>DEVELOPMENT CONTROL CENTER</small></span></div>
-        <nav aria-label="Main navigation"><a className="selected" href="#overview">▦　概要</a><a href="#runtimes">◈　AI Runtime</a><a href="#tasks">☷　タスク一覧</a><a href="#runs">⑂　実行履歴</a><span className="nav-group-label">DOCUMENTATION</span><a href="/guide">▤　ユーザーガイド</a><a href="/onboarding">↗　オンボーディング</a></nav>
+        <nav aria-label="Main navigation"><a className="selected" href="#overview">▦　概要</a><a href="#runtimes">◈　AI Runtime</a><a href="#tasks">☷　タスク一覧</a><a href="#github-import">＋　Issue取り込み</a><a href="#runs">⑂　実行履歴</a><span className="nav-group-label">DOCUMENTATION</span><a href="/guide">▤　ユーザーガイド</a><a href="/onboarding">↗　オンボーディング</a></nav>
         <div className="sidebar-footer"><span className="sidebar-dot" /> LOCAL WORKSPACE <small>Factory Core · v0.1</small></div>
       </aside>
       <main>
@@ -77,6 +112,16 @@ export default function App() {
         </section>
         <div className="section-heading"><div><span className="eyebrow">FACTORY WORKSPACE</span><h2>ワークスペース</h2></div><span className="section-note">タスク {tasks.length}件 · 外部連携 {linkedTasks}件</span></div><section className="panel" id="runtimes"><div className="panel-head"><div><span className="eyebrow">AGENT ADAPTERS</span><h2>AI Runtime</h2><p>登録済みAdapterと今後の対応候補です。登録済みでも実行可能・認証済みを意味しません。</p></div></div>
           {state === "loading" ? <p role="status">読み込み中...</p> : state === "offline" ? <div role="alert" className="notice">ローカルAPIに接続できません。FastAPIを起動してください。{error && <small>詳細: {error}</small>}</div> : <div className="runtime-list">{runtimes.map(name => <div className="runtime" key={name}><span className="runtime-symbol">◇</span><span><strong>{name}</strong><small>Registered adapter</small></span><span className="tag">登録済み</span></div>)}{plannedRuntimes.filter(candidate => !runtimes.includes(candidate.key)).map(candidate => <div className="runtime planned-runtime" key={candidate.key}><span className="runtime-symbol">◇</span><span><strong>{candidate.name}</strong><small>{candidate.note} · 利用不可</small></span><span className="tag planned-tag">未登録</span></div>)}</div>}
+        </section>
+        <section className="panel" id="github-import">
+          <div className="panel-head"><span className="eyebrow">GITHUB ISSUES</span><h2>GitHub Issueを取り込む</h2><p>公開リポジトリのIssueを確認してから登録します。AIは自動実行されません。</p></div>
+          <div className="issue-form">
+            <label>リポジトリ（owner/repo）<input value={repository} onChange={event => {setRepository(event.target.value); setIssuePreview(null);}} placeholder="owner/repo" /></label>
+            <label>Issue番号<input type="number" min="1" value={issueNumber} onChange={event => {setIssueNumber(event.target.value); setIssuePreview(null);}} placeholder="例: 12" /></label>
+            <button type="button" disabled={issueBusy || !repository.trim() || !/^[1-9][0-9]*$/.test(issueNumber)} onClick={() => void previewIssue()}>内容を確認</button>
+          </div>
+          {issueMessage && <p role="status">{issueMessage}</p>}
+          {issuePreview && <div className="issue-preview"><strong>Issue #{issuePreview.number}</strong><pre>{issuePreview.prompt}</pre><a className="source-link" href={issuePreview.url} target="_blank" rel="noopener noreferrer">GitHubで開く ↗</a><button type="button" disabled={issueBusy} onClick={() => void importIssue()}>このIssueを取り込む</button></div>}
         </section>
         <section className="panel" id="tasks"><div className="panel-head"><span className="eyebrow">TASK TRACKER</span><h2>タスク一覧</h2><p>CLIなどで登録したタスクを読み取り専用で表示します。</p></div>{state === "connected" && (tasks.length ? <div className="runtime-list">{tasks.map(task => <div className="runtime" key={task.id}><span><strong>{task.prompt}</strong><small>{task.provider ? `${task.provider.toUpperCase()} · ${task.external_id ?? ""} · ` : "LOCAL · "}{formatDate(task.created_at)}</small></span>{task.external_url && <a className="source-link" href={task.external_url} target="_blank" rel="noopener noreferrer" aria-label="元Issueを開く">元Issue ↗</a>}</div>)}</div> : <p>まだタスクはありません。CLIまたは外部Issue連携から取り込むと、ここに表示されます。</p>)}</section>
         <section className="panel" id="runs"><div className="panel-head"><span className="eyebrow">EXECUTION HISTORY</span><h2>実行履歴</h2><p>直近の実行状態を表示します。自動更新・実行操作は今後追加します。</p></div>{state === "connected" && (runs.length ? <div className="runtime-list">{runs.map(run => <div className="runtime" key={run.id}><span><strong>{run.runtime} · {run.status}</strong><small>{run.id.slice(0, 12)} · {formatDate(run.started_at)}</small></span></div>)}</div> : <p>まだ実行履歴はありません。AI Runtimeで実行すると、ここに記録されます。</p>)}</section>
