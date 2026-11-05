@@ -1,28 +1,32 @@
-# Local Web API (experimental)
+# ローカルWeb UI / API（実験的MVP）
 
-The initial API is intentionally **read-only**. It provides the foundation for
-a React dashboard without exposing code execution or arbitrary filesystem access.
+現在のWeb UIはReact/TypeScript/Viteで実装済みです。**閲覧専用**であり、WebからAIを実行したりIssueを取り込んだりする操作はまだありません。
 
-## Start on your Mac
+## 起動
 
 ```bash
 uv sync --extra web
-uv run --extra web uvicorn sf_factory.web_api:app --host 127.0.0.1 --port 8000
+uv run sf web --rebuild
 ```
 
-Open http://127.0.0.1:8000/docs to inspect the API.
+Node.js/npmが初回ビルドまたは再ビルド時に必要です。ブラウザで http://127.0.0.1:8000/ を開きます。
 
-- `GET /api/health`: local API health
-- `GET /api/runtimes`: registered runtime names (not availability or authentication)
+## 画面
 
-Do not bind to `0.0.0.0` or expose this experimental service on the public internet.
-The API has no authentication yet. No task execution endpoints are implemented.
+- `/`: ダッシュボード（登録済みRuntime、Task、Runを閲覧）
+- `/guide`: ユーザーガイドHTML
+- `/onboarding`: オンボーディングHTML
+- `/docs`: FastAPIのAPI仕様
 
-## Next PRs
+## 読み取り専用API
 
-1. React/TypeScript dashboard consuming the read-only API.
-2. Carefully scoped task management API with validation, user confirmation and
-   loopback-only access controls.
-3. Isolated Docker execution adapter with resource and filesystem restrictions.
+- `GET /api/health`: APIの稼働状況
+- `GET /api/runtimes`: 登録済みRuntime名（認証・実行可能性を保証しない）
+- `GET /api/tasks`: 保存済みTask一覧
+- `GET /api/runs`: 保存済みRun一覧
 
-Docker is not required to run the API.
+タスクやRunの作成・実行・削除を行うHTTPエンドポイントはありません。GitHub Issues AdapterはPython APIで利用できますが、Web UIのIssue取り込み機能は未実装です。
+
+## 安全上の注意
+
+認証は未実装です。ローカル専用（127.0.0.1）で起動し、`0.0.0.0`で公開したりインターネットに接続したりしないでください。DockerはWeb UI閲覧には不要です。任意リポジトリでの自律開発・隔離実行・PR自動作成は今後の課題です。

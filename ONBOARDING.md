@@ -7,6 +7,18 @@
 
 FactoryはAI開発作業の工程・権限・品質判定を共通化するための基盤です。現状はローカルCLIでTask / Runを記録し、Codex・Grok・Copilotへの限定的な接続確認ができます。Workflow、Policy、Quality Gate、Improvement LoopのPython部品も実装されていますが、これらを統合した完全自律開発CLIやPR自動作成は未実装です。
 
+## 現在のWeb UIでできること（2026年11月時点）
+
+Web UIは**閲覧専用**です。ローカルで `uv sync --extra web` を実行した後、`uv run sf web --rebuild` で起動し、`http://127.0.0.1:8000/` を開きます。初回ビルドにはNode.js/npmが必要です。
+
+- ダッシュボード: 登録済みAI Runtime、Task一覧、Run履歴を閲覧
+- ユーザーガイド: `/guide` でHTMLを表示
+- オンボーディング: `/onboarding` でHTMLを表示
+- GitHub Issues: 読み取り専用Adapterと重複防止付きTask取り込みは**Python APIとして実装済み**（[開発者向け利用例](docs/guides/github-issues-source.md)）
+- **未実装**: Web UIからのTask作成・Issue取り込み・AI実行、任意リポジトリの自律編集、PR自動作成
+
+非エンジニア向けのブラウザ完結型セットアップは将来の目標です。現在の初期セットアップには開発者によるCLI操作が必要です。APIは認証なしのローカル専用なので外部公開しないでください。
+
 ## 1. 最初に用意する
 
 - Git と uv（[READMEのOS別手順](README.md#quickstart--macos--windows--linux)）

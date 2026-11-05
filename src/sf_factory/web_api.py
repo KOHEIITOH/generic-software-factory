@@ -41,6 +41,17 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
         return {'runs': Factory(data_dir or Path('.sf-factory')).list_runs()}
 
     if static_dir is not None:
+        project_root = Path(__file__).resolve().parents[2]
+
+        @app.get("/guide", include_in_schema=False)
+        def user_guide() -> FileResponse:
+            return FileResponse(project_root / "USER_GUIDE.html", media_type="text/html")
+
+        @app.get("/onboarding", include_in_schema=False)
+        def onboarding() -> FileResponse:
+            return FileResponse(project_root / "ONBOARDING.html", media_type="text/html")
+
+    if static_dir is not None:
         if not (static_dir / 'index.html').is_file():
             raise ValueError('Dashboard build not found')
         app.mount('/assets', StaticFiles(directory=static_dir / 'assets'), name='assets')
