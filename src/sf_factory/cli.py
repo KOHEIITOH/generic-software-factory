@@ -18,6 +18,8 @@ def build_parser() -> argparse.ArgumentParser:
     web.add_argument("--rebuild", action="store_true", help="rebuild frontend assets")
     runtime = sub.add_parser("runtime", help="inspect registered runtimes")
     runtime.add_subparsers(dest="runtime_command", required=True).add_parser("list")
+    provider = sub.add_parser("provider", help="inspect model providers")
+    provider.add_subparsers(dest="provider_command", required=True).add_parser("list")
     sub.add_parser("codex-smoke", help="read-only Codex test")
     sub.add_parser("copilot-smoke", help="Copilot SDK test")
     sub.add_parser("grok-smoke", help="read-only Grok test")
@@ -63,6 +65,18 @@ def main() -> int:
         from sf_factory.runtime_status import list_runtimes
 
         print(json.dumps(list_runtimes(), indent=2))
+        return 0
+    if args.command == "provider":
+        from dataclasses import asdict
+
+        from sf_factory.model_provider_status import bedrock_configuration
+
+        config = bedrock_configuration()
+        print(json.dumps({"providers": [{
+            "name": "bedrock", **asdict(config),
+            "configured": config.configured,
+            "authenticated": "not_checked",
+        }]}, indent=2))
         return 0
     if args.command == "codex-smoke":
         from sf_factory.codex_smoke import run_smoke_test
