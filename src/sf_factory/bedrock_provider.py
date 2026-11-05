@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from importlib import import_module
 from typing import Any
 
 from sf_factory.model_provider import ModelResponse
@@ -29,7 +30,7 @@ class BedrockModelProvider:
         if not prompt.strip():
             raise ValueError("prompt must not be empty")
         try:
-            import boto3
+            boto3 = import_module("boto3")
         except ImportError as exc:
             raise RuntimeError("Install the bedrock extra: pip install -e '.[bedrock]'") from exc
 
