@@ -20,6 +20,8 @@ def build_parser() -> argparse.ArgumentParser:
     runtime.add_subparsers(dest="runtime_command", required=True).add_parser("list")
     provider = sub.add_parser("provider", help="inspect model providers")
     provider.add_subparsers(dest="provider_command", required=True).add_parser("list")
+    bedrock_smoke = sub.add_parser("bedrock-smoke", help="opt-in Bedrock inference test")
+    bedrock_smoke.add_argument("--confirm-invoke", action="store_true")
     sub.add_parser("codex-smoke", help="read-only Codex test")
     sub.add_parser("copilot-smoke", help="Copilot SDK test")
     sub.add_parser("grok-smoke", help="read-only Grok test")
@@ -78,6 +80,10 @@ def main() -> int:
             "authenticated": "not_checked",
         }]}, indent=2))
         return 0
+    if args.command == "bedrock-smoke":
+        from sf_factory.bedrock_smoke import run_bedrock_smoke
+
+        return run_bedrock_smoke(confirm_invoke=args.confirm_invoke)
     if args.command == "codex-smoke":
         from sf_factory.codex_smoke import run_smoke_test
 
