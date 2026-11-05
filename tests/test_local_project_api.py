@@ -13,7 +13,7 @@ from sf_factory.repository_contracts import Project, Repository, Visibility  # n
 from sf_factory.web_api import create_app  # noqa: E402
 
 
-def test_local_projects_and_repositories_are_listed_and_writes_are_origin_guarded(tmp_path: Path) -> None:
+def test_project_listing_and_origin_guard(tmp_path: Path) -> None:
     factory = Factory(tmp_path)
     registry = LocalProjectRegistry(factory.db)
     registry.add_project(Project("p", "Local", "local"))
