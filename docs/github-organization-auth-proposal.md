@@ -71,3 +71,39 @@ GitHub Appのインストール範囲は「All repositories」または「Only s
 3. GitHub App未インストール・権限不足・失効・SSO制限を成功として扱わない。
 4. 外部AIへコードを渡す前にデータポリシーの判定を行う。
 5. ローカル単独利用の回帰テストと、Fake Providerによる他SCMの差し替えテストを通す。
+
+## ゴール逆算レビュー：設計確定前に補強する点
+
+### Project / Repository / Task
+- Projectは開発目的・Harness・Policy・Quality Gateを管理する論理単位。1 Projectから複数Repositoryを参照できる。
+- RepositoryはSourceControl Adapterが扱うコード保管場所。provider、外部ID、接続情報、capabilitiesを保持し、GitHub固有のinstallation IDはAdapter側に隠す。
+- TaskはProjectに属し、必要に応じて複数の対象Repositoryを選択する。Repositoryごとに権限・workspace・品質証跡を評価する。
+- Projectのメンバー権限とRepositoryの閲覧・操作権限は独立する。
+
+### Identity / Source Control / Connection
+- Identity Provider（Factoryへの本人確認）、SourceControl Provider（Repository discovery・branch・PR）、Credential/Connection（外部操作の認証手段）は別契約にする。
+- GitHubログインでGitLabを操作する、ローカル認証でGitHubを操作する、GitHubなしでローカルGitを操作する構成も可能にする。
+- GitHub Appは推奨Connection方式の一つであり、SCM共通契約の必須概念にしない。GitHubのOrganizationやinstallation IDをCoreの必須モデルにしない。
+- PR機能などの差はcapabilitiesとして表現し、未対応機能を暗黙に成功扱いしない。
+
+### AIへのデータ提供と実行
+- Repositoryのread/write/PR権限と、外部AI Runtimeへコード・Issue・ログを送信する許可は別に判定する。
+- 実行場所、モデル/Provider、データ分類、送信先をProject Policyで評価し、許可がなければ送信しない。
+- AIが直接GitコマンドやネットワークAPIを実行する経路もExecution Adapterで隔離・制限し、SCM Adapterの権限検証だけに頼らない。
+
+### 縦断的な検証順序
+最終ゴールはログイン機能ではなく、権限を守りながらTask→実装→テスト→PRを完遂すること。
+1. ローカルProject + ローカルGit + Fake Identity/SCMでモデルと権限境界を検証。
+2. GitHub Public Repositoryの発見とTaskへの対象紐付けを検証。
+3. GitHub AppによるPrivate/Organization接続、権限失効・SSO・管理者承認を検証。
+4. 隔離実行・AIデータ送信Policyを備えた単一RepositoryのTask→PRを縦断検証。
+5. 複数Repository、別SCM、マルチユーザーを段階的に検証。
+
+### 設計上の未決事項
+- 初期配布形態（ローカル単独/チームサーバー/クラウド）とSecret・セッション管理の責任分界。
+- GitHubの認証方式、閲覧可能Repository列挙、SSO・承認、installation権限の最新仕様。
+- 既存Task永続化からProject/Repository関連への移行と後方互換性。
+- 共有Factoryの実行主体とGitHubユーザー/App installation権限の交差判定。
+- AI Runtimeごとのデータ送信制御と実際の隔離実行の境界。
+
+これらが決まるまでPR #47は設計提案としてDraftを維持する。
