@@ -16,7 +16,9 @@ def test_preview_and_confirmed_import(tmp_path):
                           prompt="Fix a bug", external_url="https://github.com/owner/repo/issues/7")
     with patch("sf_factory.github_issue_web.GitHubIssuesSource.fetch_issue", return_value=issue):
         with TestClient(create_app(data_dir=tmp_path)) as client:
-            preview = client.get("/api/github/issue", params={"repository": "owner/repo", "number": 7})
+            preview = client.get(
+                "/api/github/issue", params={"repository": "owner/repo", "number": 7}
+            )
             assert preview.status_code == 200
             assert preview.json()["issue"]["prompt"] == "Fix a bug"
             assert client.get("/api/tasks").json()["tasks"] == []
