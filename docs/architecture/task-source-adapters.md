@@ -17,3 +17,12 @@ FactoryはJira・GitHub Issues・Backlog等のチケット管理を置き換え�
 2. 認証情報の保管とAPI権限の最小化、外部入力の信頼境界、同期失敗時のリトライを設計する。
 3. Web UIには元IssueへのリンクとRunの実行状況を表示する。タスク管理の二重化を避ける。
 4. 外部更新・PRコメントは明示的な設定と権限確認後に追加する。
+
+## Adapter契約（PR #30）
+
+`TaskSourceAdapter.fetch_issue(external_id)` は外部サービスからIssueのスナップショットを読み取り、`ExternalIssue` を返す。Factory側の `import_issue(factory, adapter, external_id)` がID整合性を確認し、既存のSQLiteに重複なく取り込む。
+
+- 認証・API呼び出し・リトライは個別Adapterの責任。CoreはJira SDK等に依存しない。
+- `provider` はサービス種別、`instance` は接続先の識別子。異なるテナントを混同しない。
+- 同期は明示的な呼び出しのみ。バックグラウンドポーリング・Webhookは未実装。
+- HTTP APIへの書き込み口はまだ追加しない。外部Issueを信頼済みの指示として扱わない。
