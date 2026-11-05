@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from sf_factory.usage import TokenUsage
+
 
 @dataclass(frozen=True)
 class ModelResponse:
@@ -13,6 +15,7 @@ class ModelResponse:
     text: str
     input_tokens: int | None = None
     output_tokens: int | None = None
+    usage: TokenUsage | None = None
 
 
 class ModelProvider(Protocol):
