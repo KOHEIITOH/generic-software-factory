@@ -6,9 +6,9 @@ filesystem browsing, or task mutation is available over HTTP.
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 from uuid import uuid4
-import sqlite3
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
