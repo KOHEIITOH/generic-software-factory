@@ -26,7 +26,7 @@ export default function App() {
   const [issueBusy, setIssueBusy] = useState(false);
   const [issueMessage, setIssueMessage] = useState("");
 
-  async function loadIssues() {
+  async function loadIssues(page = 1) {
     setIssueListBusy(true); setIssueListMessage(""); setIssueList([]); setIssuePreview(null);
     try {
       const params = new URLSearchParams({ repository: repository.trim() });
