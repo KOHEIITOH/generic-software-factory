@@ -21,6 +21,9 @@ export default function App() {
   const [issueNumber, setIssueNumber] = useState("");
   const [issuePreview, setIssuePreview] = useState<{ repository: string; number: string; prompt: string; url: string } | null>(null);
   const [issueList, setIssueList] = useState<Issue[]>([]);
+  const [issuePage, setIssuePage] = useState(0);
+  const [issueHasMore, setIssueHasMore] = useState(false);
+  const [issueState, setIssueState] = useState<"open" | "closed">("open");
   const [issueListBusy, setIssueListBusy] = useState(false);
   const [issueListMessage, setIssueListMessage] = useState("");
   const [issueBusy, setIssueBusy] = useState(false);
