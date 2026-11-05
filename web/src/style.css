@@ -41,3 +41,14 @@ h1{font-size:clamp(26px,3vw,38px);line-height:1.2}
 @media(max-width:800px){main{padding-top:28px}.hero-banner{padding:24px}.hero-mark{font-size:56px}.section-heading{align-items:start;flex-direction:column}.sidebar nav{gap:4px}}
 @media(max-width:480px){.hero-mark{display:none}.runtime{flex-wrap:wrap}.source-link{margin-left:0}.status{white-space:normal}.hero-banner{padding:20px}}
 @media(prefers-reduced-motion:reduce){.sidebar nav a{transition:none}}
+
+
+/* Desktop: keep navigation in place while the workspace scrolls. */
+@media(min-width:801px){
+  .layout{height:100vh;overflow:hidden}
+  .sidebar{flex:0 0 260px;height:100vh;overflow-y:auto;position:sticky;top:0}
+  .layout>main{height:100vh;overflow-y:auto;scroll-behavior:smooth}
+  .layout>main section,.layout>main h1{scroll-margin-top:24px}
+}
+.nav-group-label{display:block;color:#6884ac;font-size:10px;font-weight:800;letter-spacing:.15em;padding:20px 14px 4px}
+@media(max-width:800px){.nav-group-label{width:100%;padding:10px 14px 0}}
