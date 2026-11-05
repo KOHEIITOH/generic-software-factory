@@ -6,8 +6,8 @@ from sf_factory.repository_contracts import (
     Connection,
     Project,
     Repository,
-    RepositoryCapabilities,
     RepositoryAuthorization,
+    RepositoryCapabilities,
     RepositoryDiscovery,
     Visibility,
 )
