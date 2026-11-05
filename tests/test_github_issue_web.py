@@ -46,12 +46,13 @@ def test_issue_list_excludes_pull_requests(tmp_path):
     )
     with patch(
         "sf_factory.github_issue_web.GitHubIssuesSource.list_issues",
-        return_value=[issue],
+        return_value=([issue], False),
     ):
         with TestClient(create_app(data_dir=tmp_path)) as client:
             response = client.get("/api/github/issues", params={"repository": "owner/repo"})
             assert response.status_code == 200
             assert response.json()["issues"][0]["number"] == "7"
+            assert response.json()["has_more"] is False
             assert client.get("/api/tasks").json()["tasks"] == []
 
 
