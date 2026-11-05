@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
 
+const plannedRuntimes = [
+  { name: "Claude Code", key: "claude", note: "Anthropic · CLI Adapter候補" },
+  { name: "Gemini CLI", key: "gemini", note: "Google · CLI Adapter候補" },
+  { name: "Custom Agent", key: "custom", note: "OpenAI Agents SDK等 · 将来の拡張候補" },
+] as const;
+
 type ApiState = "loading" | "connected" | "offline";
 type Task = { id: string; prompt: string; created_at: string; provider?: string | null; external_id?: string | null; external_url?: string | null };
 type Run = { id: string; task_id: string; runtime: string; status: string; started_at: string };
@@ -69,8 +75,8 @@ export default function App() {
           <article className="metric"><span>登録済みAI Runtime</span><strong>{state === "connected" ? runtimes.length : "—"}</strong><small>登録済みのアダプタ</small></article>
           <article className="metric"><span>実行中のRun</span><strong>{state === "connected" ? activeRuns : "—"}</strong><small>実行中のRun</small></article>
         </section>
-        <div className="section-heading"><div><span className="eyebrow">FACTORY WORKSPACE</span><h2>ワークスペース</h2></div><span className="section-note">タスク {tasks.length}件 · 外部連携 {linkedTasks}件</span></div><section className="panel" id="runtimes"><div className="panel-head"><div><span className="eyebrow">AGENT ADAPTERS</span><h2>AI Runtime</h2><p>登録されているRuntimeの一覧。実行可能・認証済みを意味しません。</p></div></div>
-          {state === "loading" ? <p role="status">読み込み中...</p> : state === "offline" ? <div role="alert" className="notice">ローカルAPIに接続できません。FastAPIを起動してください。{error && <small>詳細: {error}</small>}</div> : <div className="runtime-list">{runtimes.map(name => <div className="runtime" key={name}><span className="runtime-symbol">◇</span><span><strong>{name}</strong><small>Registered adapter</small></span><span className="tag">登録済み</span></div>)}</div>}
+        <div className="section-heading"><div><span className="eyebrow">FACTORY WORKSPACE</span><h2>ワークスペース</h2></div><span className="section-note">タスク {tasks.length}件 · 外部連携 {linkedTasks}件</span></div><section className="panel" id="runtimes"><div className="panel-head"><div><span className="eyebrow">AGENT ADAPTERS</span><h2>AI Runtime</h2><p>登録済みAdapterと今後の対応候補です。登録済みでも実行可能・認証済みを意味しません。</p></div></div>
+          {state === "loading" ? <p role="status">読み込み中...</p> : state === "offline" ? <div role="alert" className="notice">ローカルAPIに接続できません。FastAPIを起動してください。{error && <small>詳細: {error}</small>}</div> : <div className="runtime-list">{runtimes.map(name => <div className="runtime" key={name}><span className="runtime-symbol">◇</span><span><strong>{name}</strong><small>Registered adapter</small></span><span className="tag">登録済み</span></div>)}{plannedRuntimes.filter(candidate => !runtimes.includes(candidate.key)).map(candidate => <div className="runtime planned-runtime" key={candidate.key}><span className="runtime-symbol">◇</span><span><strong>{candidate.name}</strong><small>{candidate.note} · 利用不可</small></span><span className="tag planned-tag">未登録</span></div>)}</div>}
         </section>
         <section className="panel" id="tasks"><div className="panel-head"><span className="eyebrow">TASK TRACKER</span><h2>タスク一覧</h2><p>CLIなどで登録したタスクを読み取り専用で表示します。</p></div>{state === "connected" && (tasks.length ? <div className="runtime-list">{tasks.map(task => <div className="runtime" key={task.id}><span><strong>{task.prompt}</strong><small>{task.provider ? `${task.provider.toUpperCase()} · ${task.external_id ?? ""} · ` : "LOCAL · "}{formatDate(task.created_at)}</small></span>{task.external_url && <a className="source-link" href={task.external_url} target="_blank" rel="noopener noreferrer" aria-label="元Issueを開く">元Issue ↗</a>}</div>)}</div> : <p>まだタスクはありません。CLIまたは外部Issue連携から取り込むと、ここに表示されます。</p>)}</section>
         <section className="panel" id="runs"><div className="panel-head"><span className="eyebrow">EXECUTION HISTORY</span><h2>実行履歴</h2><p>直近の実行状態を表示します。自動更新・実行操作は今後追加します。</p></div>{state === "connected" && (runs.length ? <div className="runtime-list">{runs.map(run => <div className="runtime" key={run.id}><span><strong>{run.runtime} · {run.status}</strong><small>{run.id.slice(0, 12)} · {formatDate(run.started_at)}</small></span></div>)}</div> : <p>まだ実行履歴はありません。AI Runtimeで実行すると、ここに記録されます。</p>)}</section>
