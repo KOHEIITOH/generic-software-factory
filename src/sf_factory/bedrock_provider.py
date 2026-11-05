@@ -34,8 +34,8 @@ class BedrockModelProvider:
         except ImportError as exc:
             raise RuntimeError("Install the bedrock extra: pip install -e '.[bedrock]'") from exc
 
-        client = boto3.client("bedrock-runtime", region_name=self.region_name)
         try:
+            client = boto3.client("bedrock-runtime", region_name=self.region_name)
             response: dict[str, Any] = client.converse(
                 modelId=self.model_id,
                 messages=[{"role": "user", "content": [{"text": prompt}]}],
