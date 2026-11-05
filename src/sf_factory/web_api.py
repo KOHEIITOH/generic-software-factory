@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from sf_factory.agent_registry import default_runtime_registry
 from sf_factory.factory import Factory
 from sf_factory.github_issue_web import install_github_issue_routes
+from sf_factory.local_project_registry import LocalProjectRegistry
 
 
 class CreateTaskRequest(BaseModel):
@@ -63,6 +64,37 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
             raise HTTPException(status_code=422, detail="Task must not be blank")
         task_id = Factory(data_dir or Path(".sf-factory")).create_task(prompt)
         return {"task_id": task_id}
+
+
+    @app.get("/api/projects")
+    def projects() -> dict[str, list[dict[str, str]]]:
+        factory = Factory(data_dir or Path(".sf-factory"))
+        registry = LocalProjectRegistry(factory.db)
+        return {
+            "projects": [
+                {"id": p.id, "name": p.name, "owner_id": p.owner_id}
+                for p in registry.list_projects("local")
+            ]
+        }
+
+    @app.get("/api/projects/{project_id}/repositories")
+    def project_repositories(project_id: str) -> dict[str, list[dict[str, str]]]:
+        factory = Factory(data_dir or Path(".sf-factory"))
+        registry = LocalProjectRegistry(factory.db)
+        if not any(p.id == project_id for p in registry.list_projects("local")):
+            raise HTTPException(status_code=404, detail="Project not found")
+        return {
+            "repositories": [
+                {
+                    "id": repo.id,
+                    "project_id": repo.project_id,
+                    "provider_id": repo.provider_id,
+                    "external_id": repo.external_id,
+                    "visibility": repo.visibility.value,
+                }
+                for repo in registry.list_repositories(project_id)
+            ]
+        }
 
     install_github_issue_routes(app, data_dir)
 
