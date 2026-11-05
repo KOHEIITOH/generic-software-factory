@@ -145,6 +145,16 @@ export default function App() {
             <button type="button" disabled={issueBusy || !repository.trim() || !/^[1-9][0-9]*$/.test(issueNumber)} onClick={() => void previewIssue()}>内容を確認</button>
           </div>
           <div className="issue-form">
+            <label>状態
+              <select value={issueState} onChange={event => {
+                setIssueState(event.target.value as "open" | "closed");
+                setIssueList([]); setIssuePage(0); setIssueHasMore(false);
+                setIssuePreview(null); setIssueListMessage("");
+              }}>
+                <option value="open">Open</option>
+                <option value="closed">Closed</option>
+              </select>
+            </label>
             <button type="button" disabled={issueListBusy || issueBusy || !repository.trim()} onClick={() => void loadIssues()}>
               {issueListBusy ? "取得中..." : "公開Issue一覧を表示"}
             </button>
@@ -157,6 +167,11 @@ export default function App() {
                 setIssueNumber(issue.number); setIssuePreview(issue); setIssueMessage("");
               }}>選択</button>
             </div>)}
+          </div>}
+          {issueHasMore && <div className="issue-form">
+            <button type="button" disabled={issueListBusy} onClick={() => void loadIssues(issuePage + 1)}>
+              {issueListBusy ? "読み込み中..." : "さらに読み込む"}
+            </button>
           </div>}
           {issueMessage && <p role="status">{issueMessage}</p>}
           {issuePreview && <div className="issue-preview"><strong>Issue #{issuePreview.number}</strong><pre>{issuePreview.prompt}</pre><a className="source-link" href={issuePreview.url} target="_blank" rel="noopener noreferrer">GitHubで開く ↗</a><button type="button" disabled={issueBusy} onClick={() => void importIssue()}>このIssueを取り込む</button></div>}
