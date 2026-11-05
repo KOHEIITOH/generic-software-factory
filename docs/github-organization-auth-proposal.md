@@ -55,3 +55,19 @@ GitHub Appのインストール範囲は「All repositories」または「Only s
 - 初期実装でGitHubを優先しても、別のSCMを追加する際にCore変更が必須となる設計を避ける。
 
 受入シナリオは最低限、(A) GitHub未接続のローカル利用、(B) 個人のPublic/Private、(C) OrganizationのPrivate、(D) GitHub以外のSCMをFake Adapterで差し替え、を含める。
+
+## 信頼境界と失効時の挙動（レビュー追記）
+- **Identity**（誰か）、**Discovery**（何が見えるか）、**Authorization**（Factoryが何を操作できるか）、**Execution**（AIが何を実行できるか）を独立した判定として扱う。ログイン済みだけではGitHub操作を許可しない。
+- GitHub App installation tokenは対象installation・repository・権限に限定し、発行時とGitHub操作直前に権限を検証する。権限キャッシュを唯一の認可根拠にしない。
+- ユーザーのアクセス権消失、App削除、OrganizationのSSO失効、対象リポジトリの移動・削除時は**安全側に停止**する。進行中タスクも次の外部操作前に再検証する。
+- 複数利用者が同じFactoryを使う場合、Task・接続情報・監査ログの所有者を分離する。リポジトリ一覧のAPIレスポンスやキャッシュも利用者ごとにスコープする。
+- OAuthによる本人確認とGitHub App installationの認可は別フロー。**GitHubログインなしのローカルモード**は継続できるが、そのモードでPrivate Repositoryへアクセスするには別途明示的な認証設定が必要。
+- GitHub OAuthとGitHub Appのuser authorizationは採用候補であり、OAuth/PKCE対応状況・利用者権限での一覧取得方式・Organization SSOの制約は実装前に公式仕様で再検証する。
+- 認証方式やリポジトリ接続が未設定の場合も、既存のローカルTask作成・閲覧機能は維持する。移行で既存ユーザーのデータを破壊しない。
+
+## 実装レビューのゲート
+1. Adapterの契約はGitHub固有型をCoreへ露出させない。
+2. リポジトリ一覧にPrivate情報が混じっても、未認証者・別ユーザーに漏れない。
+3. GitHub App未インストール・権限不足・失効・SSO制限を成功として扱わない。
+4. 外部AIへコードを渡す前にデータポリシーの判定を行う。
+5. ローカル単独利用の回帰テストと、Fake Providerによる他SCMの差し替えテストを通す。
