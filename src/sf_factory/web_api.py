@@ -7,6 +7,8 @@ filesystem browsing, or task mutation is available over HTTP.
 from __future__ import annotations
 
 from pathlib import Path
+from uuid import uuid4
+import sqlite3
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
@@ -17,10 +19,21 @@ from sf_factory.agent_registry import default_runtime_registry
 from sf_factory.factory import Factory
 from sf_factory.github_issue_web import install_github_issue_routes
 from sf_factory.local_project_registry import LocalProjectRegistry
+from sf_factory.repository_contracts import Project, Repository, Visibility
 
 
 class CreateTaskRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=10000)
+
+
+class CreateProjectRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
+class CreateRepositoryRequest(BaseModel):
+    provider_id: str = Field(min_length=1, max_length=80)
+    external_id: str = Field(min_length=1, max_length=500)
+    visibility: Visibility
 
 
 def _check_local_origin(request: Request) -> None:
@@ -75,6 +88,42 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
                 {"id": p.id, "name": p.name, "owner_id": p.owner_id}
                 for p in registry.list_projects("local")
             ]
+        }
+
+    @app.post("/api/projects", status_code=201)
+    def create_project(payload: CreateProjectRequest, request: Request) -> dict[str, str]:
+        _check_local_origin(request)
+        name = payload.name.strip()
+        if not name:
+            raise HTTPException(status_code=422, detail="Project name must not be blank")
+        registry = LocalProjectRegistry(Factory(data_dir or Path(".sf-factory")).db)
+        project = Project(id=uuid4().hex, name=name, owner_id="local")
+        registry.add_project(project)
+        return {"id": project.id, "name": project.name, "owner_id": project.owner_id}
+
+    @app.post("/api/projects/{project_id}/repositories", status_code=201)
+    def create_project_repository(
+        project_id: str, payload: CreateRepositoryRequest, request: Request
+    ) -> dict[str, str]:
+        _check_local_origin(request)
+        provider_id, external_id = payload.provider_id.strip(), payload.external_id.strip()
+        if not provider_id or not external_id:
+            raise HTTPException(status_code=422, detail="Repository fields must not be blank")
+        registry = LocalProjectRegistry(Factory(data_dir or Path(".sf-factory")).db)
+        if not any(p.id == project_id for p in registry.list_projects("local")):
+            raise HTTPException(status_code=404, detail="Project not found")
+        repo = Repository(
+            id=uuid4().hex, project_id=project_id, provider_id=provider_id,
+            external_id=external_id, visibility=payload.visibility,
+        )
+        try:
+            registry.add_repository(repo)
+        except sqlite3.IntegrityError:
+            raise HTTPException(status_code=409, detail="Repository already registered")
+        return {
+            "id": repo.id, "project_id": repo.project_id,
+            "provider_id": repo.provider_id, "external_id": repo.external_id,
+            "visibility": repo.visibility.value,
         }
 
     @app.get("/api/projects/{project_id}/repositories")
