@@ -30,8 +30,9 @@ export default function App() {
   const [issueMessage, setIssueMessage] = useState("");
 
   async function loadIssues(page = 1) {
+    if (issueListBusy) return;
     setIssueListBusy(true); setIssueListMessage("");
-    if (page === 1) { setIssueList([]); setIssuePreview(null); }
+    if (page === 1) { setIssueList([]); setIssuePreview(null); setIssueHasMore(false); }
     try {
       const params = new URLSearchParams({ repository: repository.trim(), page: String(page), state: issueState });
       const response = await fetch("/api/github/issues?" + params);
@@ -140,7 +141,7 @@ export default function App() {
         <section className="panel" id="github-import">
           <div className="panel-head"><span className="eyebrow">GITHUB ISSUES</span><h2>GitHub Issueを取り込む</h2><p>公開リポジトリのIssueを確認してから登録します。AIは自動実行されません。</p></div>
           <div className="issue-form">
-            <label>リポジトリ（owner/repo）<input value={repository} onChange={event => {setRepository(event.target.value); setIssuePreview(null); setIssueList([]); setIssueListMessage("");}} placeholder="owner/repo" /></label>
+            <label>リポジトリ（owner/repo）<input value={repository} onChange={event => {setRepository(event.target.value); setIssuePreview(null); setIssueList([]); setIssueListMessage(""); setIssuePage(0); setIssueHasMore(false);}} placeholder="owner/repo" /></label>
             <label>Issue番号<input type="number" min="1" value={issueNumber} onChange={event => {setIssueNumber(event.target.value); setIssuePreview(null);}} placeholder="例: 12" /></label>
             <button type="button" disabled={issueBusy || !repository.trim() || !/^[1-9][0-9]*$/.test(issueNumber)} onClick={() => void previewIssue()}>内容を確認</button>
           </div>
