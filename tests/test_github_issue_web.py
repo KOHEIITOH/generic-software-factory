@@ -37,3 +37,25 @@ def test_invalid_repository_rejected(tmp_path):
     with TestClient(create_app(data_dir=tmp_path)) as client:
         result = client.get("/api/github/issue", params={"repository": "invalid", "number": 1})
         assert result.status_code == 422
+
+
+def test_issue_list_excludes_pull_requests(tmp_path):
+    issue = ExternalIssue(
+        provider="github", instance="owner/repo", external_id="7",
+        prompt="Fix a bug", external_url="https://github.com/owner/repo/issues/7",
+    )
+    with patch(
+        "sf_factory.github_issue_web.GitHubIssuesSource.list_issues",
+        return_value=[issue],
+    ):
+        with TestClient(create_app(data_dir=tmp_path)) as client:
+            response = client.get("/api/github/issues", params={"repository": "owner/repo"})
+            assert response.status_code == 200
+            assert response.json()["issues"][0]["number"] == "7"
+            assert client.get("/api/tasks").json()["tasks"] == []
+
+
+def test_issue_list_invalid_repository(tmp_path):
+    with TestClient(create_app(data_dir=tmp_path)) as client:
+        response = client.get("/api/github/issues", params={"repository": "invalid"})
+        assert response.status_code == 422
