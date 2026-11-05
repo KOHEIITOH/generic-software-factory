@@ -106,4 +106,37 @@ GitHub Appのインストール範囲は「All repositories」または「Only s
 - 共有Factoryの実行主体とGitHubユーザー/App installation権限の交差判定。
 - AI Runtimeごとのデータ送信制御と実際の隔離実行の境界。
 
-これらが決まるまでPR #47は設計提案としてDraftを維持する。
+以下のMVP判断で配布形態を確定する。残る外部API仕様・移行詳細は実装PRで検証する。
+
+## 採用決定：ローカル個人利用ファースト（2026-11-05）
+**初期提供形態はA：単一利用者のローカル実行。** チーム共有サーバーとSaaSは後続フェーズ。初期MVPで複数ユーザー管理・外部公開・課金を実装しない。
+
+### MVPの実行・認証境界
+- Factory Web UI/APIはloopbackにのみbindし、外部公開をサポートしない。LAN/リバースプロキシ越しの公開を「ローカルモード」の延長として許可しない。
+- GitHubログインは**任意の接続機能**であり、Factory起動やローカルTask作成の前提にしない。認証未設定でもローカルGit/Projectの管理は継続できる。
+- GitHubとの接続は別途ユーザーが明示的に開始する。Private Repositoryへのアクセスには適切な認証・App installation・権限確認が必要。
+- ローカルモードの実行主体はOS上のFactory起動ユーザー。Web UIからの操作は同一マシン上の信頼された利用者を想定するが、**ブラウザや同一マシンの別プロセスを無条件に信頼しない**。状態変更APIにはOrigin/CSRF対策と追加のローカル認可境界を設計する。
+- トークンはOS credential store等の秘密情報保管手段を優先する。平文設定ファイル・ブラウザ保存・ログへの出力は禁止。使用する保管方式とOS別の可用性は実装PRで決定する。
+- AI実行はローカルでも安全とはみなさない。実行隔離・ネットワーク/ファイルシステム制限・秘密情報の非注入を別途強制する。
+
+### 将来拡張のために今から維持する契約
+- Factory Coreは利用者・Project・Repository・Connectionの**論理ID**を扱い、ローカルMVPでは単一ローカルprincipalを使う。固定のGitHubユーザー名やOSパスをドメインIDにしない。
+- Identity、SCM、Connection、Policy、Executionは分離する。Web UI/API/CLI/MCPの入口から同じApplication Serviceと認可判定を呼ぶ。
+- 所有者と権限の概念はモデルに残すが、初期実装ではマルチテナント認証・DB分離・クラウド運用機能を作らない。
+- 永続化は将来の移行を考慮し、スキーマバージョンと移行手順を設ける。ローカルデータからチーム共有への移行は将来別途設計する。
+- チーム共有・SaaSへの移行時は**新しいセキュリティレビューと認証実装が必須**。loopback専用APIをそのまま外部公開してはいけない。
+
+### このフェーズの実装順序（従来の段階案より優先）
+1. Project/Repository/Connectionの最小モデル、SCM・Identity・Connectionの抽象契約、Fake/Local Git adapterとcontract tests。
+2. ローカルWeb UIでProject/Repositoryを選択してTaskを登録。既存Taskデータを壊さない。
+3. GitHub接続方式の仕様検証・read-only discovery。個人PublicとPrivate/Organizationの権限差を明示。
+4. 必要な認証/接続機能とGitHub App連携を実装し、最小権限でPrivate/Organizationに対応。
+5. 隔離実行とデータ送信Policyを満たした環境で、Task→テスト→PRの縦断検証。
+
+### 受入テスト
+- GitHub未ログイン・ネットワーク未接続でもローカルTaskを作成・閲覧できる。
+- GitHub接続なしでPrivate Repository操作は拒否される。
+- Projectに複数Repositoryを紐付けられるが、操作権限はRepositoryごとに評価される。
+- Fake SCMへ差し替えてもFactory Coreを変更しない。
+- APIを外部公開した設定では安全に起動拒否する（将来の認証付きサーバーモードとは別）。
+- 既存TaskデータとCLI利用の回帰テストが成功する。
