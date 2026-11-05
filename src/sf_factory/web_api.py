@@ -6,11 +6,10 @@ filesystem browsing, or task mutation is available over HTTP.
 
 from __future__ import annotations
 
-from html import escape
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from sf_factory.agent_registry import default_runtime_registry
@@ -48,25 +47,9 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
         def user_guide() -> FileResponse:
             return FileResponse(project_root / "USER_GUIDE.html", media_type="text/html")
 
-        @app.get("/onboarding", response_class=HTMLResponse, include_in_schema=False)
-        def onboarding() -> HTMLResponse:
-            # Escaping the entire Markdown document prevents HTML/script injection.
-            content = escape((project_root / "ONBOARDING.md").read_text(encoding="utf-8"))
-            return HTMLResponse(
-                '<!doctype html><html lang="ja"><head><meta charset="utf-8">'
-                '<meta name="viewport" content="width=device-width,initial-scale=1">'
-                '<title>オンボーディング | Software Factory</title>'
-                '<style>body{margin:0;background:#0b1220;color:#e6edfa;'
-                'font-family:system-ui,sans-serif;line-height:1.7}'
-                'main{max-width:900px;margin:auto;padding:32px 20px}'
-                'a{color:#a7c5ff}pre{white-space:pre-wrap;overflow-wrap:anywhere;'
-                'font:inherit;background:#131f33;border:1px solid #30415c;'
-                'border-radius:14px;padding:25px}</style></head><body>'
-                '<main><a href="/">← ダッシュボードに戻る</a>'
-                '<h1>オンボーディング</h1>'
-                '<p>初回セットアップ手順（ONBOARDING.md）</p><pre>'
-                + content + '</pre></main></body></html>'
-            )
+        @app.get("/onboarding", include_in_schema=False)
+        def onboarding() -> FileResponse:
+            return FileResponse(project_root / "ONBOARDING.html", media_type="text/html")
 
     if static_dir is not None:
         if not (static_dir / 'index.html').is_file():
