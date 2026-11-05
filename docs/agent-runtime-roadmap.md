@@ -13,7 +13,7 @@
 | Claude Code | Agent Runtime | 次のRuntime候補 | Planned |
 | GitHub Copilot SDK | Agent Runtime | 共通契約へ接続。空workspace・ツール無効で実行 | SDK Adapter |
 | Gemini CLI | Agent Runtime | 次段階で追加 | Planned |
-| AWS Bedrock | Model Provider | Custom Agentからモデル推論を利用する場合に追加 | Planned |
+| AWS Bedrock | Model Provider | Converse APIでテキスト推論。Custom Agent連携は別段階 | Inference Adapter |
 | xAI API (Grok models) | Model Provider | Custom AgentからGrokモデルを直接利用する場合に追加 | Planned |
 
 ## 役割を分ける
@@ -50,3 +50,25 @@ BedrockはCodex / Claude Code等と同じ種類のAgent Runtimeではない。�
 Python実装では、最初は同期的な execute(prompt, workspace, timeout) と正規化された RuntimeResult のみを持つ。Coreは製品固有のイベント形式、SDKオブジェクト、CLI引数を知らない。
 
 CodexとGrok BuildのAdapterで保証するのは、各CLIを既定のread-only設定で起動し、実行結果・終了コード・session IDを返せることまで。Copilot SDK AdapterはローカルCopilot認証を利用し、空workspaceで利用可能ツールを無効にして応答を得る。これはCodex/Grokと同等のsandboxやOSレベルの隔離を保証せず、現在のFactory run workspaceにも対象リポジトリは取り込まれない。Factory Workflow、永続化、独立レビュー、隔離実行基盤は別の実装段階である。
+
+## AWS Bedrock Model Provider（推論専用）
+
+`pip install -e '.[bedrock]'` で任意依存の boto3 を導入する。
+AWS認証はboto3標準のcredential chain（環境変数、AWS profile、IAM Role等）を利用し、
+アクセスキーをFactory設定やGitに保存しない。利用リージョン、モデルID、Bedrockのモデル利用権限、
+IAMの `bedrock:InvokeModel` 権限等をAWS側で用意する必要がある。
+
+```python
+from sf_factory.bedrock_provider import BedrockModelProvider
+
+provider = BedrockModelProvider(
+    model_id="YOUR_BEDROCK_MODEL_ID",
+    region_name="ap-northeast-1",
+)
+response = provider.generate("こんにちは")
+print(response.text)
+```
+
+このアダプターは `ModelProvider` 契約でテキスト推論するだけで、`AgentRuntime`
+への登録、ファイル編集、ツール実行、Taskの自律実行はまだ提供しない。
+AWS実環境での接続確認には利用者のAWS権限・モデルIDが必要。
