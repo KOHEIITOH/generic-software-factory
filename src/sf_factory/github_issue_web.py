@@ -35,7 +35,9 @@ def install_github_issue_routes(app: FastAPI, data_dir: Path | None) -> None:
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except RuntimeError as exc:
-            raise HTTPException(status_code=502, detail="GitHub Issue一覧を取得できませんでした") from exc
+            raise HTTPException(
+                status_code=502, detail="GitHub Issue一覧を取得できませんでした"
+            ) from exc
         return {"issues": [
             {"repository": issue.instance, "number": issue.external_id,
              "prompt": issue.prompt, "url": issue.external_url}
