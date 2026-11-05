@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from importlib import import_module
+from dataclasses import dataclass
 from typing import Any
 
 from sf_factory.model_provider import ModelResponse
