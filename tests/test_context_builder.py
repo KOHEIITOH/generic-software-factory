@@ -28,7 +28,7 @@ def test_rejects_symlinks(tmp_path: Path):
 
 
 def test_rejects_non_utf8(tmp_path: Path):
-    (tmp_path / "binary").write_bytes(b"\\xff")
+    (tmp_path / "binary").write_bytes(bytes([255]))
     assert build_context(tmp_path, ["binary"]).excluded == ("binary",)
 
 
