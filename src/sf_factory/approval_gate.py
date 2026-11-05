@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class ActionKind(str, Enum):
+class ActionKind(StrEnum):
     WRITE_FILE = "write_file"
     RUN_COMMAND = "run_command"
     RELEASE = "release"
