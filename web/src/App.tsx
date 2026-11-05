@@ -16,6 +16,9 @@ export default function App() {
   const [runtimes, setRuntimes] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [newTask, setNewTask] = useState("");
+  const [taskBusy, setTaskBusy] = useState(false);
+  const [taskMessage, setTaskMessage] = useState("");
   const [runs, setRuns] = useState<Run[]>([]);
   const [repository, setRepository] = useState("KOHEIITOH/generic-software-factory");
   const [issueNumber, setIssueNumber] = useState("");
@@ -28,6 +31,25 @@ export default function App() {
   const [issueListMessage, setIssueListMessage] = useState("");
   const [issueBusy, setIssueBusy] = useState(false);
   const [issueMessage, setIssueMessage] = useState("");
+
+  async function createLocalTask() {
+    if (!newTask.trim() || taskBusy) return;
+    setTaskBusy(true); setTaskMessage("");
+    try {
+      const response = await fetch("/api/tasks", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: newTask.trim() }),
+      });
+      if (!response.ok) throw new Error("タスクの作成に失敗しました。");
+      const data = await response.json();
+      setTaskMessage("タスクを登録しました: " + data.task_id + "（AIは実行されません）");
+      setNewTask("");
+      const refreshed = await fetch("/api/tasks");
+      if (refreshed.ok) setTasks((await refreshed.json()).tasks);
+    } catch (cause) {
+      setTaskMessage(cause instanceof Error ? cause.message : "作成エラー");
+    } finally { setTaskBusy(false); }
+  }
 
   async function loadIssues(page = 1) {
     if (issueListBusy) return;
@@ -177,7 +199,7 @@ export default function App() {
           {issueMessage && <p role="status">{issueMessage}</p>}
           {issuePreview && <div className="issue-preview"><strong>Issue #{issuePreview.number}</strong><pre>{issuePreview.prompt}</pre><a className="source-link" href={issuePreview.url} target="_blank" rel="noopener noreferrer">GitHubで開く ↗</a><button type="button" disabled={issueBusy} onClick={() => void importIssue()}>このIssueを取り込む</button></div>}
         </section>
-        <section className="panel" id="tasks"><div className="panel-head"><span className="eyebrow">TASK TRACKER</span><h2>タスク一覧</h2><p>CLIなどで登録したタスクを読み取り専用で表示します。</p></div>{state === "connected" && (tasks.length ? <div className="runtime-list">{tasks.map(task => <div className="runtime" key={task.id}><span><strong>{task.prompt}</strong><small>{task.provider ? `${task.provider.toUpperCase()} · ${task.external_id ?? ""} · ` : "LOCAL · "}{formatDate(task.created_at)}</small></span>{task.external_url && <a className="source-link" href={task.external_url} target="_blank" rel="noopener noreferrer" aria-label="元Issueを開く">元Issue ↗</a>}</div>)}</div> : <p>まだタスクはありません。CLIまたは外部Issue連携から取り込むと、ここに表示されます。</p>)}</section>
+        <section className="panel" id="tasks"><div className="panel-head"><span className="eyebrow">TASK TRACKER</span><h2>タスク一覧</h2><p>ローカルTaskを登録できます。登録してもAIは自動実行されません。</p></div><form className="issue-form" onSubmit={event => {event.preventDefault(); void createLocalTask();}}><label>新しいタスク<textarea aria-label="新しいタスク" value={newTask} maxLength={10000} onChange={event => setNewTask(event.target.value)} placeholder="AIに依頼したい作業を入力" rows={3} /></label><button type="submit" disabled={taskBusy || !newTask.trim() || state !== "connected"}>{taskBusy ? "登録中..." : "タスクを登録"}</button></form>{taskMessage && <p role="status">{taskMessage}</p>}{state === "connected" && (tasks.length ? <div className="runtime-list">{tasks.map(task => <div className="runtime" key={task.id}><span><strong>{task.prompt}</strong><small>{task.provider ? `${task.provider.toUpperCase()} · ${task.external_id ?? ""} · ` : "LOCAL · "}{formatDate(task.created_at)}</small></span>{task.external_url && <a className="source-link" href={task.external_url} target="_blank" rel="noopener noreferrer" aria-label="元Issueを開く">元Issue ↗</a>}</div>)}</div> : <p>まだタスクはありません。CLIまたは外部Issue連携から取り込むと、ここに表示されます。</p>)}</section>
         <section className="panel" id="runs"><div className="panel-head"><span className="eyebrow">EXECUTION HISTORY</span><h2>実行履歴</h2><p>直近の実行状態を表示します。自動更新・実行操作は今後追加します。</p></div>{state === "connected" && (runs.length ? <div className="runtime-list">{runs.map(run => <div className="runtime" key={run.id}><span><strong>{run.runtime} · {run.status}</strong><small>{run.id.slice(0, 12)} · {formatDate(run.started_at)}</small></span></div>)}</div> : <p>まだ実行履歴はありません。AI Runtimeで実行すると、ここに記録されます。</p>)}</section>
         <footer>Software Factory · ローカル管理画面 MVP · 操作機能は今後追加</footer>
       </main>
