@@ -13,9 +13,10 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from sf_factory.agent_registry import default_runtime_registry
+from sf_factory.factory import Factory
 
 
-def create_app(static_dir: Path | None = None) -> FastAPI:
+def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> FastAPI:
     app = FastAPI(
         title="Software Factory Local API",
         description="Read-only local dashboard API (experimental)",
@@ -30,6 +31,14 @@ def create_app(static_dir: Path | None = None) -> FastAPI:
     @app.get("/api/runtimes")
     def runtimes() -> dict[str, list[str]]:
         return {"runtimes": list(default_runtime_registry().names())}
+
+    @app.get('/api/tasks')
+    def tasks() -> dict[str, list[dict]]:
+        return {'tasks': Factory(data_dir or Path('.sf-factory')).list_tasks()}
+
+    @app.get('/api/runs')
+    def runs() -> dict[str, list[dict]]:
+        return {'runs': Factory(data_dir or Path('.sf-factory')).list_runs()}
 
     if static_dir is not None:
         if not (static_dir / 'index.html').is_file():
