@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 
 def _required(value: str, field: str) -> None:
@@ -67,12 +67,14 @@ class RepositoryCapabilities:
     pull_request: bool = False
 
 
+@runtime_checkable
 class RepositoryDiscovery(Protocol):
     def list_repositories(self, connection: Connection) -> tuple[Repository, ...]:
         """Return a snapshot of repositories visible to the connection principal."""
         ...
 
 
+@runtime_checkable
 class RepositoryAuthorization(Protocol):
     def capabilities(
         self, connection: Connection, repository: Repository
