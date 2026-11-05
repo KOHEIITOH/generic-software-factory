@@ -59,4 +59,5 @@ def test_local_documentation_routes(tmp_path) -> None:
     assert 'href="/onboarding"' in guide.text
     assert onboarding.status_code == 200
     assert "オンボーディング" in onboarding.text
-    assert "<pre>" in onboarding.text
+    assert "<h2>" in onboarding.text
+    assert "初回オンボーディング" in onboarding.text
