@@ -41,7 +41,8 @@ def install_github_issue_routes(app: FastAPI, data_dir: Path | None) -> None:
         parsed = urlsplit(origin)
         if (parsed.scheme not in ("http", "https")
                 or parsed.netloc != request.headers.get("host")
-                or request.headers.get("content-type", "").split(";")[0].strip() != "application/json"):
+                or request.headers.get("content-type", "").split(";")[0].strip()
+                != "application/json"):
             raise HTTPException(status_code=403, detail="Same-origin JSON request required")
         issue = _fetch(selection.repository, selection.number)
         task_id = Factory(data_dir or Path(".sf-factory")).import_external_task(
