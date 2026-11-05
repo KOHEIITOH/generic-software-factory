@@ -26,7 +26,7 @@ Generic Software Factoryは、ソフトウェア開発の計画・実行・品�
 入口（Inbound Interface）とAIへの委譲（Outbound Agent Runtime）は分離します。MCP ServerはAIがFactoryを操作する入口であり、Codex / Claude Code等はFactoryが作業を委譲するRuntimeです。
 
 詳しくは[アーキテクチャ](docs/architecture.md)、[Adapter・Interface契約](docs/adapter-contracts.md)、[Agent対応ロードマップ](docs/agent-runtime-roadmap.md)、[設定](docs/configuration.md)、[セキュリティ](docs/security.md)、[MVP計画](docs/mvp-plan.md)を参照してください。
-初めての方向けに[利用ガイド (HTML)](USER_GUIDE.html) と [初回オンボーディング](ONBOARDING.md)も用意しています。
+初めての方向けに[利用ガイド (HTML)](USER_GUIDE.html) と [初回オンボーディング（HTML）](ONBOARDING.html)（[開発者向けMarkdown](ONBOARDING.md)）も用意しています。
 [ローカルリポジトリの読み取り専用解析](docs/local-repository-analysis.md)も利用できます。
 
 ## 現在の実装方針
@@ -36,7 +36,8 @@ Generic Software Factoryは、ソフトウェア開発の計画・実行・品�
 - Agent Runtime Adapter: Codex CLI、Grok Build CLI、GitHub Copilot SDK（Task/Runから選択可能。Copilotは空workspace・tools無効の現段階に限る）
 - 追加予定: Claude Code、Gemini CLI
 - Model Provider: AWS Bedrock、xAI API等を将来の独立した接続先として追加
-- 将来のWeb UI: TypeScript（React / Next.js候補）
+- ローカルWeb UI: React / TypeScript / Vite（閲覧専用ダッシュボード。タスク実行・取り込み操作は未対応）
+- Task Source: GitHub Issuesの読み取り専用Adapterと重複防止付きTask取り込みをPython APIとして実装。Web UI/CLIからのIssue取り込みは未対応。
 - 初期検証: 一時ディレクトリ内のread-only / サンプル限定code-edit smoke test。会社のソースコードは使用しない。
 
 ## Quickstart — macOS / Windows / Linux
@@ -94,7 +95,20 @@ uv run sf copilot-smoke
 
 ## 現在のステータス
 
-**実験的MVP** — ローカルSQLiteによるTask/Run/Audit記録、Codex/Grok/Copilot Runtime Adapter、read-only smoke test、Codexによるサンプル限定のコード編集と単体テストを実装しています。`uv run sf analyze /path/to/repository --confirm-send` は指定されたローカルGitリポジトリから制限付きのテキストsnapshotをCopilotへ渡して解析します。SDK toolsは無効で、リポジトリ本体をworkspaceとして渡さず、Task/RunやFactory DBにはソース内容を保存しません。ファイルの編集・任意コマンド実行・隔離保証はありません。詳細は[解析の範囲と制約](docs/local-repository-analysis.md)を参照してください。`uv run sf dev-smoke --runtime codex` は使い捨て一時ディレクトリ内の同梱サンプルだけを編集します。編集可能なRuntimeは明示指定が必要で、現時点ではCodexのみ検証済みです。Factory Coreおよび共通AgentRuntime契約はCodexに依存しません。独立レビュー、PR自動作成、MCP Server、Web UIは未実装です。
+**実験的MVP** — ローカルSQLiteによるTask/Run/Audit記録、Codex/Grok/Copilot Runtime Adapter、read-only smoke test、Codexによるサンプル限定のコード編集と単体テストを実装しています。`uv run sf analyze /path/to/repository --confirm-send` は指定されたローカルGitリポジトリから制限付きのテキストsnapshotをCopilotへ渡して解析します。SDK toolsは無効で、リポジトリ本体をworkspaceとして渡さず、Task/RunやFactory DBにはソース内容を保存しません。ファイルの編集・任意コマンド実行・隔離保証はありません。詳細は[解析の範囲と制約](docs/local-repository-analysis.md)を参照してください。`uv run sf dev-smoke --runtime codex` は使い捨て一時ディレクトリ内の同梱サンプルだけを編集します。編集可能なRuntimeは明示指定が必要で、現時点ではCodexのみ検証済みです。Factory Coreおよび共通AgentRuntime契約はCodexに依存しません。独立レビューの自動化、PR自動作成、MCP Server、Web UIからのタスク実行は未実装です。ローカルWeb UIではTask/Run/Runtimeを閲覧できます。GitHub Issues AdapterはIssueを読み取ってTaskに取り込めますが、現時点ではPython APIからの呼び出しのみです。
+
+## ローカルWeb UI（閲覧専用）
+
+```bash
+uv sync --extra web
+uv run sf web --rebuild
+```
+
+ブラウザで `http://127.0.0.1:8000/` を開きます。画面にはタスク、実行履歴、登録済みRuntimeが表示され、`/guide` と `/onboarding` からHTML資料を読めます。初回またはフロントエンド再構築時はNode.js/npmも必要です。ローカルAPIは認証なしのため外部公開しないでください。詳細は[ローカルWeb API](docs/local-web-api.md)を参照してください。
+
+## GitHub Issuesの取り込み（Python API）
+
+[GitHub Issues Adapterガイド](docs/guides/github-issues-source.md)を参照してください。Issueの取得とTaskへの保存は実装済みですが、GitHubのIssueを選ぶ画面、CLIコマンド、自動実行、PR作成は未実装です。
 
 ## セキュリティの基準
 
