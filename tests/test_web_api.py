@@ -42,3 +42,21 @@ def test_task_and_run_listing_is_read_only(tmp_path) -> None:
     assert runs.status_code == 200
     assert runs.json() == {"runs": []}
     assert mutation.status_code == 405
+
+
+def test_local_documentation_routes(tmp_path) -> None:
+    static_dir = tmp_path / "dist"
+    static_dir.mkdir()
+    (static_dir / "index.html").write_text("<html>dashboard</html>")
+    (static_dir / "assets").mkdir()
+    with TestClient(create_app(static_dir=static_dir, data_dir=tmp_path)) as client:
+        guide = client.get("/guide")
+        onboarding = client.get("/onboarding")
+        root = client.get("/")
+    assert root.status_code == 200
+    assert guide.status_code == 200
+    assert "AI開発チーム" in guide.text
+    assert 'href="/onboarding"' in guide.text
+    assert onboarding.status_code == 200
+    assert "オンボーディング" in onboarding.text
+    assert "<pre>" in onboarding.text
