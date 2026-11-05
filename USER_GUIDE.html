@@ -135,7 +135,8 @@
         <section id="status">
           <h2>2. 現在できること・できないこと</h2>
           <div class="callout"><strong>大切な前提:</strong> ローカルCLI、Task/Run/Audit管理、Codex/Grok/Copilot Adapter、Workflow・Policy・Quality Gate・改善ループの基礎を実装済みです。ただし任意リポジトリへの開発、PR自動作成、安全なOS隔離は未対応です。</div>
-          <p>今すぐできるのは、CLIによるTaskの作成・実行・結果参照、read-only接続確認、同梱サンプルへのCodexコード編集と単体テストです。Workflow実行と品質改善ループの基盤はPython APIとして存在しますが、CLIからの一気通貫実行は未実装です。GitHubリポジトリ連携やPR作成は今後実装予定です。</p>
+          <p>今すぐできるのは、CLIによるTaskの作成・実行・結果参照、read-only接続確認、同梱サンプルへのCodexコード編集と単体テストです。Workflow実行と品質改善ループの基盤はPython APIとして存在しますが、CLIからの一気通貫実行は未実装です。GitHub Issuesの読み取り専用Adapterと、外部Issueを重複なくTaskとして保存するPython APIは実装済みです。ただしWeb UIからのIssue取り込み、GitHubへのPR自動作成、任意リポジトリへの自律編集は未実装です。</p>
+          <div class="mini"><strong>ローカルWeb UI（閲覧専用）</strong> <a href="/">ダッシュボード</a>では登録済みAI Runtime、Task一覧、Run履歴を確認できます。<a href="/onboarding">初回セットアップ</a>もブラウザで閲覧できます。Web UIからのTask作成・AI実行はまだできません。</div>
           <div class="callout good"><strong>このガイドの位置づけ:</strong> 現状を実際以上に見せず、「構想の理解」と「導入・実装に向けた準備」に役立つようにまとめています。</div>
         </section>
 
