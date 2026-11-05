@@ -43,3 +43,15 @@ GitHub Appのインストール範囲は「All repositories」または「Only s
 - 他ユーザーのセッションやリポジトリへアクセスできない。
 - 未接続・未認証の状態ではGitHub操作を拒否する。
 - 企業のPrivateコードをAIへ送る前にProvider/データポリシーを評価する。
+
+## ゴールと設計上の非目標
+この構想のゴールは**特定企業のGitHub運用を再現することではなく、開発対象・SCM・AI・ホスティングに依存しない汎用Software Factory**である。Organization配下のPrivate Repositoryは重要な受入ユースケースの一つであり、唯一の対象ではない。
+
+- 個人の単一Public Repository、個人Private Repository、Organizationの複数Private Repository、ローカルGit、将来のGitLab等を想定する。
+- GitHubログインを唯一のログイン手段にしない。ローカル単独利用はGitHubアカウントなしでも成立させる。
+- Factory CoreはGitHubのOAuth、installation ID、REST API、組織モデルに直接依存しない。認証・SCM・Repository DiscoveryはAdapterの契約として扱う。
+- リポジトリ発見とコード操作を分離し、利用者が見えるリポジトリすべてへの書き込みを前提にしない。
+- 企業固有のSSO・承認ルール・ポリシーはConfigurationまたはAdapterで吸収する。
+- 初期実装でGitHubを優先しても、別のSCMを追加する際にCore変更が必須となる設計を避ける。
+
+受入シナリオは最低限、(A) GitHub未接続のローカル利用、(B) 個人のPublic/Private、(C) OrganizationのPrivate、(D) GitHub以外のSCMをFake Adapterで差し替え、を含める。
