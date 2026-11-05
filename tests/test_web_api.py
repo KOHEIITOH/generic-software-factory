@@ -28,7 +28,7 @@ def test_mutating_requests_are_not_exposed() -> None:
     assert response.status_code == 405
 
 
-def test_task_and_run_listing_is_read_only(tmp_path) -> None:
+def test_task_and_run_listing_requires_origin_for_mutation(tmp_path) -> None:
     from sf_factory.factory import Factory
 
     factory = Factory(tmp_path)
@@ -41,7 +41,7 @@ def test_task_and_run_listing_is_read_only(tmp_path) -> None:
     assert tasks.json()["tasks"][0]["id"] == task_id
     assert runs.status_code == 200
     assert runs.json() == {"runs": []}
-    assert mutation.status_code == 405
+    assert mutation.status_code == 403
 
 
 def test_local_documentation_routes(tmp_path) -> None:
