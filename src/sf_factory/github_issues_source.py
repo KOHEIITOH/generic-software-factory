@@ -27,6 +27,51 @@ class GitHubIssuesSource:
         if not 0 < self.timeout_seconds <= 60:
             raise ValueError("timeout must be between 0 and 60 seconds")
 
+    def list_issues(self, limit: int = 20) -> list[ExternalIssue]:
+        """List up to 50 open issues; pull requests are excluded."""
+        if not 1 <= limit <= 50:
+            raise ValueError("limit must be between 1 and 50")
+        owner, repo = self.repository.split("/")
+        url = (
+            "https://api.github.com/repos/"
+            f"{quote(owner, safe='')}/{quote(repo, safe='')}/issues"
+            f"?state=open&per_page={limit}"
+        )
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "generic-software-factory",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+        try:
+            with urlopen(Request(url, headers=headers), timeout=self.timeout_seconds) as response:
+                payload = json.load(response)
+        except (HTTPError, URLError, TimeoutError) as exc:
+            raise RuntimeError("GitHub issue list request failed") from exc
+        if not isinstance(payload, list):
+            raise ValueError("GitHub response is not an issue list")
+        issues = []
+        for item in payload:
+            if not isinstance(item, dict) or "pull_request" in item:
+                continue
+            number = item.get("number")
+            title = item.get("title")
+            body = item.get("body")
+            if (not isinstance(number, int) or number < 1
+                    or not isinstance(title, str) or not title.strip()
+                    or (body is not None and not isinstance(body, str))):
+                continue
+            expected = f"https://github.com/{self.repository}/issues/{number}"
+            if item.get("html_url") != expected:
+                continue
+            prompt = title.strip() + ("\\n\\n" + body.strip() if body and body.strip() else "")
+            issues.append(ExternalIssue(
+                provider="github", instance=self.repository, external_id=str(number),
+                prompt=prompt, external_url=expected,
+            ))
+        return issues
+
     def fetch_issue(self, external_id: str) -> ExternalIssue:
         if not _NUMBER.fullmatch(external_id):
             raise ValueError("GitHub issue ID must be a positive integer")
