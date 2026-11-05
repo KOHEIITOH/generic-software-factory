@@ -21,6 +21,14 @@ export default function App() {
   const [projectError, setProjectError] = useState("");
   const [projectLoading, setProjectLoading] = useState(false);
   const [projectsError, setProjectsError] = useState("");
+  const [projectName, setProjectName] = useState("");
+  const [projectBusy, setProjectBusy] = useState(false);
+  const [projectMessage, setProjectMessage] = useState("");
+  const [repoProvider, setRepoProvider] = useState("local-git");
+  const [repoLocation, setRepoLocation] = useState("");
+  const [repoVisibility, setRepoVisibility] = useState("local");
+  const [repoBusy, setRepoBusy] = useState(false);
+  const [repoMessage, setRepoMessage] = useState("");
   const [runtimes, setRuntimes] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -51,6 +59,51 @@ export default function App() {
       .finally(() => { if (!controller.signal.aborted) setProjectLoading(false); });
     return () => controller.abort();
   }, [selectedProject]);
+
+  async function createProject() {
+    if (!projectName.trim() || projectBusy) return;
+    setProjectBusy(true); setProjectMessage("");
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: projectName.trim() }),
+      });
+      if (!response.ok) throw new Error("Projectの登録に失敗しました（" + response.status + "）");
+      const created: Project = await response.json();
+      setProjects(previous => [...previous, created]);
+      setSelectedProject(created.id);
+      setProjectName("");
+      setProjectsError("");
+      setProjectMessage("Projectを登録しました。Repositoryを追加できます。");
+    } catch (cause) {
+      setProjectMessage(cause instanceof Error ? cause.message : "登録エラー");
+    } finally { setProjectBusy(false); }
+  }
+
+  async function createRepository() {
+    if (!selectedProject || !repoLocation.trim() || !repoProvider.trim() || repoBusy) return;
+    setRepoBusy(true); setRepoMessage("");
+    const target = selectedProject;
+    try {
+      const response = await fetch("/api/projects/" + encodeURIComponent(target) + "/repositories", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider_id: repoProvider.trim(), external_id: repoLocation.trim(), visibility: repoVisibility,
+        }),
+      });
+      if (!response.ok) throw new Error(response.status === 409
+        ? "このRepositoryはすでに登録されています。" : "Repositoryの登録に失敗しました（" + response.status + "）");
+      const created: Repository = await response.json();
+      if (target === selectedProject) {
+        setProjectRepos(previous => [...previous, created]);
+        setRepoLocation("");
+        setProjectError("");
+        setRepoMessage("Repositoryを登録しました。");
+      }
+    } catch (cause) {
+      setRepoMessage(cause instanceof Error ? cause.message : "登録エラー");
+    } finally { setRepoBusy(false); }
+  }
 
   async function createLocalTask() {
     if (!newTask.trim() || taskBusy) return;
@@ -189,7 +242,28 @@ export default function App() {
           <article className="metric"><span>登録済みAI Runtime</span><strong>{state === "connected" ? runtimes.length : "—"}</strong><small>登録済みのアダプタ</small></article>
           <article className="metric"><span>実行中のRun</span><strong>{state === "connected" ? activeRuns : "—"}</strong><small>実行中のRun</small></article>
         </section>
-        <div className="section-heading"><div><span className="eyebrow">FACTORY WORKSPACE</span><h2>ワークスペース</h2></div><span className="section-note">タスク {tasks.length}件 · 外部連携 {linkedTasks}件</span></div><section className="panel" id="projects"><div className="panel-head"><span className="eyebrow">LOCAL PROJECTS</span><h2>Project・Repository</h2><p>ローカルに登録済みのProjectを参照できます。登録・編集は今後対応します。</p></div>{projectsError ? <p role="alert">{projectsError}</p> : state === "connected" && (projects.length ? <><label className="project-selector">Projectを選択<select aria-label="Projectを選択" value={selectedProject} onChange={event => setSelectedProject(event.target.value)}><option value="">選択してください</option>{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>{selectedProject && (projectError ? <p role="alert">{projectError}</p> : projectLoading ? <p role="status">Repositoryを読み込み中...</p> : projectRepos.length ? <div className="runtime-list">{projectRepos.map(repo => <div className="runtime" key={repo.id}><span><strong>{repo.external_id}</strong><small>{repo.provider_id} · {repo.visibility}</small></span></div>)}</div> : <p>Repositoryはまだ登録されていません。</p>)}</> : <p>Projectはまだ登録されていません。登録機能は今後追加します。</p>)}</section><section className="panel" id="runtimes"><div className="panel-head"><div><span className="eyebrow">AGENT ADAPTERS</span><h2>AI Runtime</h2><p>登録済みAdapterと今後の対応候補です。登録済みでも実行可能・認証済みを意味しません。</p></div></div>
+        <div className="section-heading"><div><span className="eyebrow">FACTORY WORKSPACE</span><h2>ワークスペース</h2></div><span className="section-note">タスク {tasks.length}件 · 外部連携 {linkedTasks}件</span></div><section className="panel" id="projects">
+          <div className="panel-head"><span className="eyebrow">LOCAL PROJECTS</span><h2>Project・Repository</h2><p>複数Repositoryをまとめる場合に登録します。単一RepositoryのTask作成には登録不要です。登録だけではGit操作・AI実行は始まりません。</p></div>
+          <form className="issue-form" onSubmit={event => { event.preventDefault(); void createProject(); }}>
+            <label>新しいProject名<input aria-label="新しいProject名" maxLength={120} value={projectName} onChange={event => setProjectName(event.target.value)} placeholder="例: My Service" /></label>
+            <button type="submit" disabled={projectBusy || !projectName.trim() || state !== "connected"}>{projectBusy ? "登録中..." : "Projectを登録"}</button>
+          </form>
+          {projectMessage && <p role="status">{projectMessage}</p>}
+          {projectsError && <p role="alert">{projectsError}</p>}
+          {state === "connected" && (projects.length ? <>
+            <label className="project-selector">Projectを選択<select aria-label="Projectを選択" value={selectedProject} onChange={event => { setSelectedProject(event.target.value); setRepoMessage(""); }}><option value="">選択してください</option>{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
+            {selectedProject && <>
+              <form className="issue-form project-register-form" onSubmit={event => { event.preventDefault(); void createRepository(); }}>
+                <label>接続先<select aria-label="Repositoryの接続先" value={repoProvider} onChange={event => { setRepoProvider(event.target.value); setRepoVisibility(event.target.value === "local-git" ? "local" : "private"); }}><option value="local-git">ローカルGit</option><option value="github">GitHub（メタデータ登録のみ）</option></select></label>
+                <label>{repoProvider === "local-git" ? "Repositoryのパス" : "Repository（owner/repo）"}<input aria-label="Repositoryの場所" maxLength={500} value={repoLocation} onChange={event => setRepoLocation(event.target.value)} placeholder={repoProvider === "local-git" ? "/path/to/repository" : "owner/repo"} /></label>
+                <label>公開範囲<select aria-label="公開範囲" value={repoVisibility} onChange={event => setRepoVisibility(event.target.value)}><option value="local">local</option><option value="private">private</option><option value="public">public</option></select></label>
+                <button type="submit" disabled={repoBusy || projectLoading || !repoLocation.trim() || state !== "connected"}>{repoBusy ? "登録中..." : "Repositoryを追加"}</button>
+              </form>
+              {repoMessage && <p role="status">{repoMessage}</p>}
+              {projectError ? <p role="alert">{projectError}</p> : projectLoading ? <p role="status">Repositoryを読み込み中...</p> : projectRepos.length ? <div className="runtime-list">{projectRepos.map(repo => <div className="runtime" key={repo.id}><span><strong>{repo.external_id}</strong><small>{repo.provider_id} · {repo.visibility}</small></span></div>)}</div> : <p>Repositoryはまだ登録されていません。</p>}
+            </>}
+          </> : !projectsError && <p>Projectはまだ登録されていません。上のフォームから追加できます。</p>)}
+        </section><section className="panel" id="runtimes"><div className="panel-head"><div><span className="eyebrow">AGENT ADAPTERS</span><h2>AI Runtime</h2><p>登録済みAdapterと今後の対応候補です。登録済みでも実行可能・認証済みを意味しません。</p></div></div>
           {state === "loading" ? <p role="status">読み込み中...</p> : state === "offline" ? <div role="alert" className="notice">ローカルAPIに接続できません。FastAPIを起動してください。{error && <small>詳細: {error}</small>}</div> : <div className="runtime-list">{runtimes.map(name => <div className="runtime" key={name}><span className="runtime-symbol">◇</span><span><strong>{name}</strong><small>Registered adapter</small></span><span className="tag">登録済み</span></div>)}{plannedRuntimes.filter(candidate => !runtimes.includes(candidate.key)).map(candidate => <div className="runtime planned-runtime" key={candidate.key}><span className="runtime-symbol">◇</span><span><strong>{candidate.name}</strong><small>{candidate.note} · 利用不可</small></span><span className="tag planned-tag">未登録</span></div>)}</div>}
         </section>
         <section className="panel" id="github-import">
