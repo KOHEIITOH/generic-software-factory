@@ -56,6 +56,27 @@ class Factory:
                        (task_id, "task.created", _now()))
         return task_id
 
+    def list_tasks(self, limit: int = 50) -> list[dict]:
+        if not 1 <= limit <= 100:
+            raise ValueError('limit must be between 1 and 100')
+        with self._connect() as db:
+            rows = db.execute(
+                'SELECT id,prompt,created_at FROM tasks ORDER BY created_at DESC, id DESC LIMIT ?',
+                (limit,),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def list_runs(self, limit: int = 50) -> list[dict]:
+        if not 1 <= limit <= 100:
+            raise ValueError('limit must be between 1 and 100')
+        with self._connect() as db:
+            rows = db.execute(
+                'SELECT id,task_id,runtime,status,started_at,ended_at FROM runs '
+                'ORDER BY started_at DESC, id DESC LIMIT ?',
+                (limit,),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
     def show_task(self, task_id: str) -> dict:
         with self._connect() as db:
             task = db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()

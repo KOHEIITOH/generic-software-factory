@@ -26,3 +26,19 @@ def test_mutating_requests_are_not_exposed() -> None:
     with TestClient(create_app()) as client:
         response = client.post("/api/runtimes")
     assert response.status_code == 405
+
+
+def test_task_and_run_listing_is_read_only(tmp_path) -> None:
+    from sf_factory.factory import Factory
+
+    factory = Factory(tmp_path)
+    task_id = factory.create_task("Check repository quality")
+    with TestClient(create_app(data_dir=tmp_path)) as client:
+        tasks = client.get("/api/tasks")
+        runs = client.get("/api/runs")
+        mutation = client.post("/api/tasks", json={"prompt": "not allowed"})
+    assert tasks.status_code == 200
+    assert tasks.json()["tasks"][0]["id"] == task_id
+    assert runs.status_code == 200
+    assert runs.json() == {"runs": []}
+    assert mutation.status_code == 405
