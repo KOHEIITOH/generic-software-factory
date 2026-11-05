@@ -19,8 +19,8 @@ class UsageRecord:
     def __post_init__(self) -> None:
         if not self.task_id.strip():
             raise ValueError("task_id is required")
-        if self.attempt < 1:
-            raise ValueError("attempt must be positive")
+        if type(self.attempt) is not int or self.attempt < 1:
+            raise ValueError("attempt must be a positive integer")
 
 
 @dataclass
