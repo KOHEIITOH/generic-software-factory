@@ -31,7 +31,9 @@ def install_github_issue_routes(app: FastAPI, data_dir: Path | None) -> None:
     @app.get("/api/github/issues")
     def list_issues(repository: str, page: int = 1, state: str = "open"):
         try:
-            issues, has_more = GitHubIssuesSource(repository=repository).list_issues(\n                page=page, state=state\n            )
+            issues, has_more = GitHubIssuesSource(repository=repository).list_issues(
+                page=page, state=state
+            )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except RuntimeError as exc:
