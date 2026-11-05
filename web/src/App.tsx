@@ -19,6 +19,8 @@ export default function App() {
   const [selectedProject, setSelectedProject] = useState("");
   const [projectRepos, setProjectRepos] = useState<Repository[]>([]);
   const [projectError, setProjectError] = useState("");
+  const [projectLoading, setProjectLoading] = useState(false);
+  const [projectsError, setProjectsError] = useState("");
   const [runtimes, setRuntimes] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -39,13 +41,14 @@ export default function App() {
   const [issueMessage, setIssueMessage] = useState("");
 
   useEffect(() => {
-    if (!selectedProject) { setProjectRepos([]); setProjectError(""); return; }
+    if (!selectedProject) { setProjectRepos([]); setProjectError(""); setProjectLoading(false); return; }
     const controller = new AbortController();
-    setProjectRepos([]); setProjectError("");
+    setProjectRepos([]); setProjectError(""); setProjectLoading(true);
     void fetch("/api/projects/" + encodeURIComponent(selectedProject) + "/repositories", { signal: controller.signal })
       .then(async response => { if (!response.ok) throw new Error("Repository一覧を取得できませんでした"); return response.json(); })
       .then(data => { if (!controller.signal.aborted) setProjectRepos(data.repositories as Repository[]); })
-      .catch(error => { if (!controller.signal.aborted) setProjectError(error instanceof Error ? error.message : "取得エラー"); });
+      .catch(error => { if (!controller.signal.aborted) setProjectError(error instanceof Error ? error.message : "取得エラー"); })
+      .finally(() => { if (!controller.signal.aborted) setProjectLoading(false); });
     return () => controller.abort();
   }, [selectedProject]);
 
@@ -132,24 +135,19 @@ export default function App() {
           throw new Error("Unexpected runtime response");
         }
         setRuntimes(payload.runtimes as string[]);
-        const [taskResponse, runResponse, projectResponse] = await Promise.all([
+        const [taskResponse, runResponse] = await Promise.all([
           fetch("/api/tasks", { signal: controller.signal }),
           fetch("/api/runs", { signal: controller.signal }),
-          fetch("/api/projects", { signal: controller.signal }),
         ]);
-        if (!taskResponse.ok || !runResponse.ok || !projectResponse.ok) throw new Error("Workspace API returned an error");
+        if (!taskResponse.ok || !runResponse.ok) throw new Error("Task API returned an error");
         const taskData: unknown = await taskResponse.json();
         const runData: unknown = await runResponse.json();
-        const projectData: unknown = await projectResponse.json();
-        if (!projectData || typeof projectData !== "object" || !("projects" in projectData) || !Array.isArray(projectData.projects)
-          || !projectData.projects.every((item: unknown) => item && typeof item === "object" && "id" in item && typeof item.id === "string" && "name" in item && typeof item.name === "string")) throw new Error("Unexpected projects response");
         if (!taskData || typeof taskData !== "object" || !("tasks" in taskData) || !Array.isArray(taskData.tasks)
           || !taskData.tasks.every((item: unknown) => item && typeof item === "object" && "id" in item && typeof item.id === "string" && "prompt" in item && typeof item.prompt === "string")) throw new Error("Unexpected tasks response");
         if (!runData || typeof runData !== "object" || !("runs" in runData) || !Array.isArray(runData.runs)
           || !runData.runs.every((item: unknown) => item && typeof item === "object" && "id" in item && typeof item.id === "string" && "status" in item && typeof item.status === "string")) throw new Error("Unexpected runs response");
         setTasks(taskData.tasks as Task[]);
         setRuns(runData.runs as Run[]);
-        setProjects(projectData.projects as Project[]);
         setState("connected");
       } catch (cause) {
         if (controller.signal.aborted) return;
@@ -158,6 +156,18 @@ export default function App() {
       }
     }
     void load();
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/projects", { signal: controller.signal })
+      .then(async response => { if (!response.ok) throw new Error("Project一覧を取得できませんでした"); return response.json(); })
+      .then(data => {
+        if (!data || !Array.isArray(data.projects) || !data.projects.every((p: unknown) => p && typeof p === "object" && "id" in p && typeof p.id === "string" && "name" in p && typeof p.name === "string")) throw new Error("Project APIの応答が不正です");
+        if (!controller.signal.aborted) setProjects(data.projects as Project[]);
+      })
+      .catch(error => { if (!controller.signal.aborted) setProjectsError(error instanceof Error ? error.message : "取得エラー"); });
     return () => controller.abort();
   }, []);
 
@@ -179,7 +189,7 @@ export default function App() {
           <article className="metric"><span>登録済みAI Runtime</span><strong>{state === "connected" ? runtimes.length : "—"}</strong><small>登録済みのアダプタ</small></article>
           <article className="metric"><span>実行中のRun</span><strong>{state === "connected" ? activeRuns : "—"}</strong><small>実行中のRun</small></article>
         </section>
-        <div className="section-heading"><div><span className="eyebrow">FACTORY WORKSPACE</span><h2>ワークスペース</h2></div><span className="section-note">タスク {tasks.length}件 · 外部連携 {linkedTasks}件</span></div><section className="panel" id="projects"><div className="panel-head"><span className="eyebrow">LOCAL PROJECTS</span><h2>Project・Repository</h2><p>ローカルに登録済みのProjectを参照できます。登録・編集は今後対応します。</p></div>{state === "connected" && (projects.length ? <><label className="project-selector">Projectを選択<select aria-label="Projectを選択" value={selectedProject} onChange={event => setSelectedProject(event.target.value)}><option value="">選択してください</option>{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>{selectedProject && (projectError ? <p role="alert">{projectError}</p> : projectRepos.length ? <div className="runtime-list">{projectRepos.map(repo => <div className="runtime" key={repo.id}><span><strong>{repo.external_id}</strong><small>{repo.provider_id} · {repo.visibility}</small></span></div>)}</div> : <p>Repositoryは未登録、または読み込み中です。</p>)}</> : <p>Projectはまだ登録されていません。登録機能は今後追加します。</p>)}</section><section className="panel" id="runtimes"><div className="panel-head"><div><span className="eyebrow">AGENT ADAPTERS</span><h2>AI Runtime</h2><p>登録済みAdapterと今後の対応候補です。登録済みでも実行可能・認証済みを意味しません。</p></div></div>
+        <div className="section-heading"><div><span className="eyebrow">FACTORY WORKSPACE</span><h2>ワークスペース</h2></div><span className="section-note">タスク {tasks.length}件 · 外部連携 {linkedTasks}件</span></div><section className="panel" id="projects"><div className="panel-head"><span className="eyebrow">LOCAL PROJECTS</span><h2>Project・Repository</h2><p>ローカルに登録済みのProjectを参照できます。登録・編集は今後対応します。</p></div>{projectsError ? <p role="alert">{projectsError}</p> : state === "connected" && (projects.length ? <><label className="project-selector">Projectを選択<select aria-label="Projectを選択" value={selectedProject} onChange={event => setSelectedProject(event.target.value)}><option value="">選択してください</option>{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>{selectedProject && (projectError ? <p role="alert">{projectError}</p> : projectLoading ? <p role="status">Repositoryを読み込み中...</p> : projectRepos.length ? <div className="runtime-list">{projectRepos.map(repo => <div className="runtime" key={repo.id}><span><strong>{repo.external_id}</strong><small>{repo.provider_id} · {repo.visibility}</small></span></div>)}</div> : <p>Repositoryはまだ登録されていません。</p>)}</> : <p>Projectはまだ登録されていません。登録機能は今後追加します。</p>)}</section><section className="panel" id="runtimes"><div className="panel-head"><div><span className="eyebrow">AGENT ADAPTERS</span><h2>AI Runtime</h2><p>登録済みAdapterと今後の対応候補です。登録済みでも実行可能・認証済みを意味しません。</p></div></div>
           {state === "loading" ? <p role="status">読み込み中...</p> : state === "offline" ? <div role="alert" className="notice">ローカルAPIに接続できません。FastAPIを起動してください。{error && <small>詳細: {error}</small>}</div> : <div className="runtime-list">{runtimes.map(name => <div className="runtime" key={name}><span className="runtime-symbol">◇</span><span><strong>{name}</strong><small>Registered adapter</small></span><span className="tag">登録済み</span></div>)}{plannedRuntimes.filter(candidate => !runtimes.includes(candidate.key)).map(candidate => <div className="runtime planned-runtime" key={candidate.key}><span className="runtime-symbol">◇</span><span><strong>{candidate.name}</strong><small>{candidate.note} · 利用不可</small></span><span className="tag planned-tag">未登録</span></div>)}</div>}
         </section>
         <section className="panel" id="github-import">
