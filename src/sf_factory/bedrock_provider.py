@@ -7,6 +7,7 @@ from importlib import import_module
 from typing import Any
 
 from sf_factory.model_provider import ModelResponse
+from sf_factory.usage import TokenUsage
 
 
 @dataclass(frozen=True)
@@ -57,4 +58,10 @@ class BedrockModelProvider:
             provider="bedrock", model_id=self.model_id, text=text,
             input_tokens=usage.get("inputTokens"),
             output_tokens=usage.get("outputTokens"),
+            usage=TokenUsage(
+                input_tokens=usage.get("inputTokens"),
+                output_tokens=usage.get("outputTokens"),
+                cache_read_tokens=usage.get("cacheReadInputTokens"),
+                cache_write_tokens=usage.get("cacheWriteInputTokens"),
+            ),
         )
