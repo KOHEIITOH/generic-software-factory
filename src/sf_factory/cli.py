@@ -35,6 +35,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="confirm that the selected repository text may be sent to GitHub Copilot",
     )
     analyze.add_argument("--timeout", type=int, default=120)
+    repo = sub.add_parser("repo", help="inspect a local Git repository")
+    repo_sub = repo.add_subparsers(dest="repo_command", required=True)
+    detect = repo_sub.add_parser("detect", help="detect Git root from current directory")
+    detect.add_argument("--path", type=Path, default=Path.cwd())
     task = sub.add_parser("task", help="manage tasks")
     task_sub = task.add_subparsers(dest="task_command", required=True)
     create = task_sub.add_parser("create")
@@ -133,6 +137,16 @@ def main() -> int:
             print(f"Analysis failed: {message}", file=sys.stderr)
             return 1
         print("\nAnalysis:\n" + result.output)
+        return 0
+    if args.command == "repo":
+        from sf_factory.repo_discovery import discover_git_root
+
+        try:
+            root = discover_git_root(args.path)
+        except (OSError, ValueError) as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 2
+        print(json.dumps({"repository_root": str(root), "provider": "local-git"}, indent=2))
         return 0
     from sf_factory.factory import Factory
 
