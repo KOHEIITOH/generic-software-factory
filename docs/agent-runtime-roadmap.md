@@ -72,3 +72,11 @@ print(response.text)
 このアダプターは `ModelProvider` 契約でテキスト推論するだけで、`AgentRuntime`
 への登録、ファイル編集、ツール実行、Taskの自律実行はまだ提供しない。
 AWS実環境での接続確認には利用者のAWS権限・モデルIDが必要。
+
+## Bedrock設定のローカル診断
+
+`SF_BEDROCK_MODEL_ID` にモデルID、`SF_BEDROCK_REGION` にリージョンを設定する。
+リージョンは `AWS_REGION` / `AWS_DEFAULT_REGION` でも指定可能。
+`sf provider list` はこれらの設定と任意依存 `boto3` の存在のみを表示する。
+AWSに通信せず、認証・IAM権限・モデル利用可否・推論成功は確認しない。
+資格情報をコマンド出力やリポジトリへ保存しないこと。
