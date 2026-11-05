@@ -29,16 +29,16 @@ def _fetch(repository: str, number: int):
 
 def install_github_issue_routes(app: FastAPI, data_dir: Path | None) -> None:
     @app.get("/api/github/issues")
-    def list_issues(repository: str):
+    def list_issues(repository: str, page: int = 1, state: str = "open"):
         try:
-            issues = GitHubIssuesSource(repository=repository).list_issues()
+            issues, has_more = GitHubIssuesSource(repository=repository).list_issues(\n                page=page, state=state\n            )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except RuntimeError as exc:
             raise HTTPException(
                 status_code=502, detail="GitHub Issue一覧を取得できませんでした"
             ) from exc
-        return {"issues": [
+        return {"page": page, "state": state, "has_more": has_more, "issues": [
             {"repository": issue.instance, "number": issue.external_id,
              "prompt": issue.prompt, "url": issue.external_url}
             for issue in issues
