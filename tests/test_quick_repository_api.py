@@ -13,7 +13,9 @@ from fastapi.testclient import TestClient  # noqa: E402
 from sf_factory.web_api import create_app  # noqa: E402
 
 
-def test_quick_repository_detects_server_cwd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_quick_repository_detects_server_cwd(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     nested = tmp_path / "nested"
     nested.mkdir()
