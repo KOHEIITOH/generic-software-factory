@@ -38,6 +38,12 @@ class Factory:
                     id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT,
                     task_id TEXT NOT NULL, event TEXT NOT NULL, at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS task_sources (
+                    task_id TEXT PRIMARY KEY REFERENCES tasks(id),
+                    provider TEXT NOT NULL, instance TEXT NOT NULL,
+                    external_id TEXT NOT NULL, external_url TEXT,
+                    UNIQUE(provider, instance, external_id)
+                );
             """)
 
     def _connect(self) -> sqlite3.Connection:
@@ -56,12 +62,48 @@ class Factory:
                        (task_id, "task.created", _now()))
         return task_id
 
+    def import_external_task(
+        self, *, provider: str, instance: str, external_id: str,
+        prompt: str, external_url: str | None = None,
+    ) -> str:
+        """Import an external issue once; repeated imports preserve task identity."""
+        if not all(v.strip() for v in (provider, instance, external_id, prompt)):
+            raise ValueError("provider, instance, external_id and prompt are required")
+        if any(len(v) > 512 for v in (provider, instance, external_id)):
+            raise ValueError("external identity field is too long")
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT task_id FROM task_sources WHERE provider=? AND instance=? "
+                "AND external_id=?", (provider, instance, external_id),
+            ).fetchone()
+            if row is not None:
+                return str(row["task_id"])
+            task_id = uuid.uuid4().hex
+            db.execute(
+                "INSERT INTO tasks(id,prompt,created_at) VALUES (?,?,?)",
+                (task_id, prompt, _now()),
+            )
+            db.execute(
+                "INSERT INTO task_sources(task_id,provider,instance,external_id,external_url) "
+                "VALUES (?,?,?,?,?)",
+                (task_id, provider, instance, external_id, external_url),
+            )
+            db.execute(
+                "INSERT INTO audit(run_id,task_id,event,at) VALUES (NULL,?,?,?)",
+                (task_id, "task.imported", _now()),
+            )
+            return task_id
+
     def list_tasks(self, limit: int = 50) -> list[dict]:
         if not 1 <= limit <= 100:
             raise ValueError('limit must be between 1 and 100')
         with self._connect() as db:
             rows = db.execute(
-                'SELECT id,prompt,created_at FROM tasks ORDER BY created_at DESC, id DESC LIMIT ?',
+                'SELECT t.id,t.prompt,t.created_at,s.provider,s.instance, '
+                's.external_id,s.external_url '
+                'FROM tasks t LEFT JOIN task_sources s ON s.task_id=t.id '
+                'ORDER BY t.created_at DESC, t.id DESC LIMIT ?',
                 (limit,),
             ).fetchall()
             return [dict(row) for row in rows]

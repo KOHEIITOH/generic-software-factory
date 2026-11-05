@@ -53,3 +53,45 @@ def test_unknown_task_does_not_create_workspace(tmp_path: Path) -> None:
     except ValueError:
         pass
     assert list(factory.workspaces.iterdir()) == []
+
+
+def test_external_issue_import_is_idempotent(tmp_path: Path) -> None:
+    factory = Factory(tmp_path)
+    first = factory.import_external_task(
+        provider="jira", instance="https://acme.atlassian.net",
+        external_id="PAY-123", prompt="Implement feature",
+        external_url="https://acme.atlassian.net/browse/PAY-123",
+    )
+    again = Factory(tmp_path).import_external_task(
+        provider="jira", instance="https://acme.atlassian.net",
+        external_id="PAY-123", prompt="Changed title",
+    )
+    assert first == again
+    assert factory.show_task(first)["task"]["prompt"] == "Implement feature"
+    assert len(factory.list_tasks()) == 1
+    assert factory.list_tasks()[0]["external_id"] == "PAY-123"
+
+
+def test_external_issue_identity_is_namespaced(tmp_path: Path) -> None:
+    factory = Factory(tmp_path)
+    one = factory.import_external_task(
+        provider="jira", instance="tenant-a", external_id="ABC-1", prompt="A",
+    )
+    two = factory.import_external_task(
+        provider="jira", instance="tenant-b", external_id="ABC-1", prompt="B",
+    )
+    three = factory.import_external_task(
+        provider="github", instance="tenant-a", external_id="ABC-1", prompt="C",
+    )
+    assert len({one, two, three}) == 3
+
+
+def test_existing_database_remains_usable_with_source_mapping(tmp_path: Path) -> None:
+    factory = Factory(tmp_path)
+    local = factory.create_task("Local")
+    imported = Factory(tmp_path).import_external_task(
+        provider="jira", instance="tenant", external_id="X-1", prompt="External",
+    )
+    rows = {row["id"]: row for row in Factory(tmp_path).list_tasks()}
+    assert rows[local]["provider"] is None
+    assert rows[imported]["provider"] == "jira"
