@@ -8,7 +8,8 @@ const plannedRuntimes = [
 
 type ApiState = "loading" | "connected" | "offline";
 type Task = { id: string; prompt: string; created_at: string; provider?: string | null; external_id?: string | null; external_url?: string | null };
-type Issue = { repository: string; number: string; prompt: string; url: string };\ntype Run = { id: string; task_id: string; runtime: string; status: string; started_at: string };
+type Issue = { repository: string; number: string; prompt: string; url: string };
+type Run = { id: string; task_id: string; runtime: string; status: string; started_at: string };
 
 export default function App() {
   const [state, setState] = useState<ApiState>("loading");
