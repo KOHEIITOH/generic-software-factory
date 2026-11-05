@@ -38,7 +38,7 @@ def test_rejects_negative_budget(tmp_path: Path):
 
 
 def test_rejects_nul_containing_file(tmp_path: Path):
-    (tmp_path / "mixed.txt").write_bytes(b"hello\\x00world")
+    (tmp_path / "mixed.txt").write_bytes(b"hello" + bytes([0]) + b"world")
     assert build_context(tmp_path, ["mixed.txt"]).excluded == ("mixed.txt",)
 
 
