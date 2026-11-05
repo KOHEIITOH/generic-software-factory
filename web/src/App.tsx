@@ -30,14 +30,17 @@ export default function App() {
   const [issueMessage, setIssueMessage] = useState("");
 
   async function loadIssues(page = 1) {
-    setIssueListBusy(true); setIssueListMessage(""); setIssueList([]); setIssuePreview(null);
+    setIssueListBusy(true); setIssueListMessage("");
+    if (page === 1) { setIssueList([]); setIssuePreview(null); }
     try {
-      const params = new URLSearchParams({ repository: repository.trim() });
+      const params = new URLSearchParams({ repository: repository.trim(), page: String(page), state: issueState });
       const response = await fetch("/api/github/issues?" + params);
       if (!response.ok) throw new Error("Issue一覧を取得できませんでした。公開リポジトリか確認してください。");
       const data = await response.json();
-      setIssueList(data.issues);
-      if (data.issues.length === 0) setIssueListMessage("公開中のIssueは見つかりませんでした。");
+      setIssueList(previous => page === 1 ? data.issues : [...previous, ...data.issues]);
+      setIssuePage(page);
+      setIssueHasMore(data.has_more);
+      if (page === 1 && data.issues.length === 0 && !data.has_more) setIssueListMessage("該当するIssueは見つかりませんでした。");
     } catch (error) {
       setIssueListMessage(error instanceof Error ? error.message : "取得エラー");
     } finally { setIssueListBusy(false); }
