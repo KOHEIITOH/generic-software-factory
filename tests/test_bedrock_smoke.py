@@ -1,8 +1,8 @@
 """Smoke tests never contact AWS."""
 
 from sf_factory.bedrock_smoke import run_bedrock_smoke
-from sf_factory.model_provider_status import BedrockConfiguration
 from sf_factory.model_provider import ModelResponse
+from sf_factory.model_provider_status import BedrockConfiguration
 
 
 def test_smoke_requires_confirmation(capsys):
