@@ -13,7 +13,7 @@ from sf_factory.repository_contracts import Project, Repository, Visibility  # n
 from sf_factory.web_api import create_app  # noqa: E402
 
 
-def test_local_projects_and_repositories_are_read_only(tmp_path: Path) -> None:
+def test_local_projects_and_repositories_are_listed_and_writes_are_origin_guarded(tmp_path: Path) -> None:
     factory = Factory(tmp_path)
     registry = LocalProjectRegistry(factory.db)
     registry.add_project(Project("p", "Local", "local"))
@@ -33,7 +33,7 @@ def test_local_projects_and_repositories_are_read_only(tmp_path: Path) -> None:
     assert repositories.json()["repositories"][0]["id"] == "r"
     assert hidden.status_code == 404
     assert missing.status_code == 404
-    assert write.status_code == 405
+    assert write.status_code == 403
 
 
 def test_empty_project_listing_does_not_change_tasks(tmp_path: Path) -> None:
