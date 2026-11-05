@@ -8,7 +8,7 @@ const plannedRuntimes = [
 
 type ApiState = "loading" | "connected" | "offline";
 type Task = { id: string; prompt: string; created_at: string; provider?: string | null; external_id?: string | null; external_url?: string | null };
-type Run = { id: string; task_id: string; runtime: string; status: string; started_at: string };
+type Issue = { repository: string; number: string; prompt: string; url: string };\ntype Run = { id: string; task_id: string; runtime: string; status: string; started_at: string };
 
 export default function App() {
   const [state, setState] = useState<ApiState>("loading");
@@ -19,8 +19,25 @@ export default function App() {
   const [repository, setRepository] = useState("KOHEIITOH/generic-software-factory");
   const [issueNumber, setIssueNumber] = useState("");
   const [issuePreview, setIssuePreview] = useState<{ repository: string; number: string; prompt: string; url: string } | null>(null);
+  const [issueList, setIssueList] = useState<Issue[]>([]);
+  const [issueListBusy, setIssueListBusy] = useState(false);
+  const [issueListMessage, setIssueListMessage] = useState("");
   const [issueBusy, setIssueBusy] = useState(false);
   const [issueMessage, setIssueMessage] = useState("");
+
+  async function loadIssues() {
+    setIssueListBusy(true); setIssueListMessage(""); setIssueList([]); setIssuePreview(null);
+    try {
+      const params = new URLSearchParams({ repository: repository.trim() });
+      const response = await fetch("/api/github/issues?" + params);
+      if (!response.ok) throw new Error("Issue一覧を取得できませんでした。公開リポジトリか確認してください。");
+      const data = await response.json();
+      setIssueList(data.issues);
+      if (data.issues.length === 0) setIssueListMessage("公開中のIssueは見つかりませんでした。");
+    } catch (error) {
+      setIssueListMessage(error instanceof Error ? error.message : "取得エラー");
+    } finally { setIssueListBusy(false); }
+  }
 
   async function previewIssue() {
     setIssueBusy(true); setIssueMessage(""); setIssuePreview(null);
@@ -116,10 +133,24 @@ export default function App() {
         <section className="panel" id="github-import">
           <div className="panel-head"><span className="eyebrow">GITHUB ISSUES</span><h2>GitHub Issueを取り込む</h2><p>公開リポジトリのIssueを確認してから登録します。AIは自動実行されません。</p></div>
           <div className="issue-form">
-            <label>リポジトリ（owner/repo）<input value={repository} onChange={event => {setRepository(event.target.value); setIssuePreview(null);}} placeholder="owner/repo" /></label>
+            <label>リポジトリ（owner/repo）<input value={repository} onChange={event => {setRepository(event.target.value); setIssuePreview(null); setIssueList([]); setIssueListMessage("");}} placeholder="owner/repo" /></label>
             <label>Issue番号<input type="number" min="1" value={issueNumber} onChange={event => {setIssueNumber(event.target.value); setIssuePreview(null);}} placeholder="例: 12" /></label>
             <button type="button" disabled={issueBusy || !repository.trim() || !/^[1-9][0-9]*$/.test(issueNumber)} onClick={() => void previewIssue()}>内容を確認</button>
           </div>
+          <div className="issue-form">
+            <button type="button" disabled={issueListBusy || issueBusy || !repository.trim()} onClick={() => void loadIssues()}>
+              {issueListBusy ? "取得中..." : "公開Issue一覧を表示"}
+            </button>
+          </div>
+          {issueListMessage && <p role="status">{issueListMessage}</p>}
+          {issueList.length > 0 && <div className="runtime-list" aria-label="公開GitHub Issue一覧">
+            {issueList.map(issue => <div className="runtime" key={issue.number}>
+              <span><strong>#{issue.number} · {issue.prompt.split("\\n")[0]}</strong></span>
+              <button type="button" disabled={issueBusy} onClick={() => {
+                setIssueNumber(issue.number); setIssuePreview(issue); setIssueMessage("");
+              }}>選択</button>
+            </div>)}
+          </div>}
           {issueMessage && <p role="status">{issueMessage}</p>}
           {issuePreview && <div className="issue-preview"><strong>Issue #{issuePreview.number}</strong><pre>{issuePreview.prompt}</pre><a className="source-link" href={issuePreview.url} target="_blank" rel="noopener noreferrer">GitHubで開く ↗</a><button type="button" disabled={issueBusy} onClick={() => void importIssue()}>このIssueを取り込む</button></div>}
         </section>
