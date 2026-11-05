@@ -8,6 +8,7 @@ const plannedRuntimes = [
 
 type ApiState = "loading" | "connected" | "offline";
 type Task = { id: string; prompt: string; created_at: string; provider?: string | null; external_id?: string | null; external_url?: string | null };
+type Issue = { repository: string; number: string; prompt: string; url: string };
 type Run = { id: string; task_id: string; runtime: string; status: string; started_at: string };
 
 export default function App() {
@@ -19,8 +20,32 @@ export default function App() {
   const [repository, setRepository] = useState("KOHEIITOH/generic-software-factory");
   const [issueNumber, setIssueNumber] = useState("");
   const [issuePreview, setIssuePreview] = useState<{ repository: string; number: string; prompt: string; url: string } | null>(null);
+  const [issueList, setIssueList] = useState<Issue[]>([]);
+  const [issuePage, setIssuePage] = useState(0);
+  const [issueHasMore, setIssueHasMore] = useState(false);
+  const [issueState, setIssueState] = useState<"open" | "closed">("open");
+  const [issueListBusy, setIssueListBusy] = useState(false);
+  const [issueListMessage, setIssueListMessage] = useState("");
   const [issueBusy, setIssueBusy] = useState(false);
   const [issueMessage, setIssueMessage] = useState("");
+
+  async function loadIssues(page = 1) {
+    if (issueListBusy) return;
+    setIssueListBusy(true); setIssueListMessage("");
+    if (page === 1) { setIssueList([]); setIssuePreview(null); setIssueHasMore(false); }
+    try {
+      const params = new URLSearchParams({ repository: repository.trim(), page: String(page), state: issueState });
+      const response = await fetch("/api/github/issues?" + params);
+      if (!response.ok) throw new Error("Issue一覧を取得できませんでした。公開リポジトリか確認してください。");
+      const data = await response.json();
+      setIssueList(previous => page === 1 ? data.issues : [...previous, ...data.issues]);
+      setIssuePage(page);
+      setIssueHasMore(data.has_more);
+      if (page === 1 && data.issues.length === 0 && !data.has_more) setIssueListMessage("該当するIssueは見つかりませんでした。");
+    } catch (error) {
+      setIssueListMessage(error instanceof Error ? error.message : "取得エラー");
+    } finally { setIssueListBusy(false); }
+  }
 
   async function previewIssue() {
     setIssueBusy(true); setIssueMessage(""); setIssuePreview(null);
@@ -104,7 +129,7 @@ export default function App() {
         <div className="sidebar-footer"><span className="sidebar-dot" /> LOCAL WORKSPACE <small>Factory Core · v0.1</small></div>
       </aside>
       <main>
-        <header><div><span className="eyebrow">OVERVIEW / WORKSPACE</span><h1 id="overview">開発コントロールセンター <span className="title-spark">✦</span></h1><p>AIによる開発タスクと実行状況を、ひとつの画面で。</p></div><span role="status" className={"status " + state}>{state === "connected" ? "● ローカルAPI接続中" : state === "loading" ? "◌ 接続確認中" : "● API未接続"}</span></header><div className="hero-banner"><div><span className="eyebrow">SOFTWARE FACTORY / LOCAL</span><h2>アイデアから、実装へ。</h2><p>タスクの取り込みからAI開発・品質確認まで。現在は閲覧専用のダッシュボードです。</p></div><span className="hero-mark" aria-hidden="true">⌘</span></div>
+        <header><div><span className="eyebrow">OVERVIEW / WORKSPACE</span><h1 id="overview">開発コントロールセンター <span className="title-spark">✦</span></h1><p>AIによる開発タスクと実行状況を、ひとつの画面で。</p></div><span role="status" className={"status " + state}>{state === "connected" ? "● ローカルAPI接続中" : state === "loading" ? "◌ 接続確認中" : "● API未接続"}</span></header><div className="hero-banner"><div><span className="eyebrow">SOFTWARE FACTORY / LOCAL</span><h2>アイデアから、実装へ。</h2><p>タスクの取り込みからAI開発・品質確認まで。現在はIssueの閲覧・Taskへの明示的な取り込みに対応しています。</p></div><span className="hero-mark" aria-hidden="true">⌘</span></div>
         <section className="metrics" aria-label="Summary">
           <article className="metric"><span>接続状態</span><strong>{state === "connected" ? "Online" : state === "loading" ? "Checking" : "Offline"}</strong><small>localhost:8000</small></article>
           <article className="metric"><span>登録済みAI Runtime</span><strong>{state === "connected" ? runtimes.length : "—"}</strong><small>登録済みのアダプタ</small></article>
@@ -116,10 +141,39 @@ export default function App() {
         <section className="panel" id="github-import">
           <div className="panel-head"><span className="eyebrow">GITHUB ISSUES</span><h2>GitHub Issueを取り込む</h2><p>公開リポジトリのIssueを確認してから登録します。AIは自動実行されません。</p></div>
           <div className="issue-form">
-            <label>リポジトリ（owner/repo）<input value={repository} onChange={event => {setRepository(event.target.value); setIssuePreview(null);}} placeholder="owner/repo" /></label>
+            <label>リポジトリ（owner/repo）<input value={repository} onChange={event => {setRepository(event.target.value); setIssuePreview(null); setIssueList([]); setIssueListMessage(""); setIssuePage(0); setIssueHasMore(false);}} placeholder="owner/repo" /></label>
             <label>Issue番号<input type="number" min="1" value={issueNumber} onChange={event => {setIssueNumber(event.target.value); setIssuePreview(null);}} placeholder="例: 12" /></label>
             <button type="button" disabled={issueBusy || !repository.trim() || !/^[1-9][0-9]*$/.test(issueNumber)} onClick={() => void previewIssue()}>内容を確認</button>
           </div>
+          <div className="issue-form">
+            <label>状態
+              <select value={issueState} onChange={event => {
+                setIssueState(event.target.value as "open" | "closed");
+                setIssueList([]); setIssuePage(0); setIssueHasMore(false);
+                setIssuePreview(null); setIssueListMessage("");
+              }}>
+                <option value="open">Open</option>
+                <option value="closed">Closed</option>
+              </select>
+            </label>
+            <button type="button" disabled={issueListBusy || issueBusy || !repository.trim()} onClick={() => void loadIssues()}>
+              {issueListBusy ? "取得中..." : "公開Issue一覧を表示"}
+            </button>
+          </div>
+          {issueListMessage && <p role="status">{issueListMessage}</p>}
+          {issueList.length > 0 && <div className="runtime-list" aria-label="公開GitHub Issue一覧">
+            {issueList.map(issue => <div className="runtime" key={issue.number}>
+              <span><strong>#{issue.number} · {issue.prompt.split("\n")[0]}</strong></span>
+              <button type="button" disabled={issueBusy} onClick={() => {
+                setIssueNumber(issue.number); setIssuePreview(issue); setIssueMessage("");
+              }}>選択</button>
+            </div>)}
+          </div>}
+          {issueHasMore && <div className="issue-form">
+            <button type="button" disabled={issueListBusy} onClick={() => void loadIssues(issuePage + 1)}>
+              {issueListBusy ? "読み込み中..." : "さらに読み込む"}
+            </button>
+          </div>}
           {issueMessage && <p role="status">{issueMessage}</p>}
           {issuePreview && <div className="issue-preview"><strong>Issue #{issuePreview.number}</strong><pre>{issuePreview.prompt}</pre><a className="source-link" href={issuePreview.url} target="_blank" rel="noopener noreferrer">GitHubで開く ↗</a><button type="button" disabled={issueBusy} onClick={() => void importIssue()}>このIssueを取り込む</button></div>}
         </section>
