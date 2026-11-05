@@ -27,15 +27,21 @@ class GitHubIssuesSource:
         if not 0 < self.timeout_seconds <= 60:
             raise ValueError("timeout must be between 0 and 60 seconds")
 
-    def list_issues(self, limit: int = 20) -> list[ExternalIssue]:
-        """List up to 50 open issues; pull requests are excluded."""
-        if not 1 <= limit <= 50:
-            raise ValueError("limit must be between 1 and 50")
+    def list_issues(
+        self, limit: int = 50, page: int = 1, state: str = "open"
+    ) -> tuple[list[ExternalIssue], bool]:
+        """Fetch a page of issues; PRs are filtered out of the results."""
+        if not 1 <= limit <= 100:
+            raise ValueError("limit must be between 1 and 100")
+        if not 1 <= page <= 10000:
+            raise ValueError("page must be between 1 and 10000")
+        if state not in ("open", "closed"):
+            raise ValueError("state must be open or closed")
         owner, repo = self.repository.split("/")
         url = (
             "https://api.github.com/repos/"
             f"{quote(owner, safe='')}/{quote(repo, safe='')}/issues"
-            f"?state=open&per_page={limit}"
+            f"?state={state}&per_page={limit}&page={page}"
         )
         headers = {
             "Accept": "application/vnd.github+json",
@@ -70,7 +76,7 @@ class GitHubIssuesSource:
                 provider="github", instance=self.repository, external_id=str(number),
                 prompt=prompt, external_url=expected,
             ))
-        return issues
+        return issues, len(payload) == limit
 
     def fetch_issue(self, external_id: str) -> ExternalIssue:
         if not _NUMBER.fullmatch(external_id):
