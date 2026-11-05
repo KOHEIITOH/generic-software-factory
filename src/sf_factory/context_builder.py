@@ -51,7 +51,7 @@ def build_context(
                 excluded.append(raw)
                 continue
             body = resolved.read_text(encoding="utf-8")
-            if "\\x00" in body:
+            if chr(0) in body:
                 excluded.append(raw)
                 continue
         except (OSError, UnicodeError):
