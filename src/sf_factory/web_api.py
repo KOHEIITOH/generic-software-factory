@@ -19,8 +19,8 @@ from sf_factory.agent_registry import default_runtime_registry
 from sf_factory.factory import Factory
 from sf_factory.github_issue_web import install_github_issue_routes
 from sf_factory.local_project_registry import LocalProjectRegistry
-from sf_factory.repository_contracts import Project, Repository, Visibility
 from sf_factory.repo_discovery import discover_git_root
+from sf_factory.repository_contracts import Project, Repository, Visibility
 
 
 class CreateTaskRequest(BaseModel):
