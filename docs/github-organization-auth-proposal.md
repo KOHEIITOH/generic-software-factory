@@ -1,0 +1,142 @@
+# GitHub 認証・Organization・リポジトリ連携 設計案
+
+> Status: Proposal / 未実装。現行のWeb UIにはGitHubログインやPrivate Repository一覧機能はない。
+
+## 目標
+- 利用者がGitHubでログインし、自分のアクセス可能な個人・Organization配下のPublic/Privateリポジトリを探せる。
+- Factoryによる実際のアクセスは別途明示的に許可する。**閲覧できることとFactoryが操作できることは異なる**。
+- Taskに対象リポジトリ（必要なら複数）を紐付け、将来のIssue取得・ブランチ作成・PR作成に利用する。
+- GitHub専用の認証実装をFactory Coreに埋め込まず、Provider Adapterとして交換可能にする。
+
+## 認証とアクセス許可を分離
+1. **本人確認**: GitHub OAuthまたはGitHub App user authorizationで利用者を認証。OAuth callbackのstate/PKCE、セッション固定化対策、CSRF、SameSite/HttpOnly/Secure Cookie、ログアウトを実装。
+2. **リポジトリ発見**: ユーザー権限で閲覧可能なリポジトリをページング取得し、owner・visibility・権限を表示。OrganizationのSSOや承認ポリシーによって表示できない場合は理由を案内。
+3. **Factoryへのアクセス許可**: GitHub AppをOrganization/個人にインストールし、対象リポジトリと最小権限を選択。利用者の閲覧権限とAppのinstallation権限を交差検証する。
+4. **実行権限**: Factory内のRole/Approval Gate/Risk Policyで別途判定。GitHub API権限があっても自動マージ・本番リリースを許可しない。
+
+## 推奨フロー
+GitHubでログイン → アカウント/Organization一覧 → リポジトリ検索（Public/Private） → 接続状況（未接続/承認待ち/接続済み） → 必要なリポジトリだけGitHub Appを許可 → Task作成時に対象を選択 → 権限・品質ゲートを通して実行。
+
+GitHub Appのインストール範囲は「All repositories」または「Only select repositories」。Organization管理者の承認やSSOが必要な場合がある。GitHub AppをインストールしていないPrivate RepositoryをFactoryが操作することはできない。
+
+## セキュリティ上の必須事項
+- 認証トークン/installation token/秘密鍵はサーバー側のみで管理。フロント・ログ・DBの平文に残さない。暗号化・短期有効期限・ローテーション・失効に対応。
+- ローカル開発ではループバックbindを強制。OAuth redirect URIの厳格な許可リスト、state検証、PKCE、セッション保護、CSRF対策を必須とする。既存のOrigin検査だけでは不十分。
+- Organizationの許可とGitHub APIの権限を操作直前に再確認。接続解除・権限変更・インストール削除のWebhookを処理。
+- Private Repositoryのコード・Issue本文・認証情報をAI Runtimeに無断送信しない。モデル/Provider別にデータ送信可否を明示し、企業ポリシーに従う。
+- リポジトリ名・visibility・権限などのメタデータも利用者ごとにアクセス制御。ログに秘密情報を出さない。
+- Webhook署名検証、権限の最小化、監査ログ、レート制限、ページング、エラー時の安全側拒否。
+- ローカルシングルユーザーMVPとマルチユーザー・ホスティングを混同しない。
+
+## 段階的実装（各段階を独立PRにする）
+1. **Provider契約とモック**: identity、repository discovery、installation permissionを抽象化。Fake providerとテスト。外部認証はまだ有効化しない。
+2. **GitHubログイン**: callback/state/PKCE/session/logoutの実装。ローカル設定・秘密情報管理と失敗テスト。
+3. **リポジトリ発見UI**: 個人/Organization、Public/Private、ページング、検索、権限・接続状況表示。
+4. **GitHub App接続**: installation selection、権限検証、承認待ち/失効/削除の扱い。
+5. **Taskへのrepo紐付け**: 既存SQLiteマイグレーション、対象選択、アクセス再検証。
+6. **安全な実行連携**: Execution Guardを信頼できる実行境界へ統合し、Issue→ブランチ→PRまで。マージは人間承認。
+
+## 受入基準
+- Private Repositoryが権限を持つ利用者だけに見え、Factory未許可なら操作できない。
+- Organization配下の多数のリポジトリでページング・検索できる。
+- 失効・SSO未承認・App未インストール・権限不足を区別できる。
+- 他ユーザーのセッションやリポジトリへアクセスできない。
+- 未接続・未認証の状態ではGitHub操作を拒否する。
+- 企業のPrivateコードをAIへ送る前にProvider/データポリシーを評価する。
+
+## ゴールと設計上の非目標
+この構想のゴールは**特定企業のGitHub運用を再現することではなく、開発対象・SCM・AI・ホスティングに依存しない汎用Software Factory**である。Organization配下のPrivate Repositoryは重要な受入ユースケースの一つであり、唯一の対象ではない。
+
+- 個人の単一Public Repository、個人Private Repository、Organizationの複数Private Repository、ローカルGit、将来のGitLab等を想定する。
+- GitHubログインを唯一のログイン手段にしない。ローカル単独利用はGitHubアカウントなしでも成立させる。
+- Factory CoreはGitHubのOAuth、installation ID、REST API、組織モデルに直接依存しない。認証・SCM・Repository DiscoveryはAdapterの契約として扱う。
+- リポジトリ発見とコード操作を分離し、利用者が見えるリポジトリすべてへの書き込みを前提にしない。
+- 企業固有のSSO・承認ルール・ポリシーはConfigurationまたはAdapterで吸収する。
+- 初期実装でGitHubを優先しても、別のSCMを追加する際にCore変更が必須となる設計を避ける。
+
+受入シナリオは最低限、(A) GitHub未接続のローカル利用、(B) 個人のPublic/Private、(C) OrganizationのPrivate、(D) GitHub以外のSCMをFake Adapterで差し替え、を含める。
+
+## 信頼境界と失効時の挙動（レビュー追記）
+- **Identity**（誰か）、**Discovery**（何が見えるか）、**Authorization**（Factoryが何を操作できるか）、**Execution**（AIが何を実行できるか）を独立した判定として扱う。ログイン済みだけではGitHub操作を許可しない。
+- GitHub App installation tokenは対象installation・repository・権限に限定し、発行時とGitHub操作直前に権限を検証する。権限キャッシュを唯一の認可根拠にしない。
+- ユーザーのアクセス権消失、App削除、OrganizationのSSO失効、対象リポジトリの移動・削除時は**安全側に停止**する。進行中タスクも次の外部操作前に再検証する。
+- 複数利用者が同じFactoryを使う場合、Task・接続情報・監査ログの所有者を分離する。リポジトリ一覧のAPIレスポンスやキャッシュも利用者ごとにスコープする。
+- OAuthによる本人確認とGitHub App installationの認可は別フロー。**GitHubログインなしのローカルモード**は継続できるが、そのモードでPrivate Repositoryへアクセスするには別途明示的な認証設定が必要。
+- GitHub OAuthとGitHub Appのuser authorizationは採用候補であり、OAuth/PKCE対応状況・利用者権限での一覧取得方式・Organization SSOの制約は実装前に公式仕様で再検証する。
+- 認証方式やリポジトリ接続が未設定の場合も、既存のローカルTask作成・閲覧機能は維持する。移行で既存ユーザーのデータを破壊しない。
+
+## 実装レビューのゲート
+1. Adapterの契約はGitHub固有型をCoreへ露出させない。
+2. リポジトリ一覧にPrivate情報が混じっても、未認証者・別ユーザーに漏れない。
+3. GitHub App未インストール・権限不足・失効・SSO制限を成功として扱わない。
+4. 外部AIへコードを渡す前にデータポリシーの判定を行う。
+5. ローカル単独利用の回帰テストと、Fake Providerによる他SCMの差し替えテストを通す。
+
+## ゴール逆算レビュー：設計確定前に補強する点
+
+### Project / Repository / Task
+- Projectは開発目的・Harness・Policy・Quality Gateを管理する論理単位。1 Projectから複数Repositoryを参照できる。
+- RepositoryはSourceControl Adapterが扱うコード保管場所。provider、外部ID、接続情報、capabilitiesを保持し、GitHub固有のinstallation IDはAdapter側に隠す。
+- TaskはProjectに属し、必要に応じて複数の対象Repositoryを選択する。Repositoryごとに権限・workspace・品質証跡を評価する。
+- Projectのメンバー権限とRepositoryの閲覧・操作権限は独立する。
+
+### Identity / Source Control / Connection
+- Identity Provider（Factoryへの本人確認）、SourceControl Provider（Repository discovery・branch・PR）、Credential/Connection（外部操作の認証手段）は別契約にする。
+- GitHubログインでGitLabを操作する、ローカル認証でGitHubを操作する、GitHubなしでローカルGitを操作する構成も可能にする。
+- GitHub Appは推奨Connection方式の一つであり、SCM共通契約の必須概念にしない。GitHubのOrganizationやinstallation IDをCoreの必須モデルにしない。
+- PR機能などの差はcapabilitiesとして表現し、未対応機能を暗黙に成功扱いしない。
+
+### AIへのデータ提供と実行
+- Repositoryのread/write/PR権限と、外部AI Runtimeへコード・Issue・ログを送信する許可は別に判定する。
+- 実行場所、モデル/Provider、データ分類、送信先をProject Policyで評価し、許可がなければ送信しない。
+- AIが直接GitコマンドやネットワークAPIを実行する経路もExecution Adapterで隔離・制限し、SCM Adapterの権限検証だけに頼らない。
+
+### 縦断的な検証順序
+最終ゴールはログイン機能ではなく、権限を守りながらTask→実装→テスト→PRを完遂すること。
+1. ローカルProject + ローカルGit + Fake Identity/SCMでモデルと権限境界を検証。
+2. GitHub Public Repositoryの発見とTaskへの対象紐付けを検証。
+3. GitHub AppによるPrivate/Organization接続、権限失効・SSO・管理者承認を検証。
+4. 隔離実行・AIデータ送信Policyを備えた単一RepositoryのTask→PRを縦断検証。
+5. 複数Repository、別SCM、マルチユーザーを段階的に検証。
+
+### 設計上の未決事項
+- 初期配布形態（ローカル単独/チームサーバー/クラウド）とSecret・セッション管理の責任分界。
+- GitHubの認証方式、閲覧可能Repository列挙、SSO・承認、installation権限の最新仕様。
+- 既存Task永続化からProject/Repository関連への移行と後方互換性。
+- 共有Factoryの実行主体とGitHubユーザー/App installation権限の交差判定。
+- AI Runtimeごとのデータ送信制御と実際の隔離実行の境界。
+
+以下のMVP判断で配布形態を確定する。残る外部API仕様・移行詳細は実装PRで検証する。
+
+## 採用決定：ローカル個人利用ファースト（2026-11-05）
+**初期提供形態はA：単一利用者のローカル実行。** チーム共有サーバーとSaaSは後続フェーズ。初期MVPで複数ユーザー管理・外部公開・課金を実装しない。
+
+### MVPの実行・認証境界
+- Factory Web UI/APIはloopbackにのみbindし、外部公開をサポートしない。LAN/リバースプロキシ越しの公開を「ローカルモード」の延長として許可しない。
+- GitHubログインは**任意の接続機能**であり、Factory起動やローカルTask作成の前提にしない。認証未設定でもローカルGit/Projectの管理は継続できる。
+- GitHubとの接続は別途ユーザーが明示的に開始する。Private Repositoryへのアクセスには適切な認証・App installation・権限確認が必要。
+- ローカルモードの実行主体はOS上のFactory起動ユーザー。Web UIからの操作は同一マシン上の信頼された利用者を想定するが、**ブラウザや同一マシンの別プロセスを無条件に信頼しない**。状態変更APIにはOrigin/CSRF対策と追加のローカル認可境界を設計する。
+- トークンはOS credential store等の秘密情報保管手段を優先する。平文設定ファイル・ブラウザ保存・ログへの出力は禁止。使用する保管方式とOS別の可用性は実装PRで決定する。
+- AI実行はローカルでも安全とはみなさない。実行隔離・ネットワーク/ファイルシステム制限・秘密情報の非注入を別途強制する。
+
+### 将来拡張のために今から維持する契約
+- Factory Coreは利用者・Project・Repository・Connectionの**論理ID**を扱い、ローカルMVPでは単一ローカルprincipalを使う。固定のGitHubユーザー名やOSパスをドメインIDにしない。
+- Identity、SCM、Connection、Policy、Executionは分離する。Web UI/API/CLI/MCPの入口から同じApplication Serviceと認可判定を呼ぶ。
+- 所有者と権限の概念はモデルに残すが、初期実装ではマルチテナント認証・DB分離・クラウド運用機能を作らない。
+- 永続化は将来の移行を考慮し、スキーマバージョンと移行手順を設ける。ローカルデータからチーム共有への移行は将来別途設計する。
+- チーム共有・SaaSへの移行時は**新しいセキュリティレビューと認証実装が必須**。loopback専用APIをそのまま外部公開してはいけない。
+
+### このフェーズの実装順序（従来の段階案より優先）
+1. Project/Repository/Connectionの最小モデル、SCM・Identity・Connectionの抽象契約、Fake/Local Git adapterとcontract tests。
+2. ローカルWeb UIでProject/Repositoryを選択してTaskを登録。既存Taskデータを壊さない。
+3. GitHub接続方式の仕様検証・read-only discovery。個人PublicとPrivate/Organizationの権限差を明示。
+4. 必要な認証/接続機能とGitHub App連携を実装し、最小権限でPrivate/Organizationに対応。
+5. 隔離実行とデータ送信Policyを満たした環境で、Task→テスト→PRの縦断検証。
+
+### 受入テスト
+- GitHub未ログイン・ネットワーク未接続でもローカルTaskを作成・閲覧できる。
+- GitHub接続なしでPrivate Repository操作は拒否される。
+- Projectに複数Repositoryを紐付けられるが、操作権限はRepositoryごとに評価される。
+- Fake SCMへ差し替えてもFactory Coreを変更しない。
+- APIを外部公開した設定では安全に起動拒否する（将来の認証付きサーバーモードとは別）。
+- 既存TaskデータとCLI利用の回帰テストが成功する。
