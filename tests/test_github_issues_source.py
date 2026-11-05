@@ -60,3 +60,31 @@ def test_invalid_issue_ids_rejected(issue_id: str) -> None:
 def test_invalid_repository_rejected(repository: str) -> None:
     with pytest.raises(ValueError):
         GitHubIssuesSource(repository)
+
+
+def test_list_issues_pagination_and_pull_request_filter(monkeypatch) -> None:
+    def fake_open(request, timeout):
+        assert "state=closed&per_page=2&page=3" in request.full_url
+        return FakeResponse([
+            {"number": 4, "title": "Closed task", "body": "Details",
+             "html_url": "https://github.com/org/repo/issues/4"},
+            {"number": 5, "title": "Pull request", "pull_request": {},
+             "html_url": "https://github.com/org/repo/issues/5"},
+        ])
+
+    monkeypatch.setattr("sf_factory.github_issues_source.urlopen", fake_open)
+    issues, has_more = GitHubIssuesSource("org/repo").list_issues(
+        limit=2, page=3, state="closed"
+    )
+    assert has_more is True
+    assert len(issues) == 1
+    assert issues[0].external_id == "4"
+    assert issues[0].prompt == "Closed task\\n\\nDetails"
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"page": 0}, {"page": 10001}, {"state": "all"}, {"limit": 0},
+])
+def test_invalid_list_parameters(kwargs) -> None:
+    with pytest.raises(ValueError):
+        GitHubIssuesSource("org/repo").list_issues(**kwargs)
