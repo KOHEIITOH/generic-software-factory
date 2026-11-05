@@ -100,7 +100,8 @@ class Factory:
             raise ValueError('limit must be between 1 and 100')
         with self._connect() as db:
             rows = db.execute(
-                'SELECT t.id,t.prompt,t.created_at,s.provider,s.instance,s.external_id,s.external_url '
+                'SELECT t.id,t.prompt,t.created_at,s.provider,s.instance, '
+                's.external_id,s.external_url '
                 'FROM tasks t LEFT JOIN task_sources s ON s.task_id=t.id '
                 'ORDER BY t.created_at DESC, t.id DESC LIMIT ?',
                 (limit,),
