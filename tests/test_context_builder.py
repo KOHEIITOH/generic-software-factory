@@ -35,3 +35,21 @@ def test_rejects_non_utf8(tmp_path: Path):
 def test_rejects_negative_budget(tmp_path: Path):
     with pytest.raises(ValueError):
         build_context(tmp_path, [], max_characters=-1)
+
+
+def test_rejects_nul_containing_file(tmp_path: Path):
+    (tmp_path / "mixed.txt").write_bytes(b"hello\\x00world")
+    assert build_context(tmp_path, ["mixed.txt"]).excluded == ("mixed.txt",)
+
+
+def test_rejects_nested_directory_symlink(tmp_path: Path):
+    real = tmp_path / "real"
+    real.mkdir()
+    (real / "file.txt").write_text("hello", encoding="utf-8")
+    (tmp_path / "alias").symlink_to(real, target_is_directory=True)
+    assert build_context(tmp_path, ["alias/file.txt"]).excluded == ("alias/file.txt",)
+
+
+def test_rejects_absolute_and_missing_paths(tmp_path: Path):
+    paths = [str(tmp_path / "missing"), "missing"]
+    assert build_context(tmp_path, paths).excluded == tuple(paths)
