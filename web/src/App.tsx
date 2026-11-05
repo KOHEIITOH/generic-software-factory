@@ -15,6 +15,8 @@ type Run = { id: string; task_id: string; runtime: string; status: string; start
 
 export default function App() {
   const [state, setState] = useState<ApiState>("loading");
+  const [quickRepo, setQuickRepo] = useState<string | null>(null);
+  const [quickRepoLoading, setQuickRepoLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState("");
   const [projectRepos, setProjectRepos] = useState<Repository[]>([]);
@@ -104,6 +106,24 @@ export default function App() {
       setRepoMessage(cause instanceof Error ? cause.message : "登録エラー");
     } finally { setRepoBusy(false); }
   }
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/quick/repository", { signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error("Repositoryを検出できませんでした");
+        return response.json();
+      })
+      .then(data => {
+        if (!controller.signal.aborted) {
+          setQuickRepo(data.detected && typeof data.repository_root === "string"
+            ? data.repository_root : null);
+        }
+      })
+      .catch(() => { if (!controller.signal.aborted) setQuickRepo(null); })
+      .finally(() => { if (!controller.signal.aborted) setQuickRepoLoading(false); });
+    return () => controller.abort();
+  }, []);
 
   async function createLocalTask() {
     if (!newTask.trim() || taskBusy) return;
@@ -232,7 +252,7 @@ export default function App() {
     <div className="layout">
       <aside className="sidebar">
         <div className="brand"><span className="brand-icon">SF</span><span>Software Factory<small>DEVELOPMENT CONTROL CENTER</small></span></div>
-        <nav aria-label="Main navigation"><a className="selected" href="#overview">▦　概要</a><a href="#projects">▤　Project</a><a href="#runtimes">◈　AI Runtime</a><a href="#tasks">☷　タスク一覧</a><a href="#github-import">＋　Issue取り込み</a><a href="#runs">⑂　実行履歴</a><span className="nav-group-label">DOCUMENTATION</span><a href="/guide">▤　ユーザーガイド</a><a href="/onboarding">↗　オンボーディング</a></nav>
+        <nav aria-label="Main navigation"><a className="selected" href="#overview">▦　概要</a><a href="#quick-start">▶　クイック開始</a><a href="#projects">▤　Project</a><a href="#runtimes">◈　AI Runtime</a><a href="#tasks">☷　タスク一覧</a><a href="#github-import">＋　Issue取り込み</a><a href="#runs">⑂　実行履歴</a><span className="nav-group-label">DOCUMENTATION</span><a href="/guide">▤　ユーザーガイド</a><a href="/onboarding">↗　オンボーディング</a></nav>
         <div className="sidebar-footer"><span className="sidebar-dot" /> LOCAL WORKSPACE <small>Factory Core · v0.1</small></div>
       </aside>
       <main>
@@ -241,6 +261,14 @@ export default function App() {
           <article className="metric"><span>接続状態</span><strong>{state === "connected" ? "Online" : state === "loading" ? "Checking" : "Offline"}</strong><small>localhost:8000</small></article>
           <article className="metric"><span>登録済みAI Runtime</span><strong>{state === "connected" ? runtimes.length : "—"}</strong><small>登録済みのアダプタ</small></article>
           <article className="metric"><span>実行中のRun</span><strong>{state === "connected" ? activeRuns : "—"}</strong><small>実行中のRun</small></article>
+        </section>
+        <section className="panel quick-start-panel" id="quick-start">
+          <div className="panel-head"><span className="eyebrow">SINGLE REPOSITORY</span><h2>クイック開始</h2><p>Project登録は不要。Factoryを起動したディレクトリのGitリポジトリを自動認識します。</p></div>
+          {quickRepoLoading ? <p role="status">Gitリポジトリを確認中...</p> : quickRepo
+            ? <p className="quick-repo-status"><strong>検出済み:</strong> <code>{quickRepo}</code></p>
+            : <p role="status">起動ディレクトリからGitリポジトリを検出できませんでした。Git管理下で <code>uv run sf web --rebuild</code> を起動してください。</p>}
+          <p>まずは下の「タスク一覧」からTaskを登録できます。<strong>現段階ではAIの実行・コード変更は行いません。</strong></p>
+          <a className="source-link quick-start-link" href="#tasks">Taskを作成する ↓</a>
         </section>
         <div className="section-heading"><div><span className="eyebrow">FACTORY WORKSPACE</span><h2>ワークスペース</h2></div><span className="section-note">タスク {tasks.length}件 · 外部連携 {linkedTasks}件</span></div><section className="panel" id="projects">
           <div className="panel-head"><span className="eyebrow">LOCAL PROJECTS</span><h2>Project・Repository</h2><p>複数Repositoryをまとめる場合に登録します。単一RepositoryのTask作成には登録不要です。登録だけではGit操作・AI実行は始まりません。</p></div>
