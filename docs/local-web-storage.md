@@ -52,8 +52,13 @@ Webに承認・実行の入口は追加していません。
 承認済みcommitのsource snapshotもFile対応です。payloadを先に永続化し、Runとの参照と監査を
 同じ状態更新で登録します。参照登録が不明な場合はpayloadを保全して照合し、使用前には内容hashを再検証します。
 
-**品質・レビュー証跡はまだSQLite専用です。**
-Fileモードでこれらを呼ぶと明示的に停止し、裏でDBを作りません。
+品質・レビュー証跡もFile対応です。固定したcheck plan、対象revision/bundle/diff、収集者、
+上限3回の試行に結びつけて記録し、最新の同じ試行だけで評価します。0件・不明件数のテスト、
+失敗・省略・不完全レビュー、must-fixが残るレビューは合格にしません。証跡と監査の更新は同じ
+document内で原子的に処理します。SQLite/Fileで同じ判定ルールを使います。
+
+これらのAPIは信頼されたcontroller向けで、収集者の認証・実チェックの実行・artifact照合を
+自動で行うものではありません。`eligible_for_delivery` は引き続き常にfalseです。
 Issueから自動実装してDraft PRを提出する完成状態を意味しません。
 WebにAgent起動や承認のHTTP入口を追加していません。
 
@@ -63,8 +68,8 @@ Task本体は `tasks-v1/<id>.json`、Web登録・関連付け・Runとイベン�
 `dashboard-v1/state.json` に保存します。後者はschemaと単調増加versionを持つ16 MiB上限の
 ローカル用documentです。大規模・分散運転用ではありません。
 
-schema 1/2の既存File documentは、内容を検証してから同じID/既存データを保ってschema 3へ
-原子的に更新します。既存Harness状態は維持し、新しいsnapshot collectionを空で追加します。
+schema 1/2/3の既存File documentは、内容を検証してから同じID/既存データを保ってschema 4へ
+原子的に更新します。既存Harness/snapshot状態は維持し、新しいevidence collectionを空で追加します。
 旧バージョンのアプリは新schemaを拒否するため、更新後に古いアプリへ戻す場合はWriter停止と更新前バックアップの確認が必要です。
 SQLからFileへの移行とは別のローカルschema更新です。
 

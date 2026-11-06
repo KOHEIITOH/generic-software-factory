@@ -5,6 +5,7 @@ import json
 from contextlib import closing
 from dataclasses import asdict
 
+from sf_factory import evidence_rules as rules
 from sf_factory.factory import Factory, _now
 from sf_factory.run_evidence import (
     CheckObservation,
@@ -51,11 +52,8 @@ class SqliteEvidenceState:
                 'SELECT r.task_id,r.status,m.manifest FROM runs r '
                 'JOIN run_harness_manifests m ON m.run_id=r.id WHERE r.id=?', (run_id,),
             ).fetchone()
-            if row is None or row['status'] != 'prepared':
-                raise ValueError('a prepared Harness Run is required')
-            manifest = json.loads(row['manifest'])
-            if manifest['request']['bundle_hash'] != subject.bundle_hash:
-                raise PermissionError('evidence does not match approved Harness bundle')
+            rules.registration(dict(row) if row is not None else None, subject)
+            assert row is not None
             db.execute('INSERT INTO run_evidence_plans VALUES (?,?,?,?,?)', (
                 run_id, _encoded(asdict(subject)),
                 _encoded({'requirements': [asdict(c) for c in sorted(checks, key=lambda c: c.id)]}),
@@ -73,23 +71,13 @@ class SqliteEvidenceState:
             plan = db.execute(
                 'SELECT * FROM run_evidence_plans WHERE run_id=?', (run_id,),
             ).fetchone()
-            if plan is None:
-                raise ValueError('check plan not found')
             run = db.execute('SELECT status FROM runs WHERE id=?', (run_id,)).fetchone()
-            if run is None or run['status'] != 'prepared':
-                raise ValueError('Run is no longer in the supported prepared state')
-            if (plan['subject'] != _encoded(asdict(subject)) or collector != plan['collector']
-                    or observation.run_id != run_id):
-                raise PermissionError('wrong revision, bundle, diff or collector')
+            plan = rules.active_plan(dict(plan) if plan is not None else None,
+                                     dict(run) if run is not None else None)
             latest = db.execute('SELECT COALESCE(MAX(attempt),0) FROM run_check_observations '
                                 'WHERE run_id=?', (run_id,)).fetchone()[0]
-            if attempt > plan['max_attempts'] or attempt < latest or attempt > latest + 1:
-                raise ValueError('stale, skipped or exhausted attempt')
-            checks = {c['id']: c['kind'] for c in json.loads(plan['checks'])['requirements']}
-            if observation.check_id not in checks:
-                raise ValueError('unplanned check')
-            if checks[observation.check_id] != 'tests' and observation.tests_run is not None:
-                raise ValueError('test counts apply only to test checks')
+            rules.check_observation(plan, run_id=run_id, subject=subject, collector=collector,
+                                    observation=observation, attempt=attempt, latest=latest)
             db.execute('INSERT INTO run_check_observations VALUES (?,?,?,?,?)', (
                 run_id, attempt, observation.check_id, _encoded(asdict(observation)), _now(),
             ))
@@ -120,14 +108,12 @@ class SqliteEvidenceState:
                 'JOIN run_review_plans r ON r.run_id=p.run_id WHERE p.run_id=?', (run_id,),
             ).fetchone()
             run = db.execute('SELECT status,task_id FROM runs WHERE id=?', (run_id,)).fetchone()
-            if plan is None or run is None or run['status'] != 'prepared':
-                raise ValueError('active review plan required')
-            if plan['subject'] != _encoded(asdict(subject)) or reviewer != plan['reviewer']:
-                raise PermissionError('review subject or producer mismatch')
             latest = db.execute('SELECT COALESCE(MAX(attempt),0) FROM run_check_observations '
                                 'WHERE run_id=?', (run_id,)).fetchone()[0]
-            if latest != attempt:
-                raise ValueError('review must match latest check attempt')
+            rules.review_observation(dict(plan) if plan is not None else None,
+                                     dict(run) if run is not None else None, subject=subject,
+                                     reviewer=reviewer, attempt=attempt, latest=latest)
+            assert plan is not None and run is not None
             summary = parse_review(response, run_id=run_id, subject=subject,
                                    required_paths=tuple(json.loads(plan['paths'])['paths']))
             db.execute('INSERT INTO run_review_observations VALUES (?,?,?,?)',
@@ -141,13 +127,10 @@ class SqliteEvidenceState:
             plan = db.execute(
                 'SELECT * FROM run_evidence_plans WHERE run_id=?', (run_id,),
             ).fetchone()
-            if plan is None:
-                raise ValueError('check plan not found')
             run = db.execute('SELECT status FROM runs WHERE id=?', (run_id,)).fetchone()
-            if run is None or run['status'] != 'prepared':
-                raise ValueError('Run is no longer in the supported prepared state')
-            if plan['subject'] != _encoded(asdict(subject)):
-                raise PermissionError('assessment subject does not match the check plan')
+            plan = rules.active_plan(dict(plan) if plan is not None else None,
+                                     dict(run) if run is not None else None)
+            rules.assessment_subject(plan, subject)
             # One read transaction so a concurrent new attempt cannot mix observations.
             rows = db.execute('SELECT attempt,observation FROM run_check_observations '
                               'WHERE run_id=? ORDER BY attempt,check_id', (run_id,)).fetchall()

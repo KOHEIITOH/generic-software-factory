@@ -8,8 +8,8 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from pathlib import PurePosixPath
 
+from sf_factory import evidence_rules as rules
 from sf_factory.factory import Factory
 from sf_factory.quality import QualityEvidence, QualityGate, evaluate_quality
 
@@ -82,7 +82,7 @@ def _encoded(value: dict) -> str:
 
 
 class RunEvidenceService:
-    """Keep a frozen check plan and bounded attempts, using the existing Factory DB.
+    """Keep a frozen check plan and bounded attempts with optional persistence adapters.
 
     Registration is a trusted controller action after implementation; it does
     not independently prove commit ancestry, snapshot integrity, or identity.
@@ -118,19 +118,7 @@ class RunEvidenceService:
     def register_review(
         self, run_id: str, *, reviewer: str, implementer: str, changed_paths: tuple[str, ...],
     ) -> None:
-        _identity(reviewer)
-        _identity(implementer)
-        if reviewer == implementer:
-            raise ValueError('independent reviewer identity required')
-        if (not changed_paths or len(changed_paths) > 256
-                or len(set(changed_paths)) != len(changed_paths)):
-            raise ValueError('bounded unique changed paths required')
-        for path in changed_paths:
-            relative = PurePosixPath(path)
-            if (not path or len(path) > 512 or '\\' in path or '\x00' in path
-                    or relative.is_absolute() or '..' in relative.parts
-                    or not relative.parts or relative.as_posix() != path):
-                raise ValueError('canonical relative changed paths required')
+        rules.review_plan(reviewer, implementer, changed_paths)
         self.state.register_review(run_id, reviewer=reviewer, implementer=implementer,
                                    changed_paths=changed_paths)
 
