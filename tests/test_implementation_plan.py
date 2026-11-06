@@ -18,7 +18,8 @@ def test_default_plan_denies_execution():
         task_id="task1", repository="owner/repo", runtime="test", registry=registry()
     )
     assert not plan.ready
-    assert len(plan.blockers) == 2
+    assert len(plan.blockers) == 3
+    assert "Trusted isolated executor is not connected" in plan.blockers
 
 
 def test_worktree_without_os_isolation_stays_denied():
