@@ -10,7 +10,7 @@ from pathlib import Path
 from sf_factory.agent_registry import AgentRuntimeRegistry, default_runtime_registry
 from sf_factory.policy import Capability, ExecutionPolicy, ExecutionRequest
 from sf_factory.sqlite_state import SqliteStateStore
-from sf_factory.state_store import StateStore
+from sf_factory.state_store import StateConflict, StateStore
 
 
 def _now() -> str:
@@ -23,6 +23,8 @@ class Factory:
         )
         self.root = root.expanduser().resolve()
         self.root.mkdir(parents=True, exist_ok=True)
+        if (self.root / 'tasks-v1').exists():
+            raise StateConflict('File task state exists here; File workflows are not supported yet')
         self.workspaces = self.root / "workspaces"
         self.workspaces.mkdir(exist_ok=True)
         self.db = self.root / "factory.sqlite3"
