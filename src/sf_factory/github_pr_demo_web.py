@@ -11,7 +11,8 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Request as BrowserRequest
+from fastapi import FastAPI, HTTPException
+from fastapi import Request as BrowserRequest
 from pydantic import BaseModel, Field
 
 _REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
