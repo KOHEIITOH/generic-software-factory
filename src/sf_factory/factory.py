@@ -38,6 +38,11 @@ class Factory:
                     id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT,
                     task_id TEXT NOT NULL, event TEXT NOT NULL, at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS task_repositories (
+                    task_id TEXT PRIMARY KEY REFERENCES tasks(id),
+                    repository TEXT NOT NULL, local_path TEXT NOT NULL,
+                    linked_at TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS task_sources (
                     task_id TEXT PRIMARY KEY REFERENCES tasks(id),
                     provider TEXT NOT NULL, instance TEXT NOT NULL,
@@ -94,6 +99,40 @@ class Factory:
                 (task_id, "task.imported", _now()),
             )
             return task_id
+
+    def bind_task_repository(
+        self, task_id: str, repository: str, local_path: Path
+    ) -> dict[str, str]:
+        """Persist a verified Issue-to-repository binding; never execute code."""
+        from sf_factory.github_repo_identity import verify_github_origin
+
+        root = verify_github_origin(local_path, repository)
+        with self._connect() as db:
+            task = db.execute(
+                "SELECT id FROM tasks WHERE id=?", (task_id,)
+            ).fetchone()
+            if task is None:
+                raise ValueError("task not found")
+            source = db.execute(
+                "SELECT provider,instance FROM task_sources WHERE task_id=?",
+                (task_id,),
+            ).fetchone()
+            if source is None or source["provider"] != "github":
+                raise ValueError("task must originate from a GitHub Issue")
+            if source["instance"].casefold() != repository.casefold():
+                raise ValueError("Issue repository does not match selected repository")
+            db.execute(
+                "INSERT INTO task_repositories(task_id,repository,local_path,linked_at) "
+                "VALUES (?,?,?,?) ON CONFLICT(task_id) DO UPDATE SET "
+                "repository=excluded.repository,local_path=excluded.local_path,"
+                "linked_at=excluded.linked_at",
+                (task_id, repository, str(root), _now()),
+            )
+            db.execute(
+                "INSERT INTO audit(run_id,task_id,event,at) VALUES (NULL,?,?,?)",
+                (task_id, "task.repository_bound", _now()),
+            )
+        return {"task_id": task_id, "repository": repository, "local_path": str(root)}
 
     def list_tasks(self, limit: int = 50) -> list[dict]:
         if not 1 <= limit <= 100:

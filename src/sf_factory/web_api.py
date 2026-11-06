@@ -27,6 +27,11 @@ class InspectRepositoryRequest(BaseModel):
     path: str = Field(min_length=1, max_length=1000)
 
 
+class BindTaskRepositoryRequest(BaseModel):
+    repository: str = Field(min_length=3, max_length=200)
+    local_path: str = Field(min_length=1, max_length=1000)
+
+
 class CreateTaskRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=10000)
 
@@ -104,6 +109,18 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
         task_id = Factory(data_dir or Path(".sf-factory")).create_task(prompt)
         return {"task_id": task_id}
 
+
+    @app.post("/api/tasks/{task_id}/repository")
+    def bind_task_repository(
+        task_id: str, payload: BindTaskRepositoryRequest, request: Request
+    ) -> dict[str, str]:
+        _check_local_origin(request)
+        try:
+            return Factory(data_dir or Path(".sf-factory")).bind_task_repository(
+                task_id, payload.repository, Path(payload.local_path)
+            )
+        except (OSError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.get("/api/projects")
     def projects() -> dict[str, list[dict[str, str]]]:
