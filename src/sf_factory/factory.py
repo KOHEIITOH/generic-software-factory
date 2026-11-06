@@ -38,7 +38,12 @@ class Factory:
                     id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT,
                     task_id TEXT NOT NULL, event TEXT NOT NULL, at TEXT NOT NULL
                 );
-                CREATE TABLE IF NOT EXISTS task_repositories (\n                    task_id TEXT PRIMARY KEY REFERENCES tasks(id),\n                    repository TEXT NOT NULL, local_path TEXT NOT NULL,\n                    linked_at TEXT NOT NULL\n                );\n                CREATE TABLE IF NOT EXISTS task_sources (
+                CREATE TABLE IF NOT EXISTS task_repositories (
+                    task_id TEXT PRIMARY KEY REFERENCES tasks(id),
+                    repository TEXT NOT NULL, local_path TEXT NOT NULL,
+                    linked_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS task_sources (
                     task_id TEXT PRIMARY KEY REFERENCES tasks(id),
                     provider TEXT NOT NULL, instance TEXT NOT NULL,
                     external_id TEXT NOT NULL, external_url TEXT,
