@@ -19,7 +19,13 @@ from sf_factory.factory import Factory, _now
 from sf_factory.file_document import read_document, write_document
 from sf_factory.file_state import FileStateStore
 from sf_factory.harness_state import HarnessState
-from sf_factory.repository_contracts import Project, ProjectRegistry, Repository, Visibility
+from sf_factory.repository_contracts import (
+    Project,
+    ProjectRegistry,
+    Repository,
+    RepositoryBindingAdapter,
+    Visibility,
+)
 from sf_factory.source_state import SourceState
 from sf_factory.state_store import (
     StateConflict,
@@ -31,8 +37,10 @@ from sf_factory.state_store import (
 
 
 class FileDashboardFactory(Factory):
-    def __init__(self, root: Path, *, runtime_registry: AgentRuntimeRegistry | None = None):
+    def __init__(self, root: Path, *, runtime_registry: AgentRuntimeRegistry | None = None,
+                 repository_binding: RepositoryBindingAdapter | None = None):
         self.runtime_registry = runtime_registry or default_runtime_registry()
+        self._configure_repository_binding(repository_binding)
         self.files = FileStateStore(root)
         self.task_store = self.files
         self.root = self.files.root
@@ -246,14 +254,7 @@ class FileDashboardFactory(Factory):
                     'local_path': binding.get('local_path')}
 
     def bind_task_repository(self, task_id: str, repository: str, local_path: Path) -> dict:
-        from sf_factory.github_repo_identity import verify_github_origin
-
-        root = verify_github_origin(local_path, repository)
-        source = self.task_repository(task_id)
-        if source['provider'] != 'github':
-            raise ValueError('task must originate from a GitHub Issue')
-        if source['instance'].casefold() != repository.casefold():
-            raise ValueError('Issue repository does not match selected repository')
+        root = self._verified_binding(task_id, repository, local_path)
         with self._document(edit=True) as state:
             state['bindings'][task_id] = {
                 'repository': repository, 'local_path': str(root), 'linked_at': _now(),

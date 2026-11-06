@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 
@@ -93,3 +94,14 @@ class ProjectRegistry(Protocol):
     def list_projects(self, owner_id: str) -> tuple[Project, ...]: ...
 
     def list_repositories(self, project_id: str) -> tuple[Repository, ...]: ...
+
+
+class RepositoryBindingAdapter(Protocol):
+    def verify(self, *, provider: str, instance: str, repository: str,
+               local_path: Path) -> Path:
+        """Verify task scope and local identity; return a canonical existing root.
+
+        Provider naming, source-to-repository rules and remote URL parsing belong
+        to the adapter. Verification must not mutate code or perform Git writes.
+        """
+        ...

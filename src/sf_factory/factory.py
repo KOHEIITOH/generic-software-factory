@@ -11,7 +11,7 @@ from sf_factory.agent_registry import AgentRuntimeRegistry, default_runtime_regi
 from sf_factory.evidence_state import EvidenceState
 from sf_factory.harness_state import HarnessState
 from sf_factory.policy import Capability, ExecutionPolicy, ExecutionRequest
-from sf_factory.repository_contracts import ProjectRegistry
+from sf_factory.repository_contracts import ProjectRegistry, RepositoryBindingAdapter
 from sf_factory.source_state import SourceState
 from sf_factory.sqlite_state import SqliteStateStore
 from sf_factory.state_store import StateConflict, StateStore
@@ -21,10 +21,12 @@ def _now() -> str:
     return datetime.now(UTC).isoformat()
 
 class Factory:
-    def __init__(self, root: Path, *, runtime_registry: AgentRuntimeRegistry | None = None):
+    def __init__(self, root: Path, *, runtime_registry: AgentRuntimeRegistry | None = None,
+                 repository_binding: RepositoryBindingAdapter | None = None):
         self.runtime_registry = (
             runtime_registry if runtime_registry is not None else default_runtime_registry()
         )
+        self._configure_repository_binding(repository_binding)
         self.root = root.expanduser().resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         if (self.root / 'tasks-v1').exists():
@@ -85,27 +87,29 @@ class Factory:
             prompt=prompt, external_url=external_url,
         )
 
+    def _configure_repository_binding(self, adapter: RepositoryBindingAdapter | None) -> None:
+        from sf_factory.integration_defaults import repository_binding
+
+        self.repository_binding = adapter if adapter is not None else repository_binding()
+
+    def _verified_binding(self, task_id: str, repository: str, local_path: Path) -> Path:
+        source = self.task_repository(task_id)
+        if not source['provider'] or not source['instance']:
+            raise ValueError('an external task source is required')
+        root = self.repository_binding.verify(
+            provider=source['provider'], instance=source['instance'],
+            repository=repository, local_path=local_path,
+        )
+        if not root.is_absolute() or not root.is_dir() or root != root.resolve(strict=True):
+            raise ValueError('binding adapter must return a canonical repository root')
+        return root
+
     def bind_task_repository(
         self, task_id: str, repository: str, local_path: Path
     ) -> dict[str, str]:
-        """Persist a verified Issue-to-repository binding; never execute code."""
-        from sf_factory.github_repo_identity import verify_github_origin
-
-        root = verify_github_origin(local_path, repository)
+        """Persist an adapter-verified task/repository binding; never execute code."""
+        root = self._verified_binding(task_id, repository, local_path)
         with self._connect() as db:
-            task = db.execute(
-                "SELECT id FROM tasks WHERE id=?", (task_id,)
-            ).fetchone()
-            if task is None:
-                raise ValueError("task not found")
-            source = db.execute(
-                "SELECT provider,instance FROM task_sources WHERE task_id=?",
-                (task_id,),
-            ).fetchone()
-            if source is None or source["provider"] != "github":
-                raise ValueError("task must originate from a GitHub Issue")
-            if source["instance"].casefold() != repository.casefold():
-                raise ValueError("Issue repository does not match selected repository")
             db.execute(
                 "INSERT INTO task_repositories(task_id,repository,local_path,linked_at) "
                 "VALUES (?,?,?,?) ON CONFLICT(task_id) DO UPDATE SET "
