@@ -1,9 +1,12 @@
 """Use real Git/SQLite to verify prepared metadata and atomic approval consumption."""
+import hashlib
 import sqlite3
 import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 
@@ -15,6 +18,12 @@ from sf_factory.harness_validation import validate_harness
 from sf_factory.local_project_registry import LocalProjectRegistry
 from sf_factory.local_task_projects import LocalTaskProjects
 from sf_factory.repository_contracts import Project, Repository, Visibility
+from sf_factory.run_evidence import (
+    CheckObservation,
+    CheckRequirement,
+    EvidenceSubject,
+    RunEvidenceService,
+)
 
 
 def git(root, *args):
@@ -39,6 +48,9 @@ def prepared(tmp_path, monkeypatch):
     root.mkdir()
     git(root, 'init', '-q')
     (root / 'AGENTS.md').write_text('rules')
+    bundled = Path(__file__).resolve().parents[1] / 'fixtures/calculator'
+    for name in ('calculator.py', 'test_calculator.py'):
+        (root / name).write_bytes((bundled / name).read_bytes())
     commit(root)
     factory = Factory(tmp_path / 'data')
     task = factory.create_task('Implement a sample')
@@ -173,3 +185,144 @@ def test_inherited_global_filter_is_rejected(prepared, tmp_path, monkeypatch):
         prepare(prepared)
     assert not factory.list_runs()
     assert len(service.approvals.events(approval)) == 1
+
+
+@pytest.fixture
+def evidence_run(prepared):
+    _, factory, _, request, _ = prepared
+    run = prepare(prepared)
+    service = RunEvidenceService(factory)
+    subject = EvidenceSubject(request.revision, request.bundle_hash, 'd' * 64)
+    checks = (CheckRequirement('unit', 'tests'), CheckRequirement('lint', 'lint'))
+    service.register(run['id'], subject, checks, collector='trusted-checker')
+    return service, run['id'], subject
+
+
+def observe(values, check='unit', attempt=1, status='completed', exit_code=0, tests_run=2):
+    service, run_id, subject = values
+    service.record(run_id, subject, attempt=attempt, collector='trusted-checker',
+                   observation=CheckObservation(check, status, exit_code, 'e' * 64,
+                                                tests_run if check == 'unit' else None,
+                                                run_id=run_id))
+
+
+def test_checks_connect_to_prepared_run_but_do_not_authorize_delivery(evidence_run):
+    service, run_id, subject = evidence_run
+    assert service.assess(run_id, subject)['checks_passed'] is False
+    observe(evidence_run)
+    assert service.assess(run_id, subject)['checks_passed'] is False
+    observe(evidence_run, check='lint')
+    report = service.assess(run_id, subject)
+    assert report['checks_passed'] is True
+    assert report['review_status'] == 'missing'
+    assert report['eligible_for_delivery'] is False
+    assert RunEvidenceService(service.factory).assess(run_id, subject) == report
+    assert service.factory.show_run(run_id)['status'] == 'prepared'
+
+
+@pytest.mark.parametrize('status,code,count', [
+    ('completed', 0, 0), ('completed', 0, None), ('failed', 1, 2),
+    ('skipped', None, None), ('error', None, None),
+])
+def test_incomplete_or_failed_checks_never_pass(evidence_run, status, code, count):
+    service, run_id, subject = evidence_run
+    observe(evidence_run, status=status, exit_code=code, tests_run=count)
+    observe(evidence_run, check='lint')
+    assert not service.assess(run_id, subject)['checks_passed']
+
+
+@pytest.mark.parametrize('field,value', [
+    ('revision', 'f' * 40), ('bundle_hash', 'f' * 64), ('diff_sha256', 'f' * 64),
+])
+def test_wrong_subject_is_rejected_for_record_and_assessment(evidence_run, field, value):
+    service, run_id, subject = evidence_run
+    stale = replace(subject, **{field: value})
+    with pytest.raises(PermissionError):
+        service.record(run_id, stale, attempt=1, collector='trusted-checker',
+                       observation=CheckObservation('unit', 'completed', 0, 'e' * 64, 2,
+                                                    run_id=run_id))
+    with pytest.raises(PermissionError):
+        service.assess(run_id, stale)
+    assert service.assess(run_id, subject)['attempt'] == 0
+
+
+def test_new_attempt_cannot_reuse_old_success_or_accept_old_callbacks(evidence_run):
+    service, run_id, subject = evidence_run
+    observe(evidence_run)
+    observe(evidence_run, check='lint')
+    assert service.assess(run_id, subject)['checks_passed']
+    observe(evidence_run, attempt=2)
+    report = service.assess(run_id, subject)
+    assert report['attempt'] == 2
+    assert not report['checks_passed']
+    with pytest.raises(ValueError):
+        observe(evidence_run, check='lint', attempt=1)
+    observe(evidence_run, check='lint', attempt=2)
+    assert service.assess(run_id, subject)['checks_passed']
+    with pytest.raises(ValueError):
+        observe(evidence_run, attempt=4)
+
+
+def test_check_records_and_plan_cannot_be_overwritten(evidence_run):
+    service, run_id, subject = evidence_run
+    observe(evidence_run, status='failed', exit_code=1)
+    with pytest.raises(sqlite3.IntegrityError):
+        observe(evidence_run)
+    with pytest.raises(sqlite3.IntegrityError):
+        service.register(run_id, subject, (CheckRequirement('unit', 'tests'),),
+                         collector='trusted-checker')
+    assert not service.assess(run_id, subject)['checks_passed']
+
+
+def test_unplanned_check_and_wrong_collector_are_rejected(evidence_run):
+    service, run_id, subject = evidence_run
+    with pytest.raises(ValueError):
+        service.record(run_id, subject, attempt=1, collector='trusted-checker',
+                       observation=CheckObservation('unknown', 'completed', 0, 'e' * 64, 2,
+                                                    run_id=run_id))
+    with pytest.raises(PermissionError):
+        service.record(run_id, subject, attempt=1, collector='agent-self-report',
+                       observation=CheckObservation('unit', 'completed', 0, 'e' * 64, 2,
+                                                    run_id=run_id))
+
+
+def test_real_fixture_test_failure_is_preserved_as_failed_evidence(evidence_run, prepared):
+    service, run_id, subject = evidence_run
+    fixture = prepared[0]
+    result = subprocess.run(
+        [sys.executable, '-B', '-m', 'unittest', 'discover', '-s', str(fixture)],
+        capture_output=True, timeout=10,
+    )
+    # This bundled fixture deliberately lacks an implementation.
+    assert result.returncode == 1
+    assert b'Ran 2 tests' in result.stderr
+    fingerprint = hashlib.sha256(result.stdout + result.stderr).hexdigest()
+    service.record(run_id, subject, attempt=1, collector='trusted-checker',
+                   observation=CheckObservation(
+                       'unit', 'failed', result.returncode, fingerprint, 2, run_id=run_id,
+                   ))
+    report = service.assess(run_id, subject)
+    assert not report['checks_passed']
+    assert next(c for c in report['checks'] if c['id'] == 'unit')['outcome'] == 'failed'
+
+
+
+def test_terminal_run_does_not_accept_or_reuse_quality_evidence(evidence_run):
+    service, run_id, subject = evidence_run
+    observe(evidence_run)
+    observe(evidence_run, check='lint')
+    with sqlite3.connect(service.factory.db) as db:
+        db.execute("UPDATE runs SET status='cancelled' WHERE id=?", (run_id,))
+    with pytest.raises(ValueError, match='prepared state'):
+        observe(evidence_run, attempt=2)
+    with pytest.raises(ValueError, match='prepared state'):
+        service.assess(run_id, subject)
+
+
+def test_result_from_another_run_is_rejected(evidence_run):
+    service, run_id, subject = evidence_run
+    with pytest.raises(PermissionError):
+        service.record(run_id, subject, attempt=1, collector='trusted-checker',
+                       observation=CheckObservation('unit', 'completed', 0, 'e' * 64, 2,
+                                                    run_id='f' * 32))
+    assert service.assess(run_id, subject)['attempt'] == 0
