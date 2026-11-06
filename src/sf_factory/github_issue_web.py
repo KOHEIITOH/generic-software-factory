@@ -20,7 +20,8 @@ class IssueInput(BaseModel):
 
 def _source(repository: str) -> GitHubIssuesSource:
     # Credentials remain server-side; never accept a token from the browser.
-    return GitHubIssuesSource(repository=repository, token=os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN"))
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    return GitHubIssuesSource(repository=repository, token=token)
 
 
 def _fetch(repository: str, number: int):
