@@ -1,32 +1,37 @@
-# ローカルWeb UI / API（実験的MVP）
+# ローカルWeb UI / API
 
-現在のWeb UIはReact/TypeScript/Viteで実装済みです。**閲覧専用**であり、WebからAIを実行したりIssueを取り込んだりする操作はまだありません。
+既定ではloopback専用のローカル管理画面です。開発依頼の入口はGitHub Issue、実行の記録はRunです。
+独立したTask登録フォームは主画面から外しましたが、旧Task API・データ・CLIは互換性のために残します。
+**現在はIssue取込・関連付け・事前チェック・履歴表示までで、実装実行APIはまだ接続していません。**
 
 ## 起動
 
-```bash
-uv sync --extra web
+```sh
 uv run sf web --rebuild
 ```
 
-Node.js/npmが初回ビルドまたは再ビルド時に必要です。ブラウザで http://127.0.0.1:8000/ を開きます。
+初回の依存導入が必要な場合は`uv sync --extra web`を使います。Node.js/npmは初回ビルド・再ビルド時に必要です。
+URLは`http://127.0.0.1:8000/`です。Dockerは閲覧・取込には不要です。
 
-## 画面
+## 主な読み取りAPI
 
-- `/`: ダッシュボード（登録済みRuntime、Task、Runを閲覧）
-- `/guide`: ユーザーガイドHTML
-- `/onboarding`: オンボーディングHTML
-- `/docs`: FastAPIのAPI仕様
+- `GET /api/health`: 稼働状況。
+- `GET /api/integrations`: 既定Providerと認証設定有無。トークン値を返さず認証実確認は行わない。
+- `GET /api/runtimes`: 登録名。認証・実行可能性の証明ではない。
+- `GET /api/issues`: 保存済み外部Issue参照、Issueごとの直近10 Runと全Run数。
+- `GET /api/tasks`: 旧Task一覧。ローカルTaskも含めて互換性を維持。
+- `GET /api/runs`: 全体の直近Run履歴。
+- `GET /api/github/repositories`、`/api/github/issues`、`/api/github/issue`: 既存GitHub Adapterの取得/プレビュー。
+- `GET /api/tasks/{id}/implementation-preflight`: 変更や実行を開始しない事前チェック。
 
-## 読み取り専用API
+`/guide`、`/onboarding`、`/docs`は説明・API仕様です。
 
-- `GET /api/health`: APIの稼働状況
-- `GET /api/runtimes`: 登録済みRuntime名（認証・実行可能性を保証しない）
-- `GET /api/tasks`: 保存済みTask一覧
-- `GET /api/runs`: 保存済みRun一覧
+## 既存の変更APIと境界
 
-タスクやRunの作成・実行・削除を行うHTTPエンドポイントはありません。GitHub Issues AdapterはPython APIで利用できますが、Web UIのIssue取り込み機能は未実装です。
+Project/Repository登録、Issue取込、検証済みRepositoryとの関連付け、旧ローカルTask作成は既存APIで可能です。
+ブラウザの変更要求はsame-originを要求します。GitHub Draft PRデモは明示boolean確認と権限検査後に
+markerだけを追加する機能であり、Issueの実装や自動配送ではありません。
 
-## 安全上の注意
-
-認証は未実装です。ローカル専用（127.0.0.1）で起動し、`0.0.0.0`で公開したりインターネットに接続したりしないでください。DockerはWeb UI閲覧には不要です。任意リポジトリでの自律開発・隔離実行・PR自動作成は今後の課題です。
+Webのoperator認証と安全な実行器への接続が整うまでは、読み取り専用CLI実行を実装実行APIへ転用しません。
+公開API認証は未実装なので、loopback以外へ公開する運用は対象外です。
+完成条件と未接続箇所は[縦断実装チェックリスト](issue-to-pr-vertical-slice.md)を参照してください。

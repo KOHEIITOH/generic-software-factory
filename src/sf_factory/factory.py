@@ -156,7 +156,7 @@ class Factory:
             raise ValueError('task not found')
         return dict(row)
 
-    def list_tasks(self, limit: int = 50) -> list[dict]:
+    def list_tasks(self, limit: int = 50, *, external_only: bool = False) -> list[dict]:
         if not 1 <= limit <= 100:
             raise ValueError('limit must be between 1 and 100')
         with self._connect() as db:
@@ -166,10 +166,38 @@ class Factory:
                 'tr.local_path AS bound_local_path '
                 'FROM tasks t LEFT JOIN task_sources s ON s.task_id=t.id '
                 'LEFT JOIN task_repositories tr ON tr.task_id=t.id '
-                'ORDER BY t.created_at DESC, t.id DESC LIMIT ?',
+                + ('WHERE s.task_id IS NOT NULL ' if external_only else '')
+                + 'ORDER BY t.created_at DESC, t.id DESC LIMIT ?',
                 (limit,),
             ).fetchall()
             return [dict(row) for row in rows]
+
+    def issue_history(self, limit: int = 50) -> list[dict]:
+        """Issue is the request; keep the legacy Task ID as an internal reference."""
+        issues = self.list_tasks(limit, external_only=True)
+        history = self._issue_run_history(tuple(issue['id'] for issue in issues))
+        return [{**issue, 'recent_runs': history.get(issue['id'], {}).get('runs', []),
+                 'total_runs': history.get(issue['id'], {}).get('total', 0)} for issue in issues]
+
+    def _issue_run_history(self, task_ids: tuple[str, ...]) -> dict:
+        if not task_ids:
+            return {}
+        placeholders = ','.join('?' for _ in task_ids)
+        with self._connect() as db:
+            rows = db.execute(
+                'SELECT * FROM (SELECT id,task_id,runtime,status,started_at,ended_at, '
+                'ROW_NUMBER() OVER (PARTITION BY task_id '
+                'ORDER BY started_at DESC,id DESC) AS rank, '
+                'COUNT(*) OVER (PARTITION BY task_id) AS total FROM runs '
+                f'WHERE task_id IN ({placeholders})) WHERE rank <= 10 '
+                'ORDER BY started_at DESC,id DESC', task_ids,
+            ).fetchall()
+        history: dict = {}
+        for row in rows:
+            group = history.setdefault(row['task_id'], {'runs': [], 'total': row['total']})
+            group['runs'].append({k: row[k] for k in (
+                'id', 'task_id', 'runtime', 'status', 'started_at', 'ended_at')})
+        return history
 
     def list_runs(self, limit: int = 50) -> list[dict]:
         if not 1 <= limit <= 100:

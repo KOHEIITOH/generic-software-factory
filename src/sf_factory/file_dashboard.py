@@ -196,7 +196,7 @@ class FileDashboardFactory(Factory):
         if type(limit) is not int or not 1 <= limit <= 100:
             raise ValueError('limit must be between 1 and 100')
 
-    def list_tasks(self, limit: int = 50) -> list[dict]:
+    def list_tasks(self, limit: int = 50, *, external_only: bool = False) -> list[dict]:
         self._limit(limit)
         with self._document() as state:
             rows = []
@@ -209,6 +209,8 @@ class FileDashboardFactory(Factory):
                         record = self.files._read(directory, path.stem)
                     finally:
                         os.close(directory)
+                    if external_only and record['source'] is None:
+                        continue
                     source = record['source'] or {}
                     binding = state['bindings'].get(path.stem, {})
                     rows.append({**record['task'], **{k: source.get(k) for k in (
@@ -216,6 +218,22 @@ class FileDashboardFactory(Factory):
                         'bound_repository': binding.get('repository'),
                         'bound_local_path': binding.get('local_path')})
         return sorted(rows, key=lambda row: (row['created_at'], row['id']), reverse=True)[:limit]
+
+    def _issue_run_history(self, task_ids: tuple[str, ...]) -> dict:
+        if not task_ids:
+            return {}
+        history: dict = {}
+        with self._document() as state:
+            for run in sorted(state['runs'].values(),
+                              key=lambda item: (item['started_at'], item['id']), reverse=True):
+                if run['task_id'] not in task_ids:
+                    continue
+                group = history.setdefault(run['task_id'], {'runs': [], 'total': 0})
+                group['total'] += 1
+                if len(group['runs']) < 10:
+                    group['runs'].append({k: run[k] for k in (
+                        'id', 'task_id', 'runtime', 'status', 'started_at', 'ended_at')})
+        return history
 
     def show_task(self, task_id: str) -> dict:
         task = self.task_store.get_task(task_id)

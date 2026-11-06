@@ -112,6 +112,10 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
     def runtimes() -> dict[str, list[str]]:
         return {"runtimes": list(default_runtime_registry().names())}
 
+    @app.get('/api/issues')
+    def imported_issues() -> dict:
+        return {'issues': open_factory(data_dir).issue_history()}
+
     @app.get('/api/tasks')
     def tasks() -> dict[str, list[dict]]:
         return {'tasks': open_factory(data_dir or Path('.sf-factory')).list_tasks()}

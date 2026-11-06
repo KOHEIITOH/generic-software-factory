@@ -9,7 +9,7 @@ const plannedRuntimes = [
 type ApiState = "loading" | "connected" | "offline";
 type Project = { id: string; name: string; owner_id: string };
 type Repository = { id: string; project_id: string; provider_id: string; external_id: string; visibility: string };
-type Task = { id: string; prompt: string; created_at: string; provider?: string | null; instance?: string | null; bound_repository?: string | null; bound_local_path?: string | null; external_id?: string | null; external_url?: string | null };
+type Task = { id: string; prompt: string; created_at: string; provider?: string | null; instance?: string | null; bound_repository?: string | null; bound_local_path?: string | null; external_id?: string | null; external_url?: string | null; recent_runs: Run[]; total_runs: number };
 type Issue = { repository: string; number: string; prompt: string; url: string };
 type Run = { id: string; task_id: string; runtime: string; status: string; started_at: string };
 type Preflight = { task_id: string; repository: string | null; runtimes: string[]; ready_for_implementation: boolean; blockers: string[]; execution_started: boolean };
@@ -38,10 +38,8 @@ export default function App() {
   const [runtimes, setRuntimes] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [newTask, setNewTask] = useState("");
-  const [taskBusy, setTaskBusy] = useState(false);
-  const [taskMessage, setTaskMessage] = useState("");
   const [bindingTaskId, setBindingTaskId] = useState("");
+  const [bindingMessage, setBindingMessage] = useState("");
   const [preflightByTask, setPreflightByTask] = useState<Record<string, Preflight>>({});
   const [preflightBusy, setPreflightBusy] = useState<string[]>([]);
   const [preflightErrors, setPreflightErrors] = useState<Record<string, string>>({});
@@ -175,25 +173,6 @@ export default function App() {
     }
   }
 
-  async function createLocalTask() {
-    if (!newTask.trim() || taskBusy) return;
-    setTaskBusy(true); setTaskMessage("");
-    try {
-      const response = await fetch("/api/tasks", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: newTask.trim() }),
-      });
-      if (!response.ok) throw new Error("タスクの作成に失敗しました。");
-      const data = await response.json();
-      setTaskMessage("タスクを登録しました: " + data.task_id + "（AIは実行されません）");
-      setNewTask("");
-      const refreshed = await fetch("/api/tasks");
-      if (refreshed.ok) setTasks((await refreshed.json()).tasks);
-    } catch (cause) {
-      setTaskMessage(cause instanceof Error ? cause.message : "作成エラー");
-    } finally { setTaskBusy(false); }
-  }
-
   async function loadGithubRepositories() {
     setGithubRepoMessage("取得中...");
     try {
@@ -258,7 +237,7 @@ export default function App() {
   async function bindTaskRepository(task: Task) {
     if (!quickRepo) return;
     setBindingTaskId(task.id);
-    setTaskMessage("");
+    setBindingMessage("");
     try {
       const response = await fetch("/api/tasks/" + encodeURIComponent(task.id) + "/repository", {
         method: "POST",
@@ -271,9 +250,9 @@ export default function App() {
       }
       const data = await response.json();
       setTasks(previous => previous.map(item => item.id === task.id ? { ...item, bound_repository: data.repository, bound_local_path: data.local_path } : item));
-      setTaskMessage("Repository紐付け完了。AI実行はまだ行われません。");
+      setBindingMessage("Repository紐付け完了。AI実行はまだ行われません。");
     } catch (error) {
-      setTaskMessage(error instanceof Error ? error.message : "紐付けエラー");
+      setBindingMessage(error instanceof Error ? error.message : "紐付けエラー");
     } finally {
       setBindingTaskId("");
     }
@@ -291,8 +270,8 @@ export default function App() {
       const data = await response.json();
       setIssueMessage("取り込み完了: Task " + data.task_id);
       setIssuePreview(null);
-      const tasksResponse = await fetch("/api/tasks");
-      if (tasksResponse.ok) setTasks((await tasksResponse.json()).tasks);
+      const tasksResponse = await fetch("/api/issues");
+      if (tasksResponse.ok) setTasks((await tasksResponse.json()).issues);
     } catch (error) { setIssueMessage(error instanceof Error ? error.message : "取り込みエラー"); }
     finally { setIssueBusy(false); }
   }
@@ -314,17 +293,17 @@ export default function App() {
         }
         setRuntimes(payload.runtimes as string[]);
         const [taskResponse, runResponse] = await Promise.all([
-          fetch("/api/tasks", { signal: controller.signal }),
+          fetch("/api/issues", { signal: controller.signal }),
           fetch("/api/runs", { signal: controller.signal }),
         ]);
-        if (!taskResponse.ok || !runResponse.ok) throw new Error("Task API returned an error");
+        if (!taskResponse.ok || !runResponse.ok) throw new Error("Issue・Runの履歴を取得できませんでした");
         const taskData: unknown = await taskResponse.json();
         const runData: unknown = await runResponse.json();
-        if (!taskData || typeof taskData !== "object" || !("tasks" in taskData) || !Array.isArray(taskData.tasks)
-          || !taskData.tasks.every((item: unknown) => item && typeof item === "object" && "id" in item && typeof item.id === "string" && "prompt" in item && typeof item.prompt === "string")) throw new Error("Unexpected tasks response");
+        if (!taskData || typeof taskData !== "object" || !("issues" in taskData) || !Array.isArray(taskData.issues)
+          || !taskData.issues.every((item: unknown) => item && typeof item === "object" && "id" in item && typeof item.id === "string" && "prompt" in item && typeof item.prompt === "string" && "recent_runs" in item && Array.isArray(item.recent_runs) && "total_runs" in item && typeof item.total_runs === "number")) throw new Error("Unexpected issues response");
         if (!runData || typeof runData !== "object" || !("runs" in runData) || !Array.isArray(runData.runs)
           || !runData.runs.every((item: unknown) => item && typeof item === "object" && "id" in item && typeof item.id === "string" && "status" in item && typeof item.status === "string")) throw new Error("Unexpected runs response");
-        setTasks(taskData.tasks as Task[]);
+        setTasks(taskData.issues as Task[]);
         setRuns(runData.runs as Run[]);
         setState("connected");
       } catch (cause) {
@@ -357,11 +336,11 @@ export default function App() {
     <div className="layout">
       <aside className="sidebar">
         <div className="brand"><span className="brand-icon">SF</span><span>Software Factory<small>DEVELOPMENT CONTROL CENTER</small></span></div>
-        <nav aria-label="Main navigation"><a className="selected" href="#overview">▦　概要</a><a href="#quick-start">▶　クイック開始</a><a href="#projects">▤　Project</a><a href="#runtimes">◈　AI Runtime</a><a href="#tasks">☷　タスク一覧</a><a href="#github-import">＋　Issue取り込み</a><a href="#runs">⑂　実行履歴</a><span className="nav-group-label">DOCUMENTATION</span><a href="/guide">▤　ユーザーガイド</a><a href="/onboarding">↗　オンボーディング</a></nav>
+        <nav aria-label="Main navigation"><a className="selected" href="#overview">▦　概要</a><a href="#quick-start">▶　クイック開始</a><a href="#projects">▤　Project</a><a href="#runtimes">◈　AI Runtime</a><a href="#tasks">☷　IssueとRun</a><a href="#github-import">＋　Issue取り込み</a><a href="#runs">⑂　実行履歴</a><span className="nav-group-label">DOCUMENTATION</span><a href="/guide">▤　ユーザーガイド</a><a href="/onboarding">↗　オンボーディング</a></nav>
         <div className="sidebar-footer"><span className="sidebar-dot" /> LOCAL WORKSPACE <small>Factory Core · v0.1</small></div>
       </aside>
       <main>
-        <header><div><h1 id="overview">Software Factory</h1><p>開発対象を選んで、タスクを管理します。</p></div><span role="status" className={"status " + state}>{state === "connected" ? "● ローカルAPI接続中" : state === "loading" ? "◌ 接続確認中" : "● API未接続"}</span></header>
+        <header><div><h1 id="overview">Software Factory</h1><p>Issueを開発依頼として選び、Runで実行結果を確認します。</p></div><span role="status" className={"status " + state}>{state === "connected" ? "● ローカルAPI接続中" : state === "loading" ? "◌ 接続確認中" : "● API未接続"}</span></header>
         <section className="metrics" aria-label="Summary">
           <article className="metric"><span>接続状態</span><strong>{state === "connected" ? "Online" : state === "loading" ? "Checking" : "Offline"}</strong><small>localhost:8000</small></article>
           <article className="metric"><span>登録済みAI Runtime</span><strong>{state === "connected" ? runtimes.length : "—"}</strong><small>登録済みのアダプタ</small></article>
@@ -380,7 +359,7 @@ export default function App() {
           <a className="source-link quick-start-link" href="#tasks">Taskを作成する ↓</a>
           <p className="quick-start-note">※ 現在はRepository確認とTask登録まで。AI実行は未対応です。</p>
         </section>
-        <div className="section-heading"><div><span className="eyebrow">FACTORY WORKSPACE</span><h2>ワークスペース</h2></div><span className="section-note">タスク {tasks.length}件 · 外部連携 {linkedTasks}件</span></div><section className="panel" id="projects">
+        <div className="section-heading"><div><span className="eyebrow">FACTORY WORKSPACE</span><h2>ワークスペース</h2></div><span className="section-note">Issue {tasks.length}件 · 外部連携 {linkedTasks}件</span></div><section className="panel" id="projects">
           <div className="panel-head"><span className="eyebrow">LOCAL PROJECTS</span><h2>Project・Repository</h2><p>複数Repositoryをまとめる場合に登録します。単一RepositoryのTask作成には登録不要です。登録だけではGit操作・AI実行は始まりません。</p></div>
           <form className="issue-form" onSubmit={event => { event.preventDefault(); void createProject(); }}>
             <label>新しいProject名<input aria-label="新しいProject名" maxLength={120} value={projectName} onChange={event => setProjectName(event.target.value)} placeholder="例: My Service" /></label>
@@ -457,7 +436,7 @@ export default function App() {
           {issueMessage && <p role="status">{issueMessage}</p>}
           {issuePreview && <div className="issue-preview"><strong>Issue #{issuePreview.number}</strong><pre>{issuePreview.prompt}</pre><a className="source-link" href={issuePreview.url} target="_blank" rel="noopener noreferrer">GitHubで開く ↗</a><button type="button" disabled={issueBusy} onClick={() => void importIssue()}>このIssueを取り込む</button></div>}
         </section>
-        <section className="panel" id="tasks"><div className="panel-head"><span className="eyebrow">TASK TRACKER</span><h2>タスク一覧</h2><p>ローカルTaskを登録できます。登録してもAIは自動実行されません。</p></div><form className="issue-form" onSubmit={event => {event.preventDefault(); void createLocalTask();}}><label>新しいタスク<textarea aria-label="新しいタスク" value={newTask} maxLength={10000} onChange={event => setNewTask(event.target.value)} placeholder="AIに依頼したい作業を入力" rows={3} /></label><button type="submit" disabled={taskBusy || !newTask.trim() || state !== "connected"}>{taskBusy ? "登録中..." : "タスクを登録"}</button></form>{taskMessage && <p role="status">{taskMessage}</p>}{state === "connected" && (tasks.length ? <div className="runtime-list">{tasks.map(task => <div className="runtime" key={task.id}><details className="task-details"><summary><strong>{task.prompt.split("\n")[0].slice(0, 140) || "無題のタスク"}</strong><small>{task.provider ? `${task.provider.toUpperCase()} · ${task.external_id ?? ""} · ` : "LOCAL · "}{formatDate(task.created_at)}</small></summary><pre className="task-detail-body">{task.prompt}</pre><div className="preflight-panel"><button type="button" disabled={preflightBusy.includes(task.id)} onClick={() => void checkImplementationPreflight(task.id)}>{preflightBusy.includes(task.id) ? "チェック中..." : "AI実装の事前チェック"}</button>{preflightErrors[task.id] && <p role="alert">{preflightErrors[task.id]}</p>}{preflightByTask[task.id] && <div role="status"><strong>{preflightByTask[task.id].ready_for_implementation ? "実装準備完了" : "実装開始不可（確認のみ）"}</strong><p>対象: {preflightByTask[task.id].repository || "未紐付け"} / Runtime候補: {preflightByTask[task.id].runtimes.join(", ") || "なし"}</p><ul>{preflightByTask[task.id].blockers.map((blocker, index) => <li key={index}>{blocker}</li>)}</ul><small>このチェックではAI実行・コード変更・PR作成は行いません。</small></div>}</div></details>{task.provider === "github" && <button type="button" disabled={!quickRepo || bindingTaskId !== "" || !task.instance} onClick={() => void bindTaskRepository(task)}>{bindingTaskId === task.id ? "確認中..." : task.bound_repository && task.bound_local_path === quickRepo ? "紐付け済み" : "Repositoryを紐付け"}</button>}{task.external_url && <a className="source-link" href={task.external_url} target="_blank" rel="noopener noreferrer" aria-label="元Issueを開く">元Issue ↗</a>}</div>)}</div> : <p>まだタスクはありません。CLIまたは外部Issue連携から取り込むと、ここに表示されます。</p>)}</section>
+        <section className="panel" id="tasks"><div className="panel-head"><span className="eyebrow">ISSUE / RUN TRACKER</span><h2>IssueとRun</h2><p>依頼は元のIssueで管理し、同じIssueの実行結果をRunとして残します。現在は事前チェックまでで、自動実装はまだ接続中です。</p></div>{bindingMessage && <p role="status">{bindingMessage}</p>}{state === "connected" && (tasks.length ? <div className="runtime-list">{tasks.map(task => <div className="runtime" key={task.id}><details className="task-details"><summary><strong>{task.prompt.split("\n")[0].slice(0, 140) || "無題のIssue"}</strong><small>{task.provider ? `${task.provider.toUpperCase()} · ${task.instance ?? ""} · ${task.external_id ?? ""} · ` : "LOCAL · "}{formatDate(task.created_at)}</small></summary><p>取込時の要件スナップショットです。最新の要件は元Issueで確認してください。</p><pre className="task-detail-body">{task.prompt}</pre><div className="preflight-panel"><strong>Run履歴（合計 {task.total_runs}件・直近10件）</strong>{task.recent_runs.length ? <ul>{task.recent_runs.map(run => <li key={run.id}>{run.runtime} · {run.status} · {formatDate(run.started_at)}<small> · {run.id.slice(0, 12)}</small></li>)}</ul> : <p>まだRunはありません。取込や事前チェックでは実行は始まりません。</p>}<small>既存の読み取り専用実行やHarness準備も含みます。成功表示だけで実装・PR作成済みとは扱いません。</small></div><div className="preflight-panel"><button type="button" disabled={preflightBusy.includes(task.id)} onClick={() => void checkImplementationPreflight(task.id)}>{preflightBusy.includes(task.id) ? "チェック中..." : "AI実装の事前チェック"}</button>{preflightErrors[task.id] && <p role="alert">{preflightErrors[task.id]}</p>}{preflightByTask[task.id] && <div role="status"><strong>{preflightByTask[task.id].ready_for_implementation ? "実装準備完了" : "実装開始不可（確認のみ）"}</strong><p>対象: {preflightByTask[task.id].repository || "未紐付け"} / Runtime候補: {preflightByTask[task.id].runtimes.join(", ") || "なし"}</p><ul>{preflightByTask[task.id].blockers.map((blocker, index) => <li key={index}>{blocker}</li>)}</ul><small>このチェックではAI実行・コード変更・PR作成は行いません。</small></div>}</div></details>{task.provider === "github" && <button type="button" disabled={!quickRepo || bindingTaskId !== "" || !task.instance} onClick={() => void bindTaskRepository(task)}>{bindingTaskId === task.id ? "確認中..." : task.bound_repository && task.bound_local_path === quickRepo ? "紐付け済み" : "Repositoryを紐付け"}</button>}{task.external_url && <a className="source-link" href={task.external_url} target="_blank" rel="noopener noreferrer" aria-label="元Issueを開く">元Issue ↗</a>}</div>)}</div> : <p>まだIssueは取り込まれていません。上のGitHub連携からIssueを選択してください。</p>)}</section>
         <section className="panel" id="runs"><div className="panel-head"><span className="eyebrow">EXECUTION HISTORY</span><h2>実行履歴</h2><p>直近の実行状態を表示します。自動更新・実行操作は今後追加します。</p></div>{state === "connected" && (runs.length ? <div className="runtime-list">{runs.map(run => <div className="runtime" key={run.id}><span><strong>{run.runtime} · {run.status}</strong><small>{run.id.slice(0, 12)} · {formatDate(run.started_at)}</small></span></div>)}</div> : <p>まだ実行履歴はありません。AI Runtimeで実行すると、ここに記録されます。</p>)}</section>
         <footer>Software Factory · ローカル管理画面 MVP · 操作機能は今後追加</footer>
       </main>
