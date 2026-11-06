@@ -45,6 +45,7 @@ export default function App() {
   const [repository, setRepository] = useState("KOHEIITOH/generic-software-factory");
   const [githubRepositories, setGithubRepositories] = useState<{full_name:string;can_push:boolean}[]>([]);
   const [githubRepoMessage, setGithubRepoMessage] = useState("");
+  const [githubRepoSearch, setGithubRepoSearch] = useState("");
   const [demoPrBusy, setDemoPrBusy] = useState(false);
   const [demoPrMessage, setDemoPrMessage] = useState("");
   const [demoPrUrl, setDemoPrUrl] = useState("");
@@ -385,6 +386,10 @@ export default function App() {
         <section className="panel" id="github-import">
           <div className="panel-head"><span className="eyebrow">GITHUB ISSUES</span><h2>GitHub Issueを取り込む</h2><p>GitHub Issueを確認してから登録します。Private Repositoryはサーバー側の認証設定が必要です。AIは自動実行されません。</p></div>
           <div className="issue-form"><button type="button" onClick={() => void loadGithubRepositories()}>GitHubのリポジトリ一覧を取得</button>{githubRepositories.length > 0 && <label>リポジトリを選択<select aria-label="GitHubリポジトリを選択" value={repository} onChange={event => {setRepository(event.target.value);setIssuePreview(null);setIssueList([]);}}><option value="">選択してください</option>{githubRepositories.map(item => <option key={item.full_name} value={item.full_name}>{item.full_name}{item.can_push ? "（Push可能）" : "（読み取りのみ）"}</option>)}</select></label>}{githubRepoMessage && <p role="status">{githubRepoMessage}</p>}</div>
+          {githubRepositories.length > 0 && <div className="issue-form"><label>リポジトリを検索<input aria-label="リポジトリを検索" placeholder="名前やOrganizationで絞り込み" value={githubRepoSearch} onChange={event => setGithubRepoSearch(event.target.value)} /></label><label>検索結果<select aria-label="検索結果からリポジトリを選択" value={repository} onChange={event => {setRepository(event.target.value);setIssuePreview(null);setIssueList([]);}}><option value="">リポジトリを選択</option>{githubRepositories.filter(item => item.full_name.toLowerCase().includes(githubRepoSearch.trim().toLowerCase())).map(item => <option key={item.full_name} value={item.full_name}>{item.full_name}{item.can_push ? "（Push可能）" : "（読み取りのみ）"}</option>)}</select></label></div>}
+          <div className="issue-form"><button type="button" disabled={demoPrBusy || !githubRepositories.some(item => item.full_name === repository && item.can_push)} onClick={() => void createDemoPR()}>{demoPrBusy ? "Draft PR作成中..." : "デモ用Draft PRを作成"}</button><small>確認後、選択したリポジトリにデモ用ファイルとDraft PRを作成します。AIは実行しません。</small></div>
+          {demoPrMessage && <p role="status">{demoPrMessage}</p>}
+          {demoPrUrl && <a className="source-link" href={demoPrUrl} target="_blank" rel="noopener noreferrer">作成したDraft PRを開く</a>}
           <div className="issue-form">
             <label>リポジトリ（owner/repo）<input value={repository} onChange={event => {setRepository(event.target.value); setIssuePreview(null); setIssueList([]); setIssueListMessage(""); setIssuePage(0); setIssueHasMore(false);}} placeholder="owner/repo" /></label>
             <label>Issue番号<input type="number" min="1" value={issueNumber} onChange={event => {setIssueNumber(event.target.value); setIssuePreview(null);}} placeholder="例: 12" /></label>
