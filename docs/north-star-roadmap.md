@@ -2,7 +2,7 @@
 
 - 更新日: 2026-11-06（日本時間）
 - 調査基準: `e2841cc6e2da8cb955eece15ba10b9d1ba8327ff`
-- 状態: **ユーザー確認済み。R01のライブラリを実装済み。PR候補を検証中。**
+- 状態: **ユーザー確認済み。R01はPR #75でマージ済み。R02aのCLI接続を実装。**
 - 対象: 既存コード・テスト・設計資料のギャップ分析と、M1〜M5への実装順序。
 
 ## 1. North Starと判断基準
@@ -175,6 +175,8 @@ M2の隔離仕様には、サポートするOS/実行環境、mount、ネット�
 
 R16以降は確定実装リストではなく、実証結果に基づいて分割・順序を更新する候補。M4全体の完成を待たずに自然言語計画の読取専用評価を始めてもよいが、安全性を要する実行の前提は省略しない。
 
+R02をR02a（CLI接続）とR02b（Validation/Profile候補）に分割する。R02aは検出の利用経路と終了コードを確立し、R02bの検証結果を同じ入口へ接続する。
+
 ## 6. 最初のPR: Harness Discoveryの提案スコープ
 
 **ユーザー確認済み。読取専用ライブラリを実装。CLI/UIとValidationは後続。**
@@ -209,6 +211,7 @@ PRごとに下表へ計画ID、実装範囲、証拠、制約を追記し、該�
 | 計画ID | 状態 | 実装PR/commit | 検証証拠 | 残る制約 |
 | --- | --- | --- | --- | --- |
 | 計画文書 | 提案・確認待ち | 本書 | 基準commitのコード・テスト・設計を照合 | M1〜M5はいずれも完了判定していない |
-| R01 | ローカル実装済み・未コミット | `harness_discovery.py` | `test_harness_discovery.py` 15件 | CLI/API・Validation・承認・適用は未実装。詳細は [Discovery仕様](harness-discovery.md) |
+| R02a | 実装済み・PR準備 | CLI接続 | `test_harness_cli.py` 5件 | 構文・参照検証はR02b |
+| R01 | マージ済み | [#75](https://github.com/KOHEIITOH/generic-software-factory/pull/75) | `test_harness_discovery.py` 15件 | Validation・API・承認・適用は未実装。詳細は [Discovery仕様](harness-discovery.md) |
 
 確認を求める内容は、**M3を最初の実用実証とし、R01/R02とM2の隔離基盤を先行して最小の縦断経路を作る順序、およびR01の初期スコープ**。ユーザーからこの順序での継続実装の了承を得たため、追加の定例確認を挟まず進める。Gitサービス追加、Runtime追加、Release自動化などを先に広げない。

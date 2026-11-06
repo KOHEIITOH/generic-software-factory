@@ -39,6 +39,16 @@ def build_parser() -> argparse.ArgumentParser:
     repo_sub = repo.add_subparsers(dest="repo_command", required=True)
     detect = repo_sub.add_parser("detect", help="detect Git root from current directory")
     detect.add_argument("--path", type=Path, default=Path.cwd())
+    harness = sub.add_parser(
+        "harness", help="inspect local harness candidates without applying them"
+    )
+    harness_sub = harness.add_subparsers(dest="harness_command", required=True)
+    discover = harness_sub.add_parser("discover", help="emit a bounded read-only inventory as JSON")
+    discover.add_argument("repository", type=Path, help="explicit repository root")
+    discover.add_argument("--max-entries", type=int, default=10000)
+    discover.add_argument("--max-depth", type=int, default=32)
+    discover.add_argument("--max-file-bytes", type=int, default=65536)
+    discover.add_argument("--max-total-bytes", type=int, default=1048576)
     task = sub.add_parser("task", help="manage tasks")
     task_sub = task.add_subparsers(dest="task_command", required=True)
     create = task_sub.add_parser("create")
@@ -61,6 +71,25 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
+    if args.command == "harness":
+        from dataclasses import asdict
+
+        from sf_factory.harness_discovery import DiscoveryLimits, discover_harness
+
+        try:
+            limits = DiscoveryLimits(
+                entries=args.max_entries, depth=args.max_depth,
+                file_bytes=args.max_file_bytes, total_bytes=args.max_total_bytes,
+            )
+            # Make relative input absolute without resolving away symlinks or parent traversal.
+            result = discover_harness(args.repository.absolute(), limits=limits)
+        except (OSError, ValueError, NotImplementedError):
+            print(
+                "Error: cannot discover harness; check root, platform and limits", file=sys.stderr
+            )
+            return 2
+        print(json.dumps(asdict(result), ensure_ascii=True, indent=2))
+        return 0 if result.complete else 1
     if args.command == "web":
         from sf_factory.web_launcher import launch_web
 

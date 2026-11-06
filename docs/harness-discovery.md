@@ -1,7 +1,7 @@
 # Harness Discovery v1
 
 `sf_factory.harness_discovery.discover_harness` は、明示されたローカルGit rootの
-Harness候補を決定的に列挙する読取専用ライブラリです。CLI/API接続、構文検証、承認、
+Harness候補を決定的に列挙する読取専用ライブラリです。API接続、構文検証、承認、
 Composition、適用は後続工程です。
 
 ```python
@@ -35,3 +35,14 @@ POSIXのdescriptor-relative open、O_NOFOLLOW、通常ファイル検査を使�
 Gitオブジェクトの完全性やorigin、submodule境界、指示の妥当性は検証しません。
 同時に攻撃者が変更できるホスト上の完全なsnapshotやOS隔離を保証するものではありません。
 実行へ適用する際は信頼されたsnapshotと承認済みrevisionを使う必要があります。
+
+## CLI
+
+リポジトリ直下で `.venv/bin/sf harness discover .` を実行します。
+任意の明示rootも指定できます。JSONはstdout、起動エラーはstderrです。
+終了コードは0=規約内の走査完了、1=問題を含む不完全な結果、2=入力/環境エラー。
+0は承認・妥当性・適用許可を意味しません。
+
+`--max-entries`、`--max-depth`、`--max-file-bytes`、`--max-total-bytes`で
+正の整数の上限を指定できます。相対pathは現在地基準で、symlink/親参照は拒否します。
+Factory DBやTaskは作成しません。
