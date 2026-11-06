@@ -137,20 +137,30 @@ class HarnessApprovalStore:
     ) -> None:
         """Atomically claim once; caller must revalidate current revision/bundle first."""
         self._actor(controller)
-        now = _utc(self.clock())
         with self._connect() as db:
             db.execute('BEGIN IMMEDIATE')
-            row = db.execute(
-                'SELECT * FROM harness_approvals WHERE id=?', (approval_id,),
-            ).fetchone()
-            if (row is None or row['request'] != self._request(request) or not row['approved']
-                    or row['revoked'] or row['consumed']
-                    or datetime.fromisoformat(row['expires_at']) <= now
-                    or datetime.fromisoformat(row['created_at']) > now):
-                raise PermissionError('no matching active Harness approval')
-            db.execute('UPDATE harness_approvals SET consumed=1 WHERE id=?', (approval_id,))
-            db.execute('INSERT INTO harness_approval_events(approval_id,event,actor,at) '
-                       'VALUES (?,?,?,?)', (approval_id, 'consumed', controller, now.isoformat()))
+            self._consume_in_transaction(db, approval_id, request, controller=controller)
+
+    def _consume_in_transaction(
+        self, db: sqlite3.Connection, approval_id: str, request: HarnessApprovalRequest,
+        *, controller: str,
+    ) -> None:
+        """Internal shared-DB hook so Run insertion and approval claim commit together."""
+        self._actor(controller)
+        if not db.in_transaction:
+            raise ValueError('an explicit transaction is required')
+        now = _utc(self.clock())
+        row = db.execute(
+            'SELECT * FROM harness_approvals WHERE id=?', (approval_id,),
+        ).fetchone()
+        if (row is None or row['request'] != self._request(request) or not row['approved']
+                or row['revoked'] or row['consumed']
+                or datetime.fromisoformat(row['expires_at']) <= now
+                or datetime.fromisoformat(row['created_at']) > now):
+            raise PermissionError('no matching active Harness approval')
+        db.execute('UPDATE harness_approvals SET consumed=1 WHERE id=?', (approval_id,))
+        db.execute('INSERT INTO harness_approval_events(approval_id,event,actor,at) '
+                   'VALUES (?,?,?,?)', (approval_id, 'consumed', controller, now.isoformat()))
 
     def revoke(self, approval_id: str, *, reviewer: str) -> None:
         """Record revocation; cancelling already-started work requires the run controller."""
