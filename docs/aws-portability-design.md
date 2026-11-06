@@ -298,7 +298,7 @@ M1〜M5の最終ゴールは変更しない。本設計はM1の承認、M2の実
 | P13 / 常設入口・並列 | 必要に応じAPI/Chat、queue、複数Worker、監視 | 認証/認可、重複イベント、同Repo競合、停止/予算、孤立Task回収。必要なStore能力を確認 | 直列pilot実測 |
 
 P12のIaC/設定案と、承認を得て行う実クラウド試験も別の変更・作業として扱う。
-P01〜P05は大きな一括置換をしない。各PR中はSQLite既定を維持し、未移行機能をFileへ黙って混在させない。
+P01〜P05は大きな一括置換をしない。既存SQLiteは維持し、新規POSIX保存先はPR #90からFileを選ぶ。未対応機能を黙って別のDBへ混在させない。
 File backendのTask操作が動いただけで「DB不要でSFが動く」と宣言しない。
 SQLとFileのdual writeを既定の移行策にしない。移行時はwriter停止→検証済みexport→import→readback→切替。
 復旧pointを残し、切替に失敗したら元の保存先へ戻す。Storeを消して作り直す方式は採らない。
@@ -355,7 +355,9 @@ SDK最低versionと実サービスの機能、対象OS/fsは実装PRで別途検
 | P01 | PR #88でマージ済み | Task保存をSqliteStateStoreへ委譲。全FactoryのDB不要化ではない |
 | P02 | PR #89でマージ済み | File Task保存。[単体確認手順](local-file-state.md) |
 | Webへの接続 | PR #90で実装・ローカル検証済み | [一コマンド起動](local-web-storage.md)。FileでTask/Project/Repository/binding/read-only Runを保存。既存SQLiteを維持 |
-| P03以降 | 主要部分は未実装 | 承認とprepared Runの原子操作、証跡、Worker復旧、移行は後続。Web接続で完了扱いにしない |
+| P03 | Harness原子操作はPR #91/#92で実装 | File/SQLiteで承認消費とprepared Run/manifest/auditを一括保存。一般Workflow checkpoint/再開は後続 |
+| P04 | 既存範囲の委譲をPR #90/#93/#94/#95で実装 | Project/Task関連、source参照、品質/review証跡をFile/SQLiteで保存。実collector/agent接続は後続 |
+| P05以降 | 未完了 | Worker生存照合、SQL→File移行/export、配布用container、remote実行など |
 
 ### Harness保存の段階移行
 
@@ -363,5 +365,13 @@ SDK最低versionと実サービスの機能、対象OS/fsは実装PRで別途検
 - PR #92 File Adapter: 同一documentで承認消費/Run/manifest/auditを保存し、既存SQLiteと承認契約を共有。
   schema 1→2の原子的更新、別プロセス競合、replace前後の強制終了と失敗時の整合性を検証。
 - PR #93 Source snapshot: 状態保存をSourceStateへ分離し、Fileで参照/auditを原子的に登録。payloadを先に永続化し、結果不明時は参照照合前に削除しない。
-- PR #94: 品質証跡の保存をEvidenceStateへ分離。File Adapterでも固定plan/観測/reviewとauditを同じdocumentへ保存し、判定ルールをSQLiteと共有。
+- PR #94: 品質証跡の保存をEvidenceStateへ分離。PR #95のFile Adapterでも固定plan/観測/reviewとauditを同じdocumentへ保存し、判定ルールをSQLiteと共有。
 - Worker復旧、SQL→File export/import、実collector/agentから配送への接続は引き続き別のPRで進める。
+
+### Worker復旧に残る前提
+
+現在のAgentRuntimeは同期executeのみで、再起動後に照合できる永続handleやfencingを持たない。
+PIDだけ、起動時のrunning状態だけ、lease期限だけではWorker停止を証明できないため、
+自動再実行は追加しない。終了済みRunへの遅延結果はSQLite/File双方で拒否する。
+次はExecution Adapterでprovider-neutralな実行identity/観測/停止/回収を定義し、
+古いWorkerの結果拒否と原子的checkpointを接続する。CAS guard単体を復旧完了とは扱わない。

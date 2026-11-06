@@ -243,8 +243,11 @@ class Factory:
 
     def _finish_run(self, run_id, task_id, status, output, error_kind, error_message, exit_code):
         with self._connect() as db:
-            db.execute("""UPDATE runs SET status=?,ended_at=?,output=?,error_kind=?,
-                       error_message=?,exit_code=? WHERE id=?""",
-                       (status, _now(), output, error_kind, error_message, exit_code, run_id))
+            updated = db.execute("""UPDATE runs SET status=?,ended_at=?,output=?,error_kind=?,
+                       error_message=?,exit_code=? WHERE id=? AND task_id=? AND status='running'""",
+                       (status, _now(), output, error_kind, error_message, exit_code,
+                        run_id, task_id))
+            if updated.rowcount != 1:
+                raise StateConflict('Run is not active or belongs to another task')
             db.execute("INSERT INTO audit(run_id,task_id,event,at) VALUES (?,?,?,?)",
                        (run_id, task_id, "run." + status, _now()))

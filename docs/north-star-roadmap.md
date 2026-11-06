@@ -29,12 +29,12 @@
 
 | 領域 | 現在の実装・証拠 | 状態とギャップ | 主な到達先 |
 | --- | --- | --- | --- |
-| Project管理 | `local_project_registry.py`、`repository_contracts.py`、`web_api.py`、`test_local_project_registration_api.py` | 一部実装。SQLite登録・一覧・重複制御あり。所有者はローカル固定。Task/Runと一貫したProject境界、接続管理、複数利用者の認可は不足 | M1/M4 |
+| Project管理 | `local_project_registry.py`、`repository_contracts.py`、`web_api.py`、`test_local_project_registration_api.py` | 一部実装。File/SQLite登録・一覧・重複制御あり。所有者はローカル固定。Task/Runと一貫したProject境界、接続管理、複数利用者の認可は不足 | M1/M4 |
 | リポジトリ検出・解析 | `repo_discovery.py`、`local_git.py`、`repo_analysis.py`、`test_repo_analysis.py` | 一部実装。Git root検出、明示パスの列挙、制限付きsnapshotのCopilot解析あり。Harness専用の検出・構造化Profile・再検出は未実装 | M1 |
 | Harness Discovery | `harness/`、`config/project.example.yaml`、`context_builder.py` | 未実装。テンプレートと明示ファイルの文字数制限付き読込はあるが、検出結果・根拠・適用範囲を管理しない | M1 |
 | Harness Validation/Generation | 同上、`repo_analysis.py` | 未実装。既存解析は生成案の構造化・検証・保存・承認の代替にならない | M1 |
 | Harness Approval/Composition/Integration/Evaluation | `approval_gate.py`、`quality.py`に汎用部品 | 未実装。Harness版・競合・承認対象・Runへの固定・評価履歴がない | M1/M3/M5 |
-| Task/Run/Audit | `factory.py`、`test_factory.py`、`test_task_repository_binding.py` | 限定範囲は実装済み。SQLite保存・Issue重複防止・リポジトリ紐付けあり。`run_task`は空の専用ディレクトリで同期Runtime実行。紐付け先を実装対象として読み込む経路ではない | M2/M3 |
+| Task/Run/Audit | `factory.py`、`test_factory.py`、`test_task_repository_binding.py` | 限定範囲は実装済み。File/SQLite保存・Issue重複防止・リポジトリ紐付けあり。`run_task`は空の専用ディレクトリで同期Runtime実行。紐付け先を実装対象として読み込む経路ではない | M2/M3 |
 | AI Runtime | `runtime.py`、`agent_registry.py`、`codex_cli.py`、`grok_cli.py`、`copilot_sdk.py`と各テスト | 一部実装。3種の登録・同期execute・結果正規化あり。実認証・隔離下の編集互換性・能力別拒否・cancel/resume共通運用は未完成。Claude/Geminiは未登録 | M2/M4 |
 | 要件・計画・Workflow | `workflow.py`、`workflow_runner.py`、`test_workflow_runner.py` | 一部実装。依存関係評価と読み取り専用の逐次実行あり。Factory DB・CLIと未統合。自然言語からの受け入れ条件・計画・Task DAG生成と承認は未実装 | M3/M5 |
 | 隔離・作業領域 | `issue_worktree.py`、`dev_smoke.py`と各テスト | 一部実装。作業ツリー分離と同梱サンプル編集あり。worktree・一時ディレクトリはOS隔離ではない。任意コードを実行する信頼できるExecution Adapterは未実装 | M2 |
@@ -42,7 +42,7 @@
 | 品質・修正ループ | `quality.py`、`improvement.py`、`quality_loop.py`、`test_quality_loop.py` | 一部実装。必須証拠欠落の拒否・回数/時間上限あり。証拠は注入値。実テスト実行器、証拠とcommitの結合、独立レビュー、DB連携、実行の強制停止が不足 | M2/M3 |
 | Git・Issue・PR | `github_issues_source.py`、`github_issue_web.py`、`github_repository_web.py`、`issue_worktree.py` | 一部実装。Issue取得・取り込み・Web選択、origin照合、worktree作成あり。push・Draft PR・更新時の重複防止・Merge実行器は未実装。Local Gitは読み取りのみ | M3/M4 |
 | CI/CD・Release | `.github/workflows/`、`workflows/issue-to-pr.yaml` | Factory自身のCIは実装済み。対象プロジェクトのCI結果との照合、Release管理、承認付きDeploy/Rollbackは未実装。YAMLは実行済みWorkflowではない | M3/M5 |
-| 観測・コスト | FactoryのSQLite記録、`usage.py`、`usage_tracker.py` | 一部実装。usage集計はメモリ内で価格計算なし。不明値は不明として扱う。統合ログ、成果物、永続コスト、予算停止、失敗分類、保持・秘匿化が不足 | M2/M4 |
+| 観測・コスト | FactoryのFile/SQLite記録、`usage.py`、`usage_tracker.py` | 一部実装。usage集計はメモリ内で価格計算なし。不明値は不明として扱う。統合ログ、成果物、永続コスト、予算停止、失敗分類、保持・秘匿化が不足 | M2/M4 |
 | Web/外部入口 | `web_api.py`、`github_issue_web.py`、`web/src/App.tsx` | 一部実装。閲覧に加えTask作成・Project/Repository登録・Issue取り込みあり。認証なしのloopback前提。実行・承認・cancel操作、認可、MCP/Slack連携は不足 | M3/M4/M5 |
 | 継続改善 | `improvement.py`、`quality_loop.py` | 一部実装は同一処理内の再試行。Run横断の失敗分析、Harness改善案、比較評価、承認・Rollbackは未実装 | M5 |
 
@@ -249,3 +249,10 @@ PRごとに下表へ計画ID、実装範囲、証拠、制約を追記し、該�
 既存SQLiteの維持を管理する。Task/Project/Repository/binding/read-only RunはFile対応。
 Harness承認とprepared Runの原子性、証跡、Worker生存照合・復旧はまだ移行していない。
 M2/M3全体の完了、IssueからDraft PRまでの自律実装成功とは区別する。
+
+### 保存境界の更新（PR #91〜#95）
+
+Harness承認とprepared Runの原子保存、source snapshotの参照/audit、品質とreview証跡を
+File/SQLiteへ接続済み。sourceの結果不明時は、参照済みpayloadを誤削除しない。
+対象版・収集者・試行・レビュー完備性を共有ルールで判定し、配送適格は引き続きfalse。
+Workerの生存照合・回収・復旧、実collector/実装AgentからDraft PRへの接続は未完了。
