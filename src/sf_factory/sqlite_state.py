@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from sf_factory.state_store import (
+    StateConflict,
     StateNotFound,
     StateUnavailable,
     TaskRecord,
@@ -20,6 +21,8 @@ from sf_factory.state_store import (
 class SqliteStateStore:
     def __init__(self, database: Path):
         self.database = database
+        if (database.parent / 'tasks-v1').exists():
+            raise StateConflict('use a separate root; existing File state is not migrated')
         with self._connect() as db:
             db.executescript('''
                 CREATE TABLE IF NOT EXISTS tasks (

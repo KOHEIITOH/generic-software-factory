@@ -4,14 +4,17 @@ from pathlib import Path
 
 import pytest
 
+from sf_factory.file_state import FileStateStore
 from sf_factory.sqlite_state import SqliteStateStore
 from sf_factory.state_store import StateNotFound, StateStore, TaskRecord
 
 
-@pytest.fixture(params=['sqlite'])
+@pytest.fixture(params=['sqlite', 'file'])
 def store_factory(request):
     def build(root: Path) -> StateStore:
         root.mkdir(parents=True, exist_ok=True)
+        if request.param == 'file':
+            return FileStateStore(root)
         return SqliteStateStore(root / 'factory.sqlite3')
     return build
 

@@ -352,5 +352,6 @@ SDK最低versionと実サービスの機能、対象OS/fsは実装PRで別途検
 | 計画 | 状態 | 証拠・残る範囲 |
 | --- | --- | --- |
 | 設計 | PR #87でマージ済み | 今後の変更に合わせて更新 |
-| P01 | ローカル実装・検証中 | Task保存をSqliteStateStoreへ委譲。全FactoryのDB不要化ではない |
-| P02以降 | 未実装 | File実装を次の小PRへ分離 |
+| P01 | PR #88でマージ済み | Task保存をSqliteStateStoreへ委譲。全FactoryのDB不要化ではない |
+| P02 | File Task保存を実装・検証中 | [ローカル確認手順](local-file-state.md)。Run/承認は未移行 |
+| P03以降 | 未実装 | Task保存の確認後に段階移行 |

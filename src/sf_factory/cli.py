@@ -81,11 +81,57 @@ def build_parser() -> argparse.ArgumentParser:
     evidence.add_argument("--revision", required=True)
     evidence.add_argument("--bundle-hash", required=True)
     evidence.add_argument("--diff-sha256", required=True)
+    state = sub.add_parser("state", help="preview task storage; does not execute workflows")
+    state.add_argument("--backend", choices=("file", "sqlite"), default="file")
+    state.add_argument("--root", type=Path, required=True, help="explicit storage root")
+    state_sub = state.add_subparsers(dest="state_command", required=True)
+    state_create = state_sub.add_parser("create", help="persist a task")
+    state_create.add_argument("prompt")
+    state_show = state_sub.add_parser("show", help="read a stored task")
+    state_show.add_argument("task_id")
+    state_import = state_sub.add_parser(
+        "import", help="import external task metadata without network"
+    )
+    state_import.add_argument("--provider", required=True)
+    state_import.add_argument("--instance", required=True)
+    state_import.add_argument("--external-id", required=True)
+    state_import.add_argument("--prompt", required=True)
+    state_import.add_argument("--external-url")
     return parser
 
 
 def main() -> int:
     args = build_parser().parse_args()
+    if args.command == "state":
+        from dataclasses import asdict
+
+        from sf_factory.state_store import StateConflict, StateStore, StateUnavailable
+
+        try:
+            store: StateStore
+            if args.backend == "file":
+                from sf_factory.file_state import FileStateStore
+
+                store = FileStateStore(args.root)
+            else:
+                from sf_factory.sqlite_state import SqliteStateStore
+
+                args.root.mkdir(parents=True, exist_ok=True)
+                store = SqliteStateStore(args.root / "factory.sqlite3")
+            if args.state_command == "create":
+                print(json.dumps({"task_id": store.create_task(args.prompt)}))
+            elif args.state_command == "show":
+                print(json.dumps({"task": asdict(store.get_task(args.task_id))}, indent=2))
+            else:
+                task_id = store.import_external_task(
+                    provider=args.provider, instance=args.instance, external_id=args.external_id,
+                    prompt=args.prompt, external_url=args.external_url,
+                )
+                print(json.dumps({"task_id": task_id}))
+        except (ValueError, OSError, StateUnavailable, StateConflict) as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 2
+        return 0
     if args.command == "harness":
         from dataclasses import asdict
 
