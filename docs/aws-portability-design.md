@@ -354,5 +354,5 @@ SDK最低versionと実サービスの機能、対象OS/fsは実装PRで別途検
 | 設計 | PR #87でマージ済み | 今後の変更に合わせて更新 |
 | P01 | PR #88でマージ済み | Task保存をSqliteStateStoreへ委譲。全FactoryのDB不要化ではない |
 | P02 | PR #89でマージ済み | File Task保存。[単体確認手順](local-file-state.md) |
-| Webへの接続 | 実装・検証中 | [一コマンド起動](local-web-storage.md)。FileでTask/Project/Repository/binding/read-only Runを保存。既存SQLiteを維持 |
+| Webへの接続 | PR #90で実装・ローカル検証済み | [一コマンド起動](local-web-storage.md)。FileでTask/Project/Repository/binding/read-only Runを保存。既存SQLiteを維持 |
 | P03以降 | 主要部分は未実装 | 承認とprepared Runの原子操作、証跡、Worker復旧、移行は後続。Web接続で完了扱いにしない |
