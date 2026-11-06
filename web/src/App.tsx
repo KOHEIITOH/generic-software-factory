@@ -43,6 +43,8 @@ export default function App() {
   const [bindingTaskId, setBindingTaskId] = useState("");
   const [runs, setRuns] = useState<Run[]>([]);
   const [repository, setRepository] = useState("KOHEIITOH/generic-software-factory");
+  const [githubRepositories, setGithubRepositories] = useState<{full_name:string;can_push:boolean}[]>([]);
+  const [githubRepoMessage, setGithubRepoMessage] = useState("");
   const [issueNumber, setIssueNumber] = useState("");
   const [issuePreview, setIssuePreview] = useState<{ repository: string; number: string; prompt: string; url: string } | null>(null);
   const [issueList, setIssueList] = useState<Issue[]>([]);
@@ -165,6 +167,19 @@ export default function App() {
     } catch (cause) {
       setTaskMessage(cause instanceof Error ? cause.message : "作成エラー");
     } finally { setTaskBusy(false); }
+  }
+
+  async function loadGithubRepositories() {
+    setGithubRepoMessage("取得中...");
+    try {
+      const response = await fetch("/api/github/repositories");
+      if (!response.ok) throw new Error(response.status === 503 ? "GitHub認証情報が未設定です" : "リポジトリ一覧を取得できませんでした");
+      const data = await response.json();
+      setGithubRepositories(data.repositories);
+      setGithubRepoMessage(data.repositories.length ? "" : "利用可能なリポジトリがありません");
+    } catch (error) {
+      setGithubRepoMessage(error instanceof Error ? error.message : "取得エラー");
+    }
   }
 
   async function loadIssues(page = 1) {
@@ -348,6 +363,7 @@ export default function App() {
         </section>
         <section className="panel" id="github-import">
           <div className="panel-head"><span className="eyebrow">GITHUB ISSUES</span><h2>GitHub Issueを取り込む</h2><p>GitHub Issueを確認してから登録します。Private Repositoryはサーバー側の認証設定が必要です。AIは自動実行されません。</p></div>
+          <div className="issue-form"><button type="button" onClick={() => void loadGithubRepositories()}>GitHubのリポジトリ一覧を取得</button>{githubRepositories.length > 0 && <label>リポジトリを選択<select aria-label="GitHubリポジトリを選択" value={repository} onChange={event => {setRepository(event.target.value);setIssuePreview(null);setIssueList([]);}}><option value="">選択してください</option>{githubRepositories.map(item => <option key={item.full_name} value={item.full_name}>{item.full_name}{item.can_push ? "（Push可能）" : "（読み取りのみ）"}</option>)}</select></label>}{githubRepoMessage && <p role="status">{githubRepoMessage}</p>}</div>
           <div className="issue-form">
             <label>リポジトリ（owner/repo）<input value={repository} onChange={event => {setRepository(event.target.value); setIssuePreview(null); setIssueList([]); setIssueListMessage(""); setIssuePage(0); setIssueHasMore(false);}} placeholder="owner/repo" /></label>
             <label>Issue番号<input type="number" min="1" value={issueNumber} onChange={event => {setIssueNumber(event.target.value); setIssuePreview(null);}} placeholder="例: 12" /></label>
