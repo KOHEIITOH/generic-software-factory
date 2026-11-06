@@ -1,6 +1,7 @@
 """Experimental offline command isolation. Not connected to AI authorization.
 
-No host mounts, credentials, network, repository input or external operations.
+No host mounts, inherited credentials, network or external operations.
+Explicit bounded stdin is data only; workspace/AI integration remains separate.
 Only a trusted controller may select the pinned image and command.
 """
 from __future__ import annotations
@@ -19,6 +20,9 @@ _PROXY_NAMES = ('HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY',
                 'http_proxy', 'https_proxy', 'all_proxy', 'no_proxy')
 _TMPFS = {'/workspace': 'rw,nosuid,nodev,noexec,size=16m,mode=1777',
           '/tmp': 'rw,nosuid,nodev,noexec,size=16m,mode=1777'}
+
+
+MAX_INPUT_BYTES = 16 * 1024 * 1024
 
 
 ExecutionStatus = Literal[
@@ -66,13 +70,14 @@ def resource_limits_available() -> bool:
         return False
 
 
-def _verified(document: dict, image: str, argv: tuple[str, ...]) -> bool:
+def _verified(document: dict, image: str, argv: tuple[str, ...], *, stdin: bool = False) -> bool:
     config, host = document.get('Config', {}), document.get('HostConfig', {})
     environment = config.get('Env') or []
     return all((
         config.get('Image') == image,
         config.get('User') == '65534:65534',
         config.get('WorkingDir') == '/workspace',
+        config.get('OpenStdin', False) is stdin,
         config.get('Entrypoint') == [argv[0]],
         (config.get('Cmd') or []) == list(argv[1:]),
         all(name + '=' in environment for name in _PROXY_NAMES),
@@ -105,7 +110,7 @@ def _verified(document: dict, image: str, argv: tuple[str, ...]) -> bool:
 
 def run_offline_command(
     *, image: str, argv: tuple[str, ...], timeout_seconds: int = 30,
-    max_output_bytes: int = 65536,
+    max_output_bytes: int = 65536, input_bytes: bytes | None = None,
 ) -> DockerExecutionResult:
     """Run only in tmpfs workspace; no arbitrary host path can be mounted.
 
@@ -123,6 +128,9 @@ def run_offline_command(
         raise ValueError('timeout must be between 1 and 60 seconds')
     if type(max_output_bytes) is not int or not 1 <= max_output_bytes <= 1048576:
         raise ValueError('invalid output budget')
+    if input_bytes is not None and (not isinstance(input_bytes, bytes)
+                                    or len(input_bytes) > MAX_INPUT_BYTES):
+        raise ValueError('stdin must be immutable bytes within the input budget')
     if not resource_limits_available():
         return DockerExecutionResult(
             'unavailable', None, '', image, True, 'daemon_cannot_enforce_resource_limits'
@@ -135,6 +143,8 @@ def run_offline_command(
         '--pids-limit', '64', '--memory', '256m', '--memory-swap', '256m', '--cpus', '1',
         '--init', '--ipc', 'private', '--log-driver', 'none',
     ]
+    if input_bytes is not None:
+        arguments.append('--interactive')
     for mount, options in _TMPFS.items():
         arguments += ['--tmpfs', mount + ':' + options]
     for key in _PROXY_NAMES:
@@ -153,41 +163,68 @@ def run_offline_command(
         if inspected.returncode != 0:
             raise ValueError('inspect failed')
         document = json.loads(inspected.stdout)
-        if len(document) != 1 or not _verified(document[0], image, argv):
+        if len(document) != 1 or not _verified(
+            document[0], image, argv, stdin=input_bytes is not None,
+        ):
             raise ValueError('container configuration mismatch')
+        start = ['docker', '--host=unix:///var/run/docker.sock', 'start', '--attach']
+        if input_bytes is not None:
+            start.append('--interactive')
         process = subprocess.Popen(
-            ['docker', '--host=unix:///var/run/docker.sock', 'start', '--attach', name],
-            env=_docker_env(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            [*start, name], env=_docker_env(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            stdin=subprocess.PIPE if input_bytes is not None else subprocess.DEVNULL, bufsize=0,
         )
         assert process.stdout is not None
         deadline = time.monotonic() + timeout_seconds
+        sent = 0
         with selectors.DefaultSelector() as selector:
-            selector.register(process.stdout, selectors.EVENT_READ)
-            while True:
+            selector.register(process.stdout, selectors.EVENT_READ, 'stdout')
+            if process.stdin is not None:
+                os.set_blocking(process.stdin.fileno(), False)
+                if input_bytes:
+                    selector.register(process.stdin, selectors.EVENT_WRITE, 'stdin')
+                else:
+                    process.stdin.close()
+            finished = False
+            while not finished:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     status = 'timed_out'
                     break
                 events = selector.select(min(remaining, 0.1))
-                if events:
+                for key, _ in events:
+                    if key.data == 'stdin':
+                        assert input_bytes is not None and process.stdin is not None
+                        try:
+                            sent += os.write(process.stdin.fileno(), input_bytes[sent:sent + 8192])
+                        except BlockingIOError:
+                            continue
+                        if sent == len(input_bytes):
+                            selector.unregister(process.stdin)
+                            process.stdin.close()
+                        continue
                     chunk = os.read(process.stdout.fileno(), 8192)
                     if not chunk:
+                        finished = True
                         break
                     capacity = max_output_bytes - len(output)
                     output.extend(chunk[:capacity])
                     if len(chunk) > capacity:
                         status = 'output_limit'
+                        finished = True
                         break
-                elif process.poll() is not None:
-                    # Keep draining the pipe until EOF rather than dropping trailing output.
-                    continue
+                # Drain until stdout EOF; neither a full stdin pipe nor process
+                # exit may bypass timeout/output bounds or drop trailing output.
+        if status not in {'timed_out', 'output_limit'} and input_bytes is not None:
+            if sent != len(input_bytes):
+                raise ValueError('input transfer did not finish')
         if status not in {'timed_out', 'output_limit'}:
             process.wait(timeout=5)
             state = _docker(['inspect', '--format', '{{json .State}}', name])
             observed = json.loads(state.stdout) if state.returncode == 0 else {}
             if observed.get('Status') == 'exited':
                 exit_code = observed.get('ExitCode')
-                status = 'succeeded' if exit_code == 0 else 'failed'
+                status = 'succeeded' if exit_code == 0 and process.returncode == 0 else 'failed'
     except (OSError, ValueError, TypeError, KeyError, subprocess.SubprocessError):
         status = 'failed'
     finally:
@@ -202,6 +239,8 @@ def run_offline_command(
                     process.kill()
                 process.wait(timeout=5)
             finally:
+                if process.stdin:
+                    process.stdin.close()
                 if process.stdout:
                     process.stdout.close()
     if not cleaned:

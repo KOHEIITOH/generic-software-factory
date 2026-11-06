@@ -179,3 +179,46 @@ def test_real_daemon_resource_gate():
     assert result.status == 'unavailable'
     assert result.output == ''
     assert result.cleaned_up
+
+
+@pytest.mark.parametrize('payload', ['not-bytes', bytearray(b'changeable'), b'x' * (16777216 + 1)])
+def test_invalid_input_never_calls_docker(monkeypatch, payload):
+    def forbidden(*args, **kwargs):
+        pytest.fail('invalid stdin must not call Docker')
+    monkeypatch.setattr('sf_factory.docker_execution._docker', forbidden)
+    with pytest.raises(ValueError, match='stdin'):
+        run_offline_command(image='python@sha256:' + 'a' * 64,
+                            argv=('python',), input_bytes=payload)
+
+
+@real_docker
+def test_real_bounded_input_roundtrip():
+    import hashlib
+
+    require_resources()
+    payload = (b'public-source-data\x00' * 65536)
+    code = 'import sys,hashlib; print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())'
+    result = run_offline_command(image=IMAGE, argv=('python', '-c', code), input_bytes=payload)
+    assert result.status == 'succeeded', result
+    assert result.output.strip() == hashlib.sha256(payload).hexdigest()
+    assert result.cleaned_up
+
+
+@real_docker
+def test_real_stdin_backpressure_cannot_bypass_timeout():
+    require_resources()
+    result = run_offline_command(image=IMAGE, argv=('python', '-c', 'import time; time.sleep(60)'),
+                                input_bytes=b'x' * 2097152, timeout_seconds=1)
+    assert result.status == 'timed_out', result
+    assert result.cleaned_up
+
+
+@real_docker
+def test_real_input_command_failure_is_not_success():
+    require_resources()
+    result = run_offline_command(image=IMAGE,
+        argv=('python', '-c', 'import sys; sys.stdin.buffer.read(); raise SystemExit(7)'),
+        input_bytes=b'public fixture input')
+    assert result.status == 'failed', result
+    assert result.exit_code == 7
+    assert result.cleaned_up
