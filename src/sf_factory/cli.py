@@ -16,6 +16,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("doctor", help="check local prerequisites")
     web = sub.add_parser("web", help="start the local dashboard (builds UI if needed)")
     web.add_argument("--rebuild", action="store_true", help="rebuild frontend assets")
+    integration = sub.add_parser("integration", help="inspect default integration configuration")
+    integration.add_subparsers(dest="integration_command", required=True).add_parser("show")
     runtime = sub.add_parser("runtime", help="inspect registered runtimes")
     runtime.add_subparsers(dest="runtime_command", required=True).add_parser("list")
     provider = sub.add_parser("provider", help="inspect model providers")
@@ -102,6 +104,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
+    if args.command == "integration":
+        from sf_factory.integration_defaults import describe_integrations
+
+        print(json.dumps(describe_integrations(), indent=2))
+        return 0
     if args.command == "state":
         from dataclasses import asdict
 

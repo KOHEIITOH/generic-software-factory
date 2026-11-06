@@ -93,6 +93,13 @@ uv run sf copilot-smoke
 
 **対応状況:** Pythonベースのセットアップ手順を3 OS向けに記載していますが、Windows / Linuxでの全Runtime・全機能の実機動作保証ではありません。特にOS依存のCLI、サンドボックス機能、ファイル操作は環境ごとの検証が必要です。まず[オンボーディング](ONBOARDING.md)を確認してください。
 
+## GitHubを初期標準にする方針
+
+Task SourceとSCMの初期標準はGitHubです。GitHub固有のAPI・型・認証・origin照合はAdapterへ
+閉じ込め、Core/共通WorkflowはTaskSource・Repository・SourceControl契約を使います。
+通常の起動コマンドは変わりません。認証が必要な操作は既存の`GH_TOKEN`または`GITHUB_TOKEN`を使います。
+[対応範囲・完了条件と検証](docs/github-first-integration-policy.md)を参照してください。
+
 ## WebとDBなしのローカル保存
 
 通常の起動は `uv run sf web --rebuild` のままです。新しい保存先では、対応するPOSIX環境で

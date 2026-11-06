@@ -1,6 +1,17 @@
 # 設定モデル — v0.1
 
-設定はデプロイごとに異なります。パッケージは例とスキーマを提供し、実際のRuntime、リポジトリ、Provider、プロジェクトの選択は利用者が指定します。
+初期のTask Source / SCMはGitHubが既定です。Providerを選ぶ追加設定なしに、
+`uv run sf web --rebuild`で既存のGitHub UIを利用できます。対象Repositoryは利用者が選び、
+認証が必要な操作にはサーバー側の`GH_TOKEN`（優先）または`GITHUB_TOKEN`を使います。
+公開Issueの読取は引き続き匿名でも可能です。起動だけでGitHub APIやAIを呼び出しません。
+
+実際の既定Adapterは`integration_defaults.py`で組み立てます。任意の確認コマンド
+`uv run sf integration show`と`GET /api/integrations`はProvider名・認証設定の有無だけを表示し、
+トークン値を出しません。`authenticated: not_checked`は認証未検証を意味します。
+
+以下のYAMLは将来のデプロイ設定モデルの例です。**現行CLI/Webはfactory.yamlを自動読込しません。**
+ファイルを書くだけで実行設定が切り替わるとは扱わないでください。Runtime/Execution/Policyの
+選択と、実装済みの環境変数設定はそれぞれの実行入口の要件に従います。
 
 ## 設定レイヤー
 
@@ -25,13 +36,16 @@ spec:
       enabled: false
       adapter: null
       config: {}
-  sourceControl:
-    adapter: "<source-control-adapter>"
+  taskSource:
+    adapter: github
     config:
-      provider: "<git-provider>"
       repository: "<owner>/<repository>"
-      baseBranch: main
-      credentialRef: "env:FACTORY_GIT_TOKEN"
+      credentialRef: "env:GH_TOKEN"
+  sourceControl:
+    adapter: github
+    config:
+      repository: "<owner>/<repository>"
+      credentialRef: "env:GH_TOKEN"
   execution:
     adapter: "<execution-adapter>"
     config:

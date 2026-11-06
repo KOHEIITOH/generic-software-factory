@@ -6,17 +6,18 @@ Uses the same server-side credentials as GitHub Issue import.
 from __future__ import annotations
 
 import json
-import os
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from fastapi import FastAPI, HTTPException
 
+from sf_factory.github_auth import environment_token
+
 
 def install_github_repository_routes(app: FastAPI) -> None:
     @app.get("/api/github/repositories")
     def list_github_repositories():
-        token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+        token = environment_token()
         if not token:
             raise HTTPException(
                 status_code=503, detail="GitHub credentials are not configured"

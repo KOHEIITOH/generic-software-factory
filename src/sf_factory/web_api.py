@@ -77,6 +77,12 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
     def state_conflict(request: Request, exc: StateConflict):
         return JSONResponse(status_code=409, content={"detail": str(exc)})
 
+    @app.get("/api/integrations")
+    def integrations() -> dict:
+        from sf_factory.integration_defaults import describe_integrations
+
+        return describe_integrations()
+
     @app.get("/api/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
