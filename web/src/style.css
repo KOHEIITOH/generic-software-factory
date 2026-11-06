@@ -88,3 +88,7 @@ h1{font-size:clamp(26px,3vw,38px);line-height:1.2}
 .github-helper,.github-selection{color:#b9c9df;font-size:13px;line-height:1.6;overflow-wrap:anywhere}
 .github-issue-heading{font-size:16px;margin:24px 0 14px;padding-top:20px;border-top:1px solid #304764}
 @media(max-width:640px){.github-step{padding:13px}.github-step .issue-form{align-items:stretch}.github-step .issue-form button{width:100%}}
+
+/* Task-level read-only implementation readiness. */
+.preflight-panel{margin-top:14px;padding:12px;border:1px solid #304764;border-radius:10px;display:grid;gap:10px;overflow-wrap:anywhere}
+.preflight-panel p{margin:6px 0}.preflight-panel ul{margin:8px 0;padding-left:22px}.preflight-panel li{margin:4px 0}.preflight-panel button{justify-self:start}
