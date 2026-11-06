@@ -18,9 +18,9 @@ fixtureやmockだけの成功、デモmarker PR、事前チェック、読み取
 | 段階 | 完了条件 | 現状 |
 | --- | --- | --- |
 | Issue中心の閲覧 | 既存Issue identityのまま複数Runを表示。独立Task作成を主画面から外し、旧API/データを維持 | PR #101で実装済み |
-| 安全な実行入力 | source、変更案、承認済みcommandを検証済み実行器へ渡せる。host実行へfallbackしない | PR #102でbounded stdinを接続。source materializationは後続 |
+| 安全な実行入力 | source、変更案、承認済みcommandを検証済み実行器へ渡せる。host実行へfallbackしない | PR #102でbounded stdinを接続。候補sourceの隔離内materialization/check接続を追加、実Docker CIで検証 |
 | AI実装 | 推論/Runtimeを安全な境界で接続し、実要件から変更を生成する。credentialをWorkerへ漏らさない | scope固定の変更案データ検証を追加。実provider/承認/実行への接続は未完了 |
-| 実チェック・レビュー | 実際のartifact/revision/diffとcollectorを証跡へ固定する | 保存基盤のみ実装済み |
+| 実チェック・レビュー | 実際のartifact/revision/diffとcollectorを証跡へ固定する | 候補commandの隔離実行を追加。実test-count collector/独立reviewの接続は未完了 |
 | 実変更の配送 | 検証済みの同一変更を承認範囲内でDraft PRへ届け、結果不明時を照合する | デモ経路のみ |
 | Webから実行 | operator認証、明示承認、同一repo直列、永続状態、再起動時の安全停止を備える | 未接続 |
 | 実通し試験 | 試験用Issue等からAI実装・実テスト・レビュー・Draft PRを実サービスで確認 | 未完了 |
