@@ -1,0 +1,77 @@
+name: Offline isolation
+
+on:
+  push:
+    branches: [main, "ci/**"]
+    paths:
+      - "src/sf_factory/docker_execution.py"
+      - "tests/test_docker_execution.py"
+      - "pyproject.toml"
+      - ".github/workflows/offline-isolation.yml"
+  pull_request:
+    paths:
+      - "src/sf_factory/docker_execution.py"
+      - "tests/test_docker_execution.py"
+      - "pyproject.toml"
+      - ".github/workflows/offline-isolation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: offline-isolation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SF_TEST_DOCKER_IMAGE: python@sha256:09a17cad02668ae61ece136b4fd36ac3849e14f670ebedb637ea3e15580525bc
+      SF_HOST_CANARY: public-isolation-test-canary
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+      - name: Install test dependencies
+        run: uv sync --extra dev --extra web
+      - name: Require actual resource enforcement capability
+        run: |
+          uv run python - <<'PY'
+          from sf_factory.docker_execution import resource_limits_available
+          assert resource_limits_available(), "Docker cannot enforce required cgroup limits"
+          PY
+      - name: Pull fixed trusted test image
+        run: |
+          env -u DOCKER_HOST -u DOCKER_CONTEXT -u DOCKER_TLS \
+            -u DOCKER_TLS_VERIFY -u DOCKER_CERT_PATH \
+            docker --host=unix:///var/run/docker.sock pull "$SF_TEST_DOCKER_IMAGE"
+      - name: Exercise required isolation checks
+        run: |
+          uv run pytest tests/test_docker_execution.py -q \
+            -k 'real_offline_filesystem_and_identity or real_timeout_cleans_child_processes or real_output_limit_is_enforced or real_command_failure_is_preserved' \
+            --junitxml="$RUNNER_TEMP/offline-isolation.xml"
+      - name: Reject missing or skipped isolation checks
+        run: |
+          uv run python - <<'PY'
+          import os
+          from pathlib import Path
+          from xml.etree import ElementTree
+          report = Path(os.environ["RUNNER_TEMP"]) / "offline-isolation.xml"
+          cases = ElementTree.parse(report).findall(".//testcase")
+          assert len(cases) == 4, "Expected all four required isolation checks"
+          assert all(not any(case.findall(tag) for tag in ("failure", "error", "skipped"))
+                     for case in cases), "Required isolation checks must execute and pass"
+          PY
+      - name: Check for leftover execution containers
+        if: always()
+        run: |
+          remaining=$(env -u DOCKER_HOST -u DOCKER_CONTEXT -u DOCKER_TLS \
+            -u DOCKER_TLS_VERIFY -u DOCKER_CERT_PATH \
+            docker --host=unix:///var/run/docker.sock ps -aq --filter label=sf.execution=offline-v1)
+          test -z "$remaining"

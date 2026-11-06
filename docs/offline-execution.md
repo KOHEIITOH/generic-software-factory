@@ -49,3 +49,14 @@ Repository snapshot/成果物転送、Task単位承認、RunのDB保存、cancel
 command allowlist、image allowlist、AI接続用の限定ネットワーク/credential brokerは未実装です。
 ImplementationPlanは引き続きready=falseです。Dockerはホストkernelを共有し、
 kernel/daemon侵害への完全な隔離を保証しません。高リスクの第三者コードは別VM等も必要です。
+
+## GitHub-hosted runnerでの検証
+
+2026-11-06、[Offline isolationの実行](https://github.com/KOHEIITOH/generic-software-factory/actions/runs/42211599041)
+で必須の実機4試験が実行され、失敗・エラー・skippedなしをJUnitで確認しました。
+CPU/memory/PIDの実cgroup値、非root・権限/書込/通信拒否、timeout回収、出力上限、終了コードが対象です。
+`.github/workflows/offline-isolation.yml` は、同じ固定digestで継続検証します。
+
+これはGitHub側の検証であり、このクラウド環境のrootless Dockerを修復したわけではありません。
+実モデル、資格情報、ホストmount、任意Repositoryの編集はこの試験へ渡していません。
+AI接続とsource snapshotの受渡しを実証するまでは、Issue-to-PR完成とは扱いません。
