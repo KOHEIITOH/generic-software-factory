@@ -49,6 +49,8 @@ def build_parser() -> argparse.ArgumentParser:
     discover.add_argument("--max-depth", type=int, default=32)
     discover.add_argument("--max-file-bytes", type=int, default=65536)
     discover.add_argument("--max-total-bytes", type=int, default=1048576)
+    validate = harness_sub.add_parser("validate", help="validate candidates without applying them")
+    validate.add_argument("repository", type=Path, help="explicit repository root")
     task = sub.add_parser("task", help="manage tasks")
     task_sub = task.add_subparsers(dest="task_command", required=True)
     create = task_sub.add_parser("create")
@@ -77,6 +79,12 @@ def main() -> int:
         from sf_factory.harness_discovery import DiscoveryLimits, discover_harness
 
         try:
+            if args.harness_command == "validate":
+                from sf_factory.harness_validation import validate_harness
+
+                validation = validate_harness(args.repository.absolute())
+                print(json.dumps(asdict(validation), ensure_ascii=True, indent=2))
+                return 0 if validation.valid else 1
             limits = DiscoveryLimits(
                 entries=args.max_entries, depth=args.max_depth,
                 file_bytes=args.max_file_bytes, total_bytes=args.max_total_bytes,

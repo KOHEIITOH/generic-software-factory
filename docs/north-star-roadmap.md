@@ -2,7 +2,7 @@
 
 - 更新日: 2026-11-06（日本時間）
 - 調査基準: `e2841cc6e2da8cb955eece15ba10b9d1ba8327ff`
-- 状態: **ユーザー確認済み。R01はPR #75でマージ済み。R02aのCLI接続を実装。**
+- 状態: **ユーザー確認済み。R01はPR #75でマージ済み。R02aはPR #76でマージ済み。R02bのValidationを実装。**
 - 対象: 既存コード・テスト・設計資料のギャップ分析と、M1〜M5への実装順序。
 
 ## 1. North Starと判断基準
@@ -211,7 +211,8 @@ PRごとに下表へ計画ID、実装範囲、証拠、制約を追記し、該�
 | 計画ID | 状態 | 実装PR/commit | 検証証拠 | 残る制約 |
 | --- | --- | --- | --- | --- |
 | 計画文書 | 提案・確認待ち | 本書 | 基準commitのコード・テスト・設計を照合 | M1〜M5はいずれも完了判定していない |
-| R02a | 実装済み・PR準備 | CLI接続 | `test_harness_cli.py` 5件 | 構文・参照検証はR02b |
+| R02a | マージ済み | [#76](https://github.com/KOHEIITOH/generic-software-factory/pull/76) | `test_harness_cli.py` 5件 | 構文・参照検証はR02b |
+| R02b | ローカル実装・検証済み | Validation/Profile候補 | `test_harness_validation.py` | Composition・承認・実行は未実装。詳細は [Validation仕様](harness-validation.md) |
 | R01 | マージ済み | [#75](https://github.com/KOHEIITOH/generic-software-factory/pull/75) | `test_harness_discovery.py` 15件 | Validation・API・承認・適用は未実装。詳細は [Discovery仕様](harness-discovery.md) |
 
 確認を求める内容は、**M3を最初の実用実証とし、R01/R02とM2の隔離基盤を先行して最小の縦断経路を作る順序、およびR01の初期スコープ**。ユーザーからこの順序での継続実装の了承を得たため、追加の定例確認を挟まず進める。Gitサービス追加、Runtime追加、Release自動化などを先に広げない。
