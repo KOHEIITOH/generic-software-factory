@@ -20,6 +20,7 @@ from sf_factory.factory import Factory
 from sf_factory.github_issue_web import install_github_issue_routes
 from sf_factory.github_pr_demo_web import install_github_pr_demo_routes
 from sf_factory.github_repository_web import install_github_repository_routes
+from sf_factory.implementation_preflight_web import install_implementation_preflight_routes
 from sf_factory.local_project_registry import LocalProjectRegistry
 from sf_factory.repo_discovery import discover_git_root
 from sf_factory.repository_contracts import Project, Repository, Visibility
@@ -192,6 +193,7 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
 
     install_github_issue_routes(app, data_dir)
     install_github_repository_routes(app)
+    install_implementation_preflight_routes(app, data_dir or Path('.sf-factory'))
     install_github_pr_demo_routes(app)
 
     if static_dir is not None:
