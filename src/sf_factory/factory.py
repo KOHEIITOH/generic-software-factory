@@ -3,11 +3,14 @@ from __future__ import annotations
 
 import sqlite3
 import uuid
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
 from sf_factory.agent_registry import AgentRuntimeRegistry, default_runtime_registry
 from sf_factory.policy import Capability, ExecutionPolicy, ExecutionRequest
+from sf_factory.sqlite_state import SqliteStateStore
+from sf_factory.state_store import StateStore
 
 
 def _now() -> str:
@@ -56,6 +59,8 @@ class Factory:
                 );
             """)
 
+        self.task_store: StateStore = SqliteStateStore(self.db)
+
     def _connect(self) -> sqlite3.Connection:
         db = sqlite3.connect(self.db)
         db.row_factory = sqlite3.Row
@@ -63,47 +68,16 @@ class Factory:
         return db
 
     def create_task(self, prompt: str) -> str:
-        if not prompt.strip():
-            raise ValueError("task prompt must not be empty")
-        task_id = uuid.uuid4().hex
-        with self._connect() as db:
-            db.execute("INSERT INTO tasks VALUES (?,?,?)", (task_id, prompt, _now()))
-            db.execute("INSERT INTO audit(run_id,task_id,event,at) VALUES (NULL,?,?,?)",
-                       (task_id, "task.created", _now()))
-        return task_id
+        return self.task_store.create_task(prompt)
 
     def import_external_task(
         self, *, provider: str, instance: str, external_id: str,
         prompt: str, external_url: str | None = None,
     ) -> str:
-        """Import an external issue once; repeated imports preserve task identity."""
-        if not all(v.strip() for v in (provider, instance, external_id, prompt)):
-            raise ValueError("provider, instance, external_id and prompt are required")
-        if any(len(v) > 512 for v in (provider, instance, external_id)):
-            raise ValueError("external identity field is too long")
-        with self._connect() as db:
-            db.execute("BEGIN IMMEDIATE")
-            row = db.execute(
-                "SELECT task_id FROM task_sources WHERE provider=? AND instance=? "
-                "AND external_id=?", (provider, instance, external_id),
-            ).fetchone()
-            if row is not None:
-                return str(row["task_id"])
-            task_id = uuid.uuid4().hex
-            db.execute(
-                "INSERT INTO tasks(id,prompt,created_at) VALUES (?,?,?)",
-                (task_id, prompt, _now()),
-            )
-            db.execute(
-                "INSERT INTO task_sources(task_id,provider,instance,external_id,external_url) "
-                "VALUES (?,?,?,?,?)",
-                (task_id, provider, instance, external_id, external_url),
-            )
-            db.execute(
-                "INSERT INTO audit(run_id,task_id,event,at) VALUES (NULL,?,?,?)",
-                (task_id, "task.imported", _now()),
-            )
-            return task_id
+        return self.task_store.import_external_task(
+            provider=provider, instance=instance, external_id=external_id,
+            prompt=prompt, external_url=external_url,
+        )
 
     def bind_task_repository(
         self, task_id: str, repository: str, local_path: Path
@@ -166,15 +140,13 @@ class Factory:
             return [dict(row) for row in rows]
 
     def show_task(self, task_id: str) -> dict:
+        task = self.task_store.get_task(task_id)
         with self._connect() as db:
-            task = db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
-            if task is None:
-                raise ValueError("task not found")
             runs = db.execute(
                 "SELECT id,runtime,status,started_at FROM runs WHERE task_id=? ORDER BY started_at",
                 (task_id,),
             ).fetchall()
-            return {"task": dict(task), "runs": [dict(row) for row in runs]}
+            return {"task": asdict(task), "runs": [dict(row) for row in runs]}
 
     def show_run(self, run_id: str) -> dict:
         with self._connect() as db:
