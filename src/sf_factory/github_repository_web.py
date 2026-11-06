@@ -18,7 +18,9 @@ def install_github_repository_routes(app: FastAPI) -> None:
     def list_github_repositories():
         token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
         if not token:
-            raise HTTPException(status_code=503, detail="GitHub credentials are not configured")
+            raise HTTPException(
+                status_code=503, detail="GitHub credentials are not configured"
+            )
         request = Request(
             "https://api.github.com/user/repos?per_page=100&sort=updated",
             headers={
@@ -32,11 +34,16 @@ def install_github_repository_routes(app: FastAPI) -> None:
             with urlopen(request, timeout=10) as response:
                 repositories = json.load(response)
         except (HTTPError, URLError, TimeoutError) as exc:
-            raise HTTPException(status_code=502, detail="GitHub repository discovery failed") from exc
+            raise HTTPException(
+                status_code=502, detail="GitHub repository discovery failed"
+            ) from exc
         if not isinstance(repositories, list):
             raise HTTPException(status_code=502, detail="Unexpected GitHub response")
         return {"repositories": [
-            {"full_name": item["full_name"], "can_push": bool(item["permissions"].get("push"))}
+            {
+                "full_name": item["full_name"],
+                "can_push": bool(item["permissions"].get("push")),
+            }
             for item in repositories
             if isinstance(item, dict)
             and isinstance(item.get("full_name"), str)
