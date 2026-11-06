@@ -2,7 +2,7 @@
 
 - 更新日: 2026-11-06（日本時間）
 - 調査基準: `e2841cc6e2da8cb955eece15ba10b9d1ba8327ff`
-- 状態: **ユーザー確認済み。R01はPR #75でマージ済み。R02aはPR #76でマージ済み。R02bはPR #77でマージ済み。R03はPR #78でマージ済み。R04aはPR #79でマージ済み。現環境はcgroup不足で拒否。R05aはPR #80でマージ済み。R05bはPR #81でマージ済み。R06aはPR #82でマージ済み。R09aはPR #83でマージ済み。R10aのレビュー結果接続を実装。**
+- 状態: **ユーザー確認済み。R01はPR #75でマージ済み。R02aはPR #76でマージ済み。R02bはPR #77でマージ済み。R03はPR #78でマージ済み。R04aはPR #79でマージ済み。現環境はcgroup不足で拒否。R05aはPR #80でマージ済み。R05bはPR #81でマージ済み。R06aはPR #82でマージ済み。R09aはPR #83でマージ済み。R10aはPR #84でマージ済み。GitHub-hosted runnerでオフライン隔離実機4試験が成功。**
 - 対象: 既存コード・テスト・設計資料のギャップ分析と、M1〜M5への実装順序。
 
 ## 1. North Starと判断基準
@@ -219,7 +219,18 @@ PRごとに下表へ計画ID、実装範囲、証拠、制約を追記し、該�
 | R05b | マージ済み（[#81](https://github.com/KOHEIITOH/generic-software-factory/pull/81)） | [Composition](harness-composition.md) | 明示選択・scope・単一Profile試験 | Runへの承認済み版固定は後続 |
 | R06a | マージ済み（[#82](https://github.com/KOHEIITOH/generic-software-factory/pull/82)） | [Prepared Runs](prepared-harness-runs.md) | 実Git/DBのrollback・同時作成試験 | snapshot・実行状態遷移・Quality証拠は後続 |
 | R09a | マージ済み（[#83](https://github.com/KOHEIITOH/generic-software-factory/pull/83)） | [Run Check Evidence](run-check-evidence.md) | Run・版・試行・失敗件数の接続試験 | 実collector真正性/独立レビュー/実行接続は後続 |
-| R10a | 実装・検証中 | [Run Review Evidence](run-review-evidence.md) | 厳密schema・版・試行・coverage試験 | 実モデル/collector真正性/修正/提出は後続 |
+| R10a | マージ済み（[#84](https://github.com/KOHEIITOH/generic-software-factory/pull/84)） | [Run Review Evidence](run-review-evidence.md) | 厳密schema・版・試行・coverage試験 | 実モデル/collector真正性/修正/提出は後続 |
+| R04b | CI実機検証成功・PR準備 | [実行記録](https://github.com/KOHEIITOH/generic-software-factory/actions/runs/42211599041) | 必須4試験実行、skipなし | ローカルのcgroup制約は残る。AI/ソース転送は未接続 |
 | R01 | マージ済み | [#75](https://github.com/KOHEIITOH/generic-software-factory/pull/75) | `test_harness_discovery.py` 15件 | Validation・API・承認・適用は未実装。詳細は [Discovery仕様](harness-discovery.md) |
 
 確認を求める内容は、**M3を最初の実用実証とし、R01/R02とM2の隔離基盤を先行して最小の縦断経路を作る順序、およびR01の初期スコープ**。ユーザーからこの順序での継続実装の了承を得たため、追加の定例確認を挟まず進める。Gitサービス追加、Runtime追加、Release自動化などを先に広げない。
+
+### 実接続に向けた現在の条件（2026-11-06）
+
+- GitHub認証・PR操作は成功。GitHub-hosted runner上でのオフライン隔離4試験も成功。
+- CodexはChatGPTログイン状態だが、空の一時領域のsmoke testは
+  chatgpt.comへのHTTP CONNECT 403で応答できずtimeoutした。認証不在とは断定しない。
+- chatgpt.comを環境のネットワーク設定ドラフトへ追加済み。保存・Publish後に実接続を再検証する。
+- この追加はAIへの実ソース送信、Agentの権限拡大、モデル資格情報のcontainer転送の許可を
+  代替しない。source snapshot/信頼された結果収集/実レビュー/Draft PRを接続して初めて
+  M3の通し実証を行える。現在は未完成。
