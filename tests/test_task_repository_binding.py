@@ -32,6 +32,9 @@ def test_imported_issue_can_bind_matching_origin(tmp_path: Path) -> None:
             "SELECT repository FROM task_repositories WHERE task_id=?", (task_id,)
         ).fetchone()
     assert row["repository"] == "org/repo"
+    task = next(item for item in factory.list_tasks() if item["id"] == task_id)
+    assert task["bound_repository"] == "org/repo"
+    assert task["bound_local_path"] == str(checkout.resolve())
 
 
 def test_rejects_mismatched_origin(tmp_path: Path) -> None:
