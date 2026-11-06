@@ -1,10 +1,11 @@
 """Use real Git/SQLite to verify prepared metadata and atomic approval consumption."""
 import hashlib
+import json
 import sqlite3
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import replace
+from dataclasses import asdict, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -326,3 +327,128 @@ def test_result_from_another_run_is_rejected(evidence_run):
                        observation=CheckObservation('unit', 'completed', 0, 'e' * 64, 2,
                                                     run_id='f' * 32))
     assert service.assess(run_id, subject)['attempt'] == 0
+
+
+@pytest.fixture
+def review_run(evidence_run):
+    service, run_id, _ = evidence_run
+    service.register_review(run_id, reviewer='review-runtime', implementer='implementation-runtime',
+                            changed_paths=('calculator.py',))
+    observe(evidence_run)
+    observe(evidence_run, check='lint')
+    return evidence_run
+
+
+def review_payload(values, **changes):
+    _, run_id, subject = values
+    return json.dumps({
+        'schema_version': 1, 'run_id': run_id, **asdict(subject),
+        'status': 'completed', 'complete': True, 'truncated': False,
+        'reviewed_paths': ['calculator.py'], 'findings': [], **changes,
+    })
+
+
+def record_review(values, **changes):
+    service, run_id, subject = values
+    service.record_review(run_id, subject, attempt=1, reviewer='review-runtime',
+                          response=review_payload(values, **changes))
+
+
+def test_complete_review_connects_to_current_check_attempt_but_not_delivery(review_run):
+    service, run_id, subject = review_run
+    assert not service.assess(run_id, subject)['evidence_complete']
+    record_review(review_run)
+    report = service.assess(run_id, subject)
+    assert report['review_status'] == 'passed'
+    assert report['evidence_complete']
+    assert report['eligible_for_delivery'] is False
+    assert RunEvidenceService(service.factory).assess(run_id, subject) == report
+
+
+@pytest.mark.parametrize('change', [
+    {'status': 'failed'}, {'truncated': True}, {'complete': False}, {'reviewed_paths': []},
+])
+def test_failed_or_partial_review_cannot_complete_evidence(review_run, change):
+    service, run_id, subject = review_run
+    record_review(review_run, **change)
+    report = service.assess(run_id, subject)
+    assert report['review_status'] in {'failed', 'incomplete'}
+    assert not report['evidence_complete']
+
+
+def test_must_fix_is_counted_from_findings(review_run):
+    service, run_id, subject = review_run
+    finding = {'severity': 'must-fix', 'path': 'calculator.py', 'line': 5,
+               'summary': 'Not implemented', 'evidence': 'add raises NotImplementedError'}
+    record_review(review_run, findings=[finding])
+    report = service.assess(run_id, subject)
+    assert report['review']['must_fix'] == 1
+    assert report['review_status'] == 'must_fix'
+    assert not report['evidence_complete']
+    assert 'NotImplementedError' not in repr(report)
+
+
+def test_next_attempt_cannot_reuse_old_review(review_run):
+    service, run_id, subject = review_run
+    record_review(review_run)
+    assert service.assess(run_id, subject)['evidence_complete']
+    observe(review_run, attempt=2)
+    observe(review_run, check='lint', attempt=2)
+    report = service.assess(run_id, subject)
+    assert report['review_status'] == 'missing'
+    assert not report['evidence_complete']
+    with pytest.raises(ValueError):
+        record_review(review_run)
+
+
+def test_review_producer_and_record_are_fixed(review_run):
+    service, run_id, subject = review_run
+    with pytest.raises(PermissionError):
+        service.record_review(run_id, subject, attempt=1, reviewer='implementation-runtime',
+                              response=review_payload(review_run))
+    record_review(review_run)
+    with pytest.raises(sqlite3.IntegrityError):
+        record_review(review_run)
+
+
+def test_self_review_identity_cannot_be_registered(evidence_run):
+    service, run_id, _ = evidence_run
+    with pytest.raises(ValueError):
+        service.register_review(run_id, reviewer='same-runtime', implementer='same-runtime',
+                                changed_paths=('calculator.py',))
+
+
+@pytest.mark.parametrize('change', [
+    {'run_id': 'f' * 32}, {'revision': 'f' * 40}, {'bundle_hash': 'f' * 64},
+    {'diff_sha256': 'f' * 64}, {'must_fix_count': 0},
+])
+def test_mismatched_or_non_schema_review_is_not_recorded(review_run, change):
+    service, run_id, subject = review_run
+    with pytest.raises(ValueError):
+        record_review(review_run, **change)
+    assert service.assess(run_id, subject)['review_status'] == 'missing'
+
+
+def test_cli_reads_current_evidence_and_rejects_wrong_revision(review_run, tmp_path, monkeypatch,
+                                                             capsys):
+    from sf_factory.cli import main
+    service, run_id, subject = review_run
+    record_review(review_run)
+    data = tmp_path / '.sf-factory'
+    data.mkdir()
+    with (sqlite3.connect(service.factory.db) as source,
+          sqlite3.connect(data / 'factory.sqlite3') as dest):
+        source.backup(dest)
+    monkeypatch.chdir(tmp_path)
+    arguments = ['sf', 'run', 'evidence', run_id, '--revision', subject.revision,
+                 '--bundle-hash', subject.bundle_hash, '--diff-sha256', subject.diff_sha256]
+    monkeypatch.setattr(sys, 'argv', arguments)
+    assert main() == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report['evidence_complete']
+    assert report['eligible_for_delivery'] is False
+    arguments[5] = 'f' * 40
+    assert main() == 2
+    captured = capsys.readouterr()
+    assert captured.out == ''
+    assert 'subject' in captured.err

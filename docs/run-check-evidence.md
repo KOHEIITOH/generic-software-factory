@@ -26,7 +26,8 @@ stdout/stderrやファイル内容は保存せず、report hashを保存しま�
 - 元の承認base commitと、実装後の検査対象commitの祖先関係は本サービスでは検証しない。
   snapshot/実行器からの信頼された受渡しが後続で必要。
 - report本文/成果物の保存・取得、実チェック実行、試行の強制停止は後続。
-- `checks_passed`はチェック集約だけ。独立レビューはまだmissingで、
+- `checks_passed`はチェック集約だけ。レビュー記録がなければmissing。
+  [レビュー契約](run-review-evidence.md)で同じ対象版へ接続する。
   `eligible_for_delivery`は常にfalse。Run状態を合格や実行完了へ更新しない。
 - 実Gitで準備したRunと同じcommit内の同梱calculator fixtureを実unittestで実行し、
   意図的な未実装による失敗を失敗証拠として記録する試験を含む。

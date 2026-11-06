@@ -9,6 +9,7 @@ import json
 import re
 from contextlib import closing
 from dataclasses import asdict, dataclass
+from pathlib import PurePosixPath
 
 from sf_factory.factory import Factory, _now
 from sf_factory.quality import QualityEvidence, QualityGate, evaluate_quality
@@ -97,6 +98,15 @@ class RunEvidenceService:
                     run_id TEXT PRIMARY KEY REFERENCES runs(id), subject TEXT NOT NULL,
                     checks TEXT NOT NULL, collector TEXT NOT NULL, max_attempts INTEGER NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS run_review_plans (
+                    run_id TEXT PRIMARY KEY REFERENCES run_evidence_plans(run_id),
+                    reviewer TEXT NOT NULL, implementer TEXT NOT NULL, paths TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS run_review_observations (
+                    run_id TEXT NOT NULL REFERENCES run_review_plans(run_id),
+                    attempt INTEGER NOT NULL, summary TEXT NOT NULL, recorded_at TEXT NOT NULL,
+                    PRIMARY KEY(run_id,attempt)
+                );
                 CREATE TABLE IF NOT EXISTS run_check_observations (
                     run_id TEXT NOT NULL REFERENCES run_evidence_plans(run_id),
                     attempt INTEGER NOT NULL, check_id TEXT NOT NULL,
@@ -170,6 +180,62 @@ class RunEvidenceService:
             db.execute('INSERT INTO audit(run_id,task_id,event,at) VALUES (?,?,?,?)',
                        (run_id, task_id, 'run.check_observed', _now()))
 
+    def register_review(
+        self, run_id: str, *, reviewer: str, implementer: str, changed_paths: tuple[str, ...],
+    ) -> None:
+        _identity(reviewer)
+        _identity(implementer)
+        if reviewer == implementer:
+            raise ValueError('independent reviewer identity required')
+        if (not changed_paths or len(changed_paths) > 256
+                or len(set(changed_paths)) != len(changed_paths)):
+            raise ValueError('bounded unique changed paths required')
+        for path in changed_paths:
+            relative = PurePosixPath(path)
+            if (not path or len(path) > 512 or '\\' in path or '\x00' in path
+                    or relative.is_absolute() or '..' in relative.parts
+                    or not relative.parts or relative.as_posix() != path):
+                raise ValueError('canonical relative changed paths required')
+        with closing(self.factory._connect()) as db, db:
+            db.execute('BEGIN IMMEDIATE')
+            run = db.execute('SELECT status,task_id FROM runs WHERE id=?', (run_id,)).fetchone()
+            if run is None or run['status'] != 'prepared':
+                raise ValueError('prepared Run required')
+            db.execute('INSERT INTO run_review_plans VALUES (?,?,?,?)',
+                       (run_id, reviewer, implementer, _encoded({'paths': sorted(changed_paths)})))
+            db.execute('INSERT INTO audit(run_id,task_id,event,at) VALUES (?,?,?,?)',
+                       (run_id, run['task_id'], 'run.review_plan_registered', _now()))
+
+    def record_review(
+        self, run_id: str, subject: EvidenceSubject, *, attempt: int, reviewer: str, response: str,
+    ) -> None:
+        from sf_factory.run_review import parse_review
+
+        _identity(reviewer)
+        if type(attempt) is not int or attempt < 1:
+            raise ValueError('positive review attempt required')
+        with closing(self.factory._connect()) as db, db:
+            db.execute('BEGIN IMMEDIATE')
+            plan = db.execute(
+                'SELECT p.subject,r.reviewer,r.paths FROM run_evidence_plans p '
+                'JOIN run_review_plans r ON r.run_id=p.run_id WHERE p.run_id=?', (run_id,),
+            ).fetchone()
+            run = db.execute('SELECT status,task_id FROM runs WHERE id=?', (run_id,)).fetchone()
+            if plan is None or run is None or run['status'] != 'prepared':
+                raise ValueError('active review plan required')
+            if plan['subject'] != _encoded(asdict(subject)) or reviewer != plan['reviewer']:
+                raise PermissionError('review subject or producer mismatch')
+            latest = db.execute('SELECT COALESCE(MAX(attempt),0) FROM run_check_observations '
+                                'WHERE run_id=?', (run_id,)).fetchone()[0]
+            if latest != attempt:
+                raise ValueError('review must match latest check attempt')
+            summary = parse_review(response, run_id=run_id, subject=subject,
+                                   required_paths=tuple(json.loads(plan['paths'])['paths']))
+            db.execute('INSERT INTO run_review_observations VALUES (?,?,?,?)',
+                       (run_id, attempt, _encoded(asdict(summary)), _now()))
+            db.execute('INSERT INTO audit(run_id,task_id,event,at) VALUES (?,?,?,?)',
+                       (run_id, run['task_id'], 'run.review_observed', _now()))
+
     def assess(self, run_id: str, subject: EvidenceSubject) -> dict:
         with closing(self.factory._connect()) as db, db:
             db.execute('BEGIN')
@@ -186,7 +252,21 @@ class RunEvidenceService:
             # One read transaction so a concurrent new attempt cannot mix observations.
             rows = db.execute('SELECT attempt,observation FROM run_check_observations '
                               'WHERE run_id=? ORDER BY attempt,check_id', (run_id,)).fetchall()
+            review_rows = db.execute('SELECT attempt,summary FROM run_review_observations '
+                                     'WHERE run_id=?', (run_id,)).fetchall()
         latest = max((row['attempt'] for row in rows), default=0)
+        review = next((json.loads(row['summary']) for row in review_rows
+                       if row['attempt'] == latest), None)
+        review_status = 'missing'
+        if review is not None:
+            if review['status'] != 'completed':
+                review_status = 'failed'
+            elif not review['complete'] or review['truncated']:
+                review_status = 'incomplete'
+            elif review['must_fix']:
+                review_status = 'must_fix'
+            else:
+                review_status = 'passed'
         observed = {item['check_id']: item for item in (
             json.loads(row['observation']) for row in rows if row['attempt'] == latest
         )}
@@ -212,5 +292,7 @@ class RunEvidenceService:
         return {
             'subject': json.loads(plan['subject']), 'attempt': latest,
             'checks_passed': report.passed, 'checks': outcomes,
-            'review_status': 'missing', 'eligible_for_delivery': False,
+            'review_status': review_status, 'review': review,
+            'evidence_complete': report.passed and review_status == 'passed',
+            'eligible_for_delivery': False,
         }

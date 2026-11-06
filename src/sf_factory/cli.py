@@ -74,6 +74,13 @@ def build_parser() -> argparse.ArgumentParser:
     run_sub = run_group.add_subparsers(dest="run_command", required=True)
     run_show = run_sub.add_parser("show")
     run_show.add_argument("run_id")
+    evidence = run_sub.add_parser(
+        "evidence", help="inspect revision-bound check and review results"
+    )
+    evidence.add_argument("run_id")
+    evidence.add_argument("--revision", required=True)
+    evidence.add_argument("--bundle-hash", required=True)
+    evidence.add_argument("--diff-sha256", required=True)
     return parser
 
 
@@ -216,8 +223,15 @@ def main() -> int:
                 print(json.dumps(result, indent=2))
                 return 0 if result["status"] == "succeeded" else 1
         elif args.command == "run":
+            if args.run_command == "evidence":
+                from sf_factory.run_evidence import EvidenceSubject, RunEvidenceService
+
+                subject = EvidenceSubject(args.revision, args.bundle_hash, args.diff_sha256)
+                report = RunEvidenceService(factory).assess(args.run_id, subject)
+                print(json.dumps(report, indent=2))
+                return 0 if report["evidence_complete"] else 1
             print(json.dumps(factory.show_run(args.run_id), indent=2))
-    except ValueError as exc:
+    except (ValueError, PermissionError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
     return 0
