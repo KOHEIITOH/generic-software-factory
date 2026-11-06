@@ -2,7 +2,7 @@
 
 - 更新日: 2026-11-06（日本時間）
 - 調査基準: `e2841cc6e2da8cb955eece15ba10b9d1ba8327ff`
-- 状態: **ユーザー確認済み。R01はPR #75でマージ済み。R02aはPR #76でマージ済み。R02bはPR #77でマージ済み。R03はPR #78でマージ済み。R04aはPR #79でマージ済み。現環境はcgroup不足で拒否。独立したR05aの承認記録を実装。**
+- 状態: **ユーザー確認済み。R01はPR #75でマージ済み。R02aはPR #76でマージ済み。R02bはPR #77でマージ済み。R03はPR #78でマージ済み。R04aはPR #79でマージ済み。現環境はcgroup不足で拒否。R05aはPR #80でマージ済み。R05bの明示Compositionを実装。**
 - 対象: 既存コード・テスト・設計資料のギャップ分析と、M1〜M5への実装順序。
 
 ## 1. North Starと判断基準
@@ -215,7 +215,8 @@ PRごとに下表へ計画ID、実装範囲、証拠、制約を追記し、該�
 | R02b | マージ済み | [#77](https://github.com/KOHEIITOH/generic-software-factory/pull/77) | `test_harness_validation.py` | Composition・承認・実行は未実装。詳細は [Validation仕様](harness-validation.md) |
 | R03 | マージ済み（[#78](https://github.com/KOHEIITOH/generic-software-factory/pull/78)） | [ADR-0005](decisions/0005-trusted-execution-boundary.md) | ローカルDocker daemon応答確認 | 隔離実証・AI接続は未実施 |
 | R04a | マージ済み（[#79](https://github.com/KOHEIITOH/generic-software-factory/pull/79)）、環境ブロック | [Offline Execution](offline-execution.md) | cgroup能力不足の実機拒否確認 | 資源制限の実機4試験は未成立。cgroup委譲環境で再検証が必要 |
-| R05a | 実装済み・PR準備 | [ADR-0006](decisions/0006-harness-approval-receipts.md) | 期限/失効/対象変更/並行消費の試験 | 認証済み操作UI・Composition・Run接続は後続 |
+| R05a | マージ済み（[#80](https://github.com/KOHEIITOH/generic-software-factory/pull/80)） | [ADR-0006](decisions/0006-harness-approval-receipts.md) | 期限/失効/対象変更/並行消費の試験 | 認証済み操作UI・Composition・Run接続は後続 |
+| R05b | 実装・検証中 | [Composition](harness-composition.md) | 明示選択・scope・単一Profile試験 | Runへの承認済み版固定は後続 |
 | R01 | マージ済み | [#75](https://github.com/KOHEIITOH/generic-software-factory/pull/75) | `test_harness_discovery.py` 15件 | Validation・API・承認・適用は未実装。詳細は [Discovery仕様](harness-discovery.md) |
 
 確認を求める内容は、**M3を最初の実用実証とし、R01/R02とM2の隔離基盤を先行して最小の縦断経路を作る順序、およびR01の初期スコープ**。ユーザーからこの順序での継続実装の了承を得たため、追加の定例確認を挟まず進める。Gitサービス追加、Runtime追加、Release自動化などを先に広げない。
