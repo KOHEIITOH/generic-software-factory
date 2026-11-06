@@ -356,3 +356,10 @@ SDK最低versionと実サービスの機能、対象OS/fsは実装PRで別途検
 | P02 | PR #89でマージ済み | File Task保存。[単体確認手順](local-file-state.md) |
 | Webへの接続 | PR #90で実装・ローカル検証済み | [一コマンド起動](local-web-storage.md)。FileでTask/Project/Repository/binding/read-only Runを保存。既存SQLiteを維持 |
 | P03以降 | 主要部分は未実装 | 承認とprepared Runの原子操作、証跡、Worker復旧、移行は後続。Web接続で完了扱いにしない |
+
+### Harness保存の段階移行
+
+- PR #91: controllerからSQLを切り離し、`HarnessState`の原子的prepare操作へ委譲。既存SQLiteのtransactionを維持。
+- File Adapter: 同一documentで承認消費/Run/manifest/auditを保存し、既存SQLiteと承認契約を共有。
+  schema 1→2の原子的更新、別プロセス競合、replace前後の強制終了と失敗時の整合性を検証。
+- 品質証跡、snapshot、Worker復旧、SQL→File export/importは引き続き別のPRで進める。

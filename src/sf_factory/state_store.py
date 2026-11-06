@@ -17,6 +17,10 @@ class StateConflict(RuntimeError):
     """An operation conflicts with existing state."""
 
 
+class StatePermissionDenied(PermissionError):
+    """A domain authorization decision, distinct from filesystem access errors."""
+
+
 class StateUnavailable(RuntimeError):
     """The backend cannot safely complete or confirm the operation."""
 

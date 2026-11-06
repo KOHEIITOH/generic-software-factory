@@ -16,16 +16,26 @@ NOW = datetime(2026, 11, 6, tzinfo=UTC)
 REQUEST = HarnessApprovalRequest('project', 'repo', 'task', 'a' * 40, 'b' * 64)
 
 
+@pytest.fixture(params=['sqlite', 'file'])
+def approval_store(request):
+    if request.param == 'sqlite':
+        return HarnessApprovalStore
+    from sf_factory.file_dashboard import FileDashboardFactory
+    from sf_factory.file_harness_state import FileApprovalDecisions
+
+    return lambda path, **kwargs: FileApprovalDecisions(FileDashboardFactory(path), **kwargs)
+
+
 def approve(store, request=REQUEST, **kwargs):
     return store.record(request, reviewer='verified-human', approved=True,
                         expires_at=NOW + timedelta(hours=1), **kwargs)
 
 
-def test_decision_persists_and_is_consumed_once(tmp_path):
+def test_decision_persists_and_is_consumed_once(approval_store, tmp_path):
     path = tmp_path / 'approvals.db'
-    store = HarnessApprovalStore(path, clock=lambda: NOW)
+    store = approval_store(path, clock=lambda: NOW)
     approval = approve(store)
-    restored = HarnessApprovalStore(path, clock=lambda: NOW)
+    restored = approval_store(path, clock=lambda: NOW)
     restored.consume(approval, REQUEST, controller='factory')
     with pytest.raises(PermissionError):
         store.consume(approval, REQUEST, controller='factory')
@@ -36,17 +46,17 @@ def test_decision_persists_and_is_consumed_once(tmp_path):
     ('project_id', 'other'), ('repository_id', 'other'), ('task_id', 'other'),
     ('revision', 'c' * 40), ('bundle_hash', 'd' * 64),
 ])
-def test_any_scope_change_rejects_without_consuming(tmp_path, field, value):
-    store = HarnessApprovalStore(tmp_path / 'db', clock=lambda: NOW)
+def test_any_scope_change_rejects_without_consuming(approval_store, tmp_path, field, value):
+    store = approval_store(tmp_path / 'db', clock=lambda: NOW)
     approval = approve(store)
     with pytest.raises(PermissionError):
         store.consume(approval, replace(REQUEST, **{field: value}), controller='factory')
     store.consume(approval, REQUEST, controller='factory')
 
 
-def test_rejected_revoked_and_expired_decisions_do_not_authorize(tmp_path):
+def test_rejected_revoked_and_expired_decisions_do_not_authorize(approval_store, tmp_path):
     now = [NOW]
-    store = HarnessApprovalStore(tmp_path / 'db', clock=lambda: now[0])
+    store = approval_store(tmp_path / 'db', clock=lambda: now[0])
     rejected = store.record(REQUEST, reviewer='human', approved=False,
                             expires_at=NOW + timedelta(hours=1))
     revoked = approve(store)
@@ -59,17 +69,17 @@ def test_rejected_revoked_and_expired_decisions_do_not_authorize(tmp_path):
     assert [e['event'] for e in store.events(revoked)] == ['approved', 'revoked']
 
 
-def test_clock_before_creation_is_rejected(tmp_path):
+def test_clock_before_creation_is_rejected(approval_store, tmp_path):
     now = [NOW]
-    store = HarnessApprovalStore(tmp_path / 'db', clock=lambda: now[0])
+    store = approval_store(tmp_path / 'db', clock=lambda: now[0])
     approval = approve(store)
     now[0] -= timedelta(minutes=1)
     with pytest.raises(PermissionError):
         store.consume(approval, REQUEST, controller='factory')
 
 
-def test_concurrent_consumers_only_one_can_claim(tmp_path):
-    store = HarnessApprovalStore(tmp_path / 'db', clock=lambda: NOW)
+def test_concurrent_consumers_only_one_can_claim(approval_store, tmp_path):
+    store = approval_store(tmp_path / 'db', clock=lambda: NOW)
     approval = approve(store)
 
     def claim(_):
@@ -84,8 +94,8 @@ def test_concurrent_consumers_only_one_can_claim(tmp_path):
 
 
 @pytest.mark.parametrize('expires', [NOW, NOW + timedelta(days=2), NOW.replace(tzinfo=None)])
-def test_expiry_must_be_bounded_and_aware(tmp_path, expires):
-    store = HarnessApprovalStore(tmp_path / 'db', clock=lambda: NOW)
+def test_expiry_must_be_bounded_and_aware(approval_store, tmp_path, expires):
+    store = approval_store(tmp_path / 'db', clock=lambda: NOW)
     with pytest.raises(ValueError):
         store.record(REQUEST, reviewer='human', approved=True, expires_at=expires)
 
