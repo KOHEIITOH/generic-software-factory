@@ -145,6 +145,7 @@ def test_schema_two_upgrade_retains_consumed_approvals_and_prepared_runs(snapsho
     state = json.loads(path.read_text())
     before_harness = state['harness']
     state.pop('snapshots')
+    state.pop('evidence')
     state['schema_version'] = 2
     path.write_text(json.dumps(state))
     reopened = open_factory(service.factory.root)

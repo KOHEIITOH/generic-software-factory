@@ -12,7 +12,6 @@ from sf_factory.factory import Factory
 from sf_factory.factory_selection import open_factory
 from sf_factory.file_dashboard import FileDashboardFactory
 from sf_factory.repository_contracts import Project, Repository, Visibility
-from sf_factory.run_evidence import RunEvidenceService
 from sf_factory.runtime import RuntimeResult
 from sf_factory.state_store import StateConflict, StateCorrupt, StateUnavailable
 from sf_factory.web_api import create_app
@@ -111,7 +110,7 @@ def test_file_backend_has_no_hidden_fallback_for_sql_workflows(tmp_path, monkeyp
     monkeypatch.setattr(sqlite3, 'connect', no_sqlite)
     factory = open_factory(tmp_path)
     with pytest.raises(StateUnavailable, match='SQL workflow operations'):
-        RunEvidenceService(factory)
+        factory._connect()
     with pytest.raises(StateConflict):
         open_factory(tmp_path, backend='sqlite')
     with pytest.raises(ValueError):
