@@ -56,7 +56,7 @@ def test_local_task_has_no_external_source_and_is_not_bound(factory, tmp_path):
 def test_core_and_shared_workflows_do_not_import_github_adapters():
     root = Path(__file__).resolve().parents[1] / 'src/sf_factory'
     for name in ('factory', 'file_dashboard', 'workflow', 'workflow_runner', 'harness_runs',
-                 'run_evidence', 'source_snapshot'):
+                 'run_evidence', 'source_snapshot', 'draft_pr_demo', 'source_control'):
         tree = ast.parse((root / f'{name}.py').read_text())
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom):
