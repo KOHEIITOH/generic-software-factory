@@ -44,7 +44,12 @@ CLIの `sf task` / `sf run show` もWebと同じ選択規則・設定を使い�
   Runtimeの認証・利用料金は別の要件であり、Web起動やTask作成だけではAIを呼び出しません。
 - プロセスを跨ぐ再読込、同一hostの協調するWriter間のロック。
 
-**Harness承認、承認消費とprepared Runの原子的作成、品質・レビュー証跡、source snapshotはまだSQLite専用です。**
+信頼されたローカルcontroller向けには、Harness承認の記録・取消・一回消費と、
+承認消費/prepared Run/manifest/auditの原子的保存もFile対応です。
+Task/Project関連付けと登録リポジトリの照合を同じ保存境界で行います。
+Webに承認・実行の入口は追加していません。
+
+**品質・レビュー証跡、source snapshotはまだSQLite専用です。**
 Fileモードでこれらを呼ぶと明示的に停止し、裏でDBを作りません。
 Issueから自動実装してDraft PRを提出する完成状態を意味しません。
 WebにAgent起動や承認のHTTP入口を追加していません。
@@ -54,6 +59,11 @@ WebにAgent起動や承認のHTTP入口を追加していません。
 Task本体は `tasks-v1/<id>.json`、Web登録・関連付け・Runとイベントは
 `dashboard-v1/state.json` に保存します。後者はschemaと単調増加versionを持つ16 MiB上限の
 ローカル用documentです。大規模・分散運転用ではありません。
+
+schema 1の既存File documentは、内容を検証してから同じID/既存データを保ってschema 2へ
+原子的に更新します。追加するHarness collectionは空です。旧バージョンのアプリはschema 2を
+拒否するため、更新後に古いアプリへ戻す場合はWriter停止と更新前バックアップの確認が必要です。
+SQLからFileへの移行とは別のローカルschema更新です。
 
 同一documentの変更は、プロセスロック、0600の一時ファイル、file fsync、atomic replace、
 directory fsyncの順で保存します。Run状態と対応イベント、Repository登録と重複検出は同じ

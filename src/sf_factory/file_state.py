@@ -22,6 +22,7 @@ from sf_factory.state_store import (
     StateConflict,
     StateCorrupt,
     StateNotFound,
+    StatePermissionDenied,
     StateUnavailable,
     TaskRecord,
     validate_external,
@@ -219,6 +220,8 @@ def lock_directory(path: Path, *, lock_timeout: float = 5.0) -> Iterator[int]:
                     raise StateUnavailable('File state lock timed out') from None
                 time.sleep(0.01)
         yield directory
+    except StatePermissionDenied:
+        raise
     except OSError as exc:
         raise StateUnavailable('File state operation failed') from exc
     finally:

@@ -3,7 +3,7 @@
 初期StateStoreのFile Adapterと、Task保存用のCLIを追加しました。
 このページはTask保存Adapter単体の確認用です。Web起動に追加手順は必要ありません。
 `uv run sf web --rebuild` の自動選択と対応範囲は[Web保存の手順](local-web-storage.md)を参照してください。
-既存SQLiteの保存先は維持します。Harness承認/prepared Run/evidenceのFile移行は後続です。
+既存SQLiteの保存先は維持します。Harness承認/prepared RunもFile対応し、evidenceのFile移行は後続です。
 
 ## 試す
 

@@ -1,7 +1,7 @@
 """File adapter for the existing local dashboard and read-only Runtime Runs.
 
-No SQL compatibility layer. Harness approvals/prepared Runs/evidence still require
-SQLite and explicitly fail closed through _connect; they are not Web operations.
+No SQL compatibility layer. Harness approval/prepare uses atomic File state;
+quality evidence and snapshots still fail closed through the SQL-only boundary.
 """
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from sf_factory.agent_registry import AgentRuntimeRegistry, default_runtime_regi
 from sf_factory.factory import Factory, _now
 from sf_factory.file_document import read_document, write_document
 from sf_factory.file_state import FileStateStore
+from sf_factory.harness_state import HarnessState
 from sf_factory.repository_contracts import Project, ProjectRegistry, Repository, Visibility
 from sf_factory.state_store import StateConflict, StateCorrupt, StateNotFound, StateUnavailable
 
@@ -42,7 +43,8 @@ class FileDashboardFactory(Factory):
             try:
                 if created:
                     write_document(directory, {
-                        'schema_version': 1, 'version': 1,
+                        'schema_version': 2, 'version': 1,
+                        'harness': self._empty_harness(),
                         'bindings': {}, 'runs': {}, 'events': [],
                         'projects': {}, 'repositories': {},
                     })
@@ -51,7 +53,13 @@ class FileDashboardFactory(Factory):
                         os.fsync(parent)
                     finally:
                         os.close(parent)
-                self._validate(read_document(directory))
+                record = read_document(directory)
+                self._validate(record)
+                if record['schema_version'] == 1:
+                    record.update(schema_version=2, harness=self._empty_harness())
+                    record['version'] += 1
+                    self._validate(record)
+                    write_document(directory, record)
             finally:
                 os.close(directory)
 
@@ -59,7 +67,7 @@ class FileDashboardFactory(Factory):
     def db(self) -> Path:
         raise StateUnavailable(
             'This operation requires the SQLite workflow adapter; '
-            'Harness approvals, prepared Runs and evidence are not supported in File mode yet'
+            'Quality evidence and source snapshots are not supported in File mode yet'
         )
 
     def _connect(self):
@@ -69,9 +77,11 @@ class FileDashboardFactory(Factory):
     @staticmethod
     def _validate(record: dict) -> None:
         try:
-            if (set(record) != {'schema_version', 'version', 'bindings', 'runs', 'events',
-                                'projects', 'repositories'}
-                    or type(record['schema_version']) is not int or record['schema_version'] != 1
+            if (set(record) != ({'schema_version', 'version', 'bindings', 'runs', 'events',
+                                 'projects', 'repositories'} |
+                                ({'harness'} if record.get('schema_version') == 2 else set()))
+                    or type(record['schema_version']) is not int
+                    or record['schema_version'] not in {1, 2}
                     or type(record['version']) is not int or record['version'] < 1):
                 raise ValueError('unsupported dashboard schema or revision')
             for name in ('bindings', 'runs', 'projects', 'repositories'):
@@ -99,16 +109,19 @@ class FileDashboardFactory(Factory):
                         or set(run) != {'id', 'task_id', 'runtime', 'status', 'workspace',
                                        'started_at', 'ended_at', 'output', 'error_kind',
                                        'error_message', 'exit_code'}
-                        or run['status'] not in {'running', 'succeeded', 'failed', 'timed_out'}
+                        or run['status'] not in {
+                            'running', 'prepared', 'succeeded', 'failed', 'timed_out'}
                         or not all(isinstance(run[k], str) and run[k]
-                                   for k in ('runtime', 'workspace', 'started_at'))):
+                                   for k in ('runtime', 'started_at'))
+                        or not isinstance(run['workspace'], str)
+                        or (run['status'] != 'prepared' and not run['workspace'])):
                     raise ValueError('invalid Run')
                 for field in ('ended_at', 'output', 'error_kind', 'error_message'):
                     if run[field] is not None and not isinstance(run[field], str):
                         raise ValueError('invalid Run result')
                 if run['exit_code'] is not None and type(run['exit_code']) is not int:
                     raise ValueError('invalid Run exit code')
-                if (run['status'] == 'running') != (run['ended_at'] is None):
+                if (run['status'] in {'running', 'prepared'}) != (run['ended_at'] is None):
                     raise ValueError('invalid Run lifecycle')
             if not isinstance(record['events'], list):
                 raise ValueError('invalid audit events')
@@ -120,6 +133,10 @@ class FileDashboardFactory(Factory):
                         or (event['run_id'] is not None
                             and event['run_id'] not in record['runs'])):
                     raise ValueError('invalid audit event')
+            if record['schema_version'] == 2:
+                from sf_factory.file_harness_state import validate_harness_state
+
+                validate_harness_state(record)
         except (ValueError, TypeError, KeyError, AttributeError) as exc:
             raise StateCorrupt('invalid or unsupported dashboard state') from exc
 
@@ -184,7 +201,13 @@ class FileDashboardFactory(Factory):
         with self._document() as state:
             if run_id not in state['runs']:
                 raise StateNotFound('run not found')
-            return copy.deepcopy(state['runs'][run_id])
+            run = copy.deepcopy(state['runs'][run_id])
+            entry = state.get('harness', {}).get('manifests', {}).get(run_id)
+            if entry is not None:
+                import json
+
+                run['harness_manifest'] = json.loads(entry['manifest'])
+            return run
 
     def task_repository(self, task_id: str) -> dict:
         with self.files._locked() as directory:
@@ -237,6 +260,17 @@ class FileDashboardFactory(Factory):
                        error_message=error_message, exit_code=exit_code, ended_at=at)
             state['events'].append({'task_id': task_id, 'run_id': run_id,
                                     'event': 'run.' + status, 'at': at})
+
+    @staticmethod
+    def _empty_harness() -> dict:
+        from sf_factory.file_harness_state import empty_harness
+
+        return empty_harness()
+
+    def harness_state(self) -> HarnessState:
+        from sf_factory.file_harness_state import FileHarnessState
+
+        return FileHarnessState(self)
 
     def project_registry(self) -> ProjectRegistry:
         return FileProjectRegistry(self)
