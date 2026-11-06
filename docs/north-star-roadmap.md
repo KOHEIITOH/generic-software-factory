@@ -235,3 +235,10 @@ PRごとに下表へ計画ID、実装範囲、証拠、制約を追記し、該�
 - この追加はAIへの実ソース送信、Agentの権限拡大、モデル資格情報のcontainer転送の許可を
   代替しない。source snapshot/信頼された結果収集/実レビュー/Draft PRを接続して初めて
   M3の通し実証を行える。現在は未完成。
+
+### AWS対応・保存先の任意化（設計提案）
+
+[AWS portability設計とPR計画](aws-portability-design.md)で、SQLite/File/GitHub/S3の役割、
+承認原子性と復旧、Bedrock Provider再利用、Docker配布とECS実行の分離を整理した。
+初期はユーザー確認済みの直列実行とする。M1〜M5のゴールは変更しない。
+現時点では文書のみで、DB不要運転/ECS deploy/Bedrock自律開発が実装済みという意味ではない。
