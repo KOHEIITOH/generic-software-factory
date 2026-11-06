@@ -67,3 +67,9 @@ h1{font-size:clamp(26px,3vw,38px);line-height:1.2}
 .project-register-form label{min-width:145px}
 #projects .project-selector{margin-top:20px}
 #projects .issue-form{margin-bottom:14px}
+
+/* Single repository quick-start */
+.quick-start-panel{border-color:#42629a;background:linear-gradient(145deg,#182b49,#101b2d)}
+.quick-repo-status{overflow-wrap:anywhere;color:#b9d9ff}
+.quick-repo-status code{font-size:12px}
+.quick-start-link{display:inline-flex;margin:4px 0 0}

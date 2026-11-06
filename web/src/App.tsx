@@ -15,6 +15,11 @@ type Run = { id: string; task_id: string; runtime: string; status: string; start
 
 export default function App() {
   const [state, setState] = useState<ApiState>("loading");
+  const [quickRepo, setQuickRepo] = useState<string | null>(null);
+  const [quickRepoLoading, setQuickRepoLoading] = useState(true);
+  const [quickRepoPath, setQuickRepoPath] = useState("");
+  const [quickRepoError, setQuickRepoError] = useState("");
+  const [quickRepoBusy, setQuickRepoBusy] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState("");
   const [projectRepos, setProjectRepos] = useState<Repository[]>([]);
@@ -103,6 +108,43 @@ export default function App() {
     } catch (cause) {
       setRepoMessage(cause instanceof Error ? cause.message : "登録エラー");
     } finally { setRepoBusy(false); }
+  }
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/quick/repository", { signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error("Repositoryを検出できませんでした");
+        return response.json();
+      })
+      .then(data => {
+        if (!controller.signal.aborted) {
+          setQuickRepo(data.detected && typeof data.repository_root === "string"
+            ? data.repository_root : null);
+        }
+      })
+      .catch(() => { if (!controller.signal.aborted) setQuickRepo(null); })
+      .finally(() => { if (!controller.signal.aborted) setQuickRepoLoading(false); });
+    return () => controller.abort();
+  }, []);
+
+  async function inspectQuickRepository() {
+    if (!quickRepoPath.trim() || quickRepoBusy) return;
+    setQuickRepoBusy(true); setQuickRepoError("");
+    try {
+      const response = await fetch("/api/quick/repository/inspect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: quickRepoPath.trim() }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(typeof data.detail === "string"
+        ? data.detail : "Gitリポジトリを確認できませんでした");
+      setQuickRepo(data.repository_root);
+      setQuickRepoPath(data.repository_root);
+    } catch (cause) {
+      setQuickRepoError(cause instanceof Error ? cause.message : "確認エラー");
+    } finally { setQuickRepoBusy(false); }
   }
 
   async function createLocalTask() {
@@ -232,15 +274,28 @@ export default function App() {
     <div className="layout">
       <aside className="sidebar">
         <div className="brand"><span className="brand-icon">SF</span><span>Software Factory<small>DEVELOPMENT CONTROL CENTER</small></span></div>
-        <nav aria-label="Main navigation"><a className="selected" href="#overview">▦　概要</a><a href="#projects">▤　Project</a><a href="#runtimes">◈　AI Runtime</a><a href="#tasks">☷　タスク一覧</a><a href="#github-import">＋　Issue取り込み</a><a href="#runs">⑂　実行履歴</a><span className="nav-group-label">DOCUMENTATION</span><a href="/guide">▤　ユーザーガイド</a><a href="/onboarding">↗　オンボーディング</a></nav>
+        <nav aria-label="Main navigation"><a className="selected" href="#overview">▦　概要</a><a href="#quick-start">▶　クイック開始</a><a href="#projects">▤　Project</a><a href="#runtimes">◈　AI Runtime</a><a href="#tasks">☷　タスク一覧</a><a href="#github-import">＋　Issue取り込み</a><a href="#runs">⑂　実行履歴</a><span className="nav-group-label">DOCUMENTATION</span><a href="/guide">▤　ユーザーガイド</a><a href="/onboarding">↗　オンボーディング</a></nav>
         <div className="sidebar-footer"><span className="sidebar-dot" /> LOCAL WORKSPACE <small>Factory Core · v0.1</small></div>
       </aside>
       <main>
-        <header><div><span className="eyebrow">OVERVIEW / WORKSPACE</span><h1 id="overview">開発コントロールセンター <span className="title-spark">✦</span></h1><p>AIによる開発タスクと実行状況を、ひとつの画面で。</p></div><span role="status" className={"status " + state}>{state === "connected" ? "● ローカルAPI接続中" : state === "loading" ? "◌ 接続確認中" : "● API未接続"}</span></header><div className="hero-banner"><div><span className="eyebrow">SOFTWARE FACTORY / LOCAL</span><h2>アイデアから、実装へ。</h2><p>タスクの取り込みからAI開発・品質確認まで。現在はIssueの閲覧・Taskへの明示的な取り込みに対応しています。</p></div><span className="hero-mark" aria-hidden="true">⌘</span></div>
+        <header><div><h1 id="overview">Software Factory</h1><p>開発対象を選んで、タスクを管理します。</p></div><span role="status" className={"status " + state}>{state === "connected" ? "● ローカルAPI接続中" : state === "loading" ? "◌ 接続確認中" : "● API未接続"}</span></header>
         <section className="metrics" aria-label="Summary">
           <article className="metric"><span>接続状態</span><strong>{state === "connected" ? "Online" : state === "loading" ? "Checking" : "Offline"}</strong><small>localhost:8000</small></article>
           <article className="metric"><span>登録済みAI Runtime</span><strong>{state === "connected" ? runtimes.length : "—"}</strong><small>登録済みのアダプタ</small></article>
           <article className="metric"><span>実行中のRun</span><strong>{state === "connected" ? activeRuns : "—"}</strong><small>実行中のRun</small></article>
+        </section>
+        <section className="panel quick-start-panel" id="quick-start">
+          <div className="panel-head"><h2>クイック開始</h2><p>開発対象のGitリポジトリを指定してください。Project登録は不要です。</p></div>
+          <form className="issue-form" onSubmit={event => { event.preventDefault(); void inspectQuickRepository(); }}>
+            <label>Repositoryのパス<input aria-label="クイック開始のRepositoryパス" value={quickRepoPath} onChange={event => { setQuickRepoPath(event.target.value); setQuickRepo(null); setQuickRepoError(""); }} placeholder="/Users/you/projects/my-service" /></label>
+            <button type="submit" disabled={!quickRepoPath.trim() || quickRepoBusy}>{quickRepoBusy ? "確認中..." : "確認"}</button>
+          </form>
+          {quickRepoLoading ? <p role="status">Gitを確認中...</p> : quickRepo
+            ? <p className="quick-repo-status">検証済み（Task未連携）: <code>{quickRepo}</code></p>
+            : <p role="status">開発対象のパスを入力して確認してください。</p>}
+          {quickRepoError && <p role="alert">{quickRepoError}</p>}
+          <a className="source-link quick-start-link" href="#tasks">Taskを作成する ↓</a>
+          <p className="quick-start-note">※ 現在はRepository確認とTask登録まで。AI実行は未対応です。</p>
         </section>
         <div className="section-heading"><div><span className="eyebrow">FACTORY WORKSPACE</span><h2>ワークスペース</h2></div><span className="section-note">タスク {tasks.length}件 · 外部連携 {linkedTasks}件</span></div><section className="panel" id="projects">
           <div className="panel-head"><span className="eyebrow">LOCAL PROJECTS</span><h2>Project・Repository</h2><p>複数Repositoryをまとめる場合に登録します。単一RepositoryのTask作成には登録不要です。登録だけではGit操作・AI実行は始まりません。</p></div>
