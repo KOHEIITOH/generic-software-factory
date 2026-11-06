@@ -49,7 +49,10 @@ CLIの `sf task` / `sf run show` もWebと同じ選択規則・設定を使い�
 Task/Project関連付けと登録リポジトリの照合を同じ保存境界で行います。
 Webに承認・実行の入口は追加していません。
 
-**品質・レビュー証跡、source snapshotはまだSQLite専用です。**
+承認済みcommitのsource snapshotもFile対応です。payloadを先に永続化し、Runとの参照と監査を
+同じ状態更新で登録します。参照登録が不明な場合はpayloadを保全して照合し、使用前には内容hashを再検証します。
+
+**品質・レビュー証跡はまだSQLite専用です。**
 Fileモードでこれらを呼ぶと明示的に停止し、裏でDBを作りません。
 Issueから自動実装してDraft PRを提出する完成状態を意味しません。
 WebにAgent起動や承認のHTTP入口を追加していません。
@@ -60,9 +63,9 @@ Task本体は `tasks-v1/<id>.json`、Web登録・関連付け・Runとイベン�
 `dashboard-v1/state.json` に保存します。後者はschemaと単調増加versionを持つ16 MiB上限の
 ローカル用documentです。大規模・分散運転用ではありません。
 
-schema 1の既存File documentは、内容を検証してから同じID/既存データを保ってschema 2へ
-原子的に更新します。追加するHarness collectionは空です。旧バージョンのアプリはschema 2を
-拒否するため、更新後に古いアプリへ戻す場合はWriter停止と更新前バックアップの確認が必要です。
+schema 1/2の既存File documentは、内容を検証してから同じID/既存データを保ってschema 3へ
+原子的に更新します。既存Harness状態は維持し、新しいsnapshot collectionを空で追加します。
+旧バージョンのアプリは新schemaを拒否するため、更新後に古いアプリへ戻す場合はWriter停止と更新前バックアップの確認が必要です。
 SQLからFileへの移行とは別のローカルschema更新です。
 
 同一documentの変更は、プロセスロック、0600の一時ファイル、file fsync、atomic replace、
@@ -90,3 +93,11 @@ SQLite接続を禁止したWeb/CLI試験、別プロセスの同時更新、異�
 replace直前のプロセス強制終了、破損・消失・symlink・容量超過、Run timeout/例外結果、
 SQLite既存データの互換試験を実施します。
 実際の `uv run sf web --rebuild` でもHTML配信・Task作成/再取得とDBファイル0件を確認します。
+
+### Snapshotの中断と照合
+
+payloadのファイル/ディレクトリをfsyncし、未使用のUUID directoryをmkdirで確保してから配置し、
+親directoryもfsyncした後に状態へ登録します。既存directoryは空でも置換しません。
+参照登録に失敗した場合、正式な状態の読取で未参照と確認できた自分のpayloadだけを削除します。
+結果不明や状態が読めない場合は削除せず失敗を返します。登録済みpayloadは後続のverifyで照合できます。
+プロセス強制終了で未参照payloadが残る可能性があり、自動GC・一般的な復旧操作は後続です。

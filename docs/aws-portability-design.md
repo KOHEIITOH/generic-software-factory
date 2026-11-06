@@ -360,6 +360,7 @@ SDK最低versionと実サービスの機能、対象OS/fsは実装PRで別途検
 ### Harness保存の段階移行
 
 - PR #91: controllerからSQLを切り離し、`HarnessState`の原子的prepare操作へ委譲。既存SQLiteのtransactionを維持。
-- File Adapter: 同一documentで承認消費/Run/manifest/auditを保存し、既存SQLiteと承認契約を共有。
+- PR #92 File Adapter: 同一documentで承認消費/Run/manifest/auditを保存し、既存SQLiteと承認契約を共有。
   schema 1→2の原子的更新、別プロセス競合、replace前後の強制終了と失敗時の整合性を検証。
-- 品質証跡、snapshot、Worker復旧、SQL→File export/importは引き続き別のPRで進める。
+- Source snapshot: 状態保存をSourceStateへ分離し、Fileで参照/auditを原子的に登録。payloadを先に永続化し、結果不明時は参照照合前に削除しない。
+- 品質証跡、Worker復旧、SQL→File export/importは引き続き別のPRで進める。
