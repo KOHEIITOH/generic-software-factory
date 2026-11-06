@@ -287,12 +287,12 @@ export default function App() {
         <section className="panel quick-start-panel" id="quick-start">
           <div className="panel-head"><h2>クイック開始</h2><p>開発対象のGitリポジトリを指定してください。Project登録は不要です。</p></div>
           <form className="issue-form" onSubmit={event => { event.preventDefault(); void inspectQuickRepository(); }}>
-            <label>Repositoryのパス<input aria-label="クイック開始のRepositoryパス" value={quickRepoPath} onChange={event => setQuickRepoPath(event.target.value)} placeholder="/Users/you/projects/my-service" /></label>
+            <label>Repositoryのパス<input aria-label="クイック開始のRepositoryパス" value={quickRepoPath} onChange={event => { setQuickRepoPath(event.target.value); setQuickRepo(null); setQuickRepoError(""); }} placeholder="/Users/you/projects/my-service" /></label>
             <button type="submit" disabled={!quickRepoPath.trim() || quickRepoBusy}>{quickRepoBusy ? "確認中..." : "確認"}</button>
           </form>
           {quickRepoLoading ? <p role="status">Gitを確認中...</p> : quickRepo
-            ? <p className="quick-repo-status">選択中: <code>{quickRepo}</code></p>
-            : <p role="status">開発対象を指定してください。</p>}
+            ? <p className="quick-repo-status">検証済み（Task未連携）: <code>{quickRepo}</code></p>
+            : <p role="status">開発対象のパスを入力して確認してください。</p>}
           {quickRepoError && <p role="alert">{quickRepoError}</p>}
           <a className="source-link quick-start-link" href="#tasks">Taskを作成する ↓</a>
           <p className="quick-start-note">※ 現在はRepository確認とTask登録まで。AI実行は未対応です。</p>
