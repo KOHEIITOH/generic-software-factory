@@ -256,3 +256,11 @@ Harness承認とprepared Runの原子保存、source snapshotの参照/audit、�
 File/SQLiteへ接続済み。sourceの結果不明時は、参照済みpayloadを誤削除しない。
 対象版・収集者・試行・レビュー完備性を共有ルールで判定し、配送適格は引き続きfalse。
 Workerの生存照合・回収・復旧、実collector/実装AgentからDraft PRへの接続は未完了。
+
+### GitHub初期標準とProvider境界
+
+初期のTask Source/SCMはGitHubを正式採用する。[対応条件と検証](github-first-integration-policy.md)を管理する。
+PR #97でCoreのorigin/source規則をAdapterへ、PR #98でDraft PRデモのREST/認証/JSONをSourceControlへ移動。
+既存TaskSource/Repository契約を再利用し、GitHubを組立・Web初期値・設定例の標準へ揃える。
+他サービスの追加実装やplugin基盤は作らず、共通WorkflowにGitHub型を持ち込まない。
+この方針対応はM3自動実装・配送の完了とは区別する。

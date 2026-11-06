@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -11,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from sf_factory.factory_selection import open_factory
 from sf_factory.github_issues_source import GitHubIssuesSource
+from sf_factory.integration_defaults import task_source
 
 
 class IssueInput(BaseModel):
@@ -20,13 +20,12 @@ class IssueInput(BaseModel):
 
 def _source(repository: str) -> GitHubIssuesSource:
     # Credentials remain server-side; never accept a token from the browser.
-    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
-    return GitHubIssuesSource(repository=repository, token=token)
+    return GitHubIssuesSource.from_environment(repository)
 
 
 def _fetch(repository: str, number: int):
     try:
-        source = _source(repository)
+        source = task_source(repository)
         return source.fetch_issue(str(number))
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

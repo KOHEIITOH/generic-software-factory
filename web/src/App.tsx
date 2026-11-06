@@ -30,9 +30,9 @@ export default function App() {
   const [projectName, setProjectName] = useState("");
   const [projectBusy, setProjectBusy] = useState(false);
   const [projectMessage, setProjectMessage] = useState("");
-  const [repoProvider, setRepoProvider] = useState("local-git");
+  const [repoProvider, setRepoProvider] = useState("github");
   const [repoLocation, setRepoLocation] = useState("");
-  const [repoVisibility, setRepoVisibility] = useState("local");
+  const [repoVisibility, setRepoVisibility] = useState("private");
   const [repoBusy, setRepoBusy] = useState(false);
   const [repoMessage, setRepoMessage] = useState("");
   const [runtimes, setRuntimes] = useState<string[]>([]);
@@ -392,7 +392,7 @@ export default function App() {
             <label className="project-selector">Projectを選択<select aria-label="Projectを選択" value={selectedProject} onChange={event => { setSelectedProject(event.target.value); setRepoMessage(""); }}><option value="">選択してください</option>{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
             {selectedProject && <>
               <form className="issue-form project-register-form" onSubmit={event => { event.preventDefault(); void createRepository(); }}>
-                <label>接続先<select aria-label="Repositoryの接続先" value={repoProvider} onChange={event => { setRepoProvider(event.target.value); setRepoVisibility(event.target.value === "local-git" ? "local" : "private"); }}><option value="local-git">ローカルGit</option><option value="github">GitHub（メタデータ登録のみ）</option></select></label>
+                <label>接続先<select aria-label="Repositoryの接続先" value={repoProvider} onChange={event => { setRepoProvider(event.target.value); setRepoVisibility(event.target.value === "local-git" ? "local" : "private"); }}><option value="github">GitHub（メタデータ登録のみ）</option><option value="local-git">ローカルGit</option></select></label>
                 <label>{repoProvider === "local-git" ? "Repositoryのパス" : "Repository（owner/repo）"}<input aria-label="Repositoryの場所" maxLength={500} value={repoLocation} onChange={event => setRepoLocation(event.target.value)} placeholder={repoProvider === "local-git" ? "/path/to/repository" : "owner/repo"} /></label>
                 <label>公開範囲<select aria-label="公開範囲" value={repoVisibility} onChange={event => setRepoVisibility(event.target.value)}><option value="local">local</option><option value="private">private</option><option value="public">public</option></select></label>
                 <button type="submit" disabled={repoBusy || projectLoading || !repoLocation.trim() || state !== "connected"}>{repoBusy ? "登録中..." : "Repositoryを追加"}</button>

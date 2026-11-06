@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import base64
 import json
-import os
 import re
 from pathlib import PurePosixPath
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
+from sf_factory.github_auth import environment_token
 from sf_factory.repository_contracts import RepositoryCapabilities
 from sf_factory.source_control import PullRequestReference, RepositoryInfo, SourceControlError
 
@@ -34,7 +34,7 @@ def _branch(branch: str) -> str:
 
 class GitHubSourceControl:
     def _request(self, path: str, method: str = 'GET', payload: dict | None = None) -> dict:
-        token = os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN')
+        token = environment_token()
         if not token:
             raise SourceControlError('not_configured', 'GitHub credentials are not configured')
         headers = {'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json',

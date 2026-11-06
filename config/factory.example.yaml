@@ -11,12 +11,16 @@ spec:
       enabled: false
       adapter: null
       config: {}
-  sourceControl:
-    adapter: "<configure-source-control>"
+  taskSource:
+    adapter: github
     config:
       repository: "<owner>/<repository>"
-      baseBranch: main
-      credentialRef: "env:FACTORY_GIT_TOKEN"
+      credentialRef: "env:GH_TOKEN"
+  sourceControl:
+    adapter: github
+    config:
+      repository: "<owner>/<repository>"
+      credentialRef: "env:GH_TOKEN"
   execution:
     adapter: "<configure-isolated-execution>"
     config:
