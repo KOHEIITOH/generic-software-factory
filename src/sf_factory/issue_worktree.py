@@ -24,11 +24,13 @@ def prepare_issue_worktree(
     root = verify_github_origin(checkout, repository)
     if not _SAFE_REF.fullmatch(branch) or ".." in branch or "@{" in branch:
         raise ValueError("invalid worktree branch name")
-    destination = destination.expanduser().absolute()
+    destination = destination.expanduser().resolve()
     if destination.exists():
         raise ValueError("worktree destination already exists")
     if root == destination or root in destination.parents:
         raise ValueError("worktree must be outside the source checkout")
+    if destination == root.parent:
+        raise ValueError("worktree destination must not be checkout parent")
     destination.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
         "git", "-C", str(root), "worktree", "add",
