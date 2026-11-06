@@ -93,6 +93,17 @@ uv run sf copilot-smoke
 
 **対応状況:** Pythonベースのセットアップ手順を3 OS向けに記載していますが、Windows / Linuxでの全Runtime・全機能の実機動作保証ではありません。特にOS依存のCLI、サンドボックス機能、ファイル操作は環境ごとの検証が必要です。まず[オンボーディング](ONBOARDING.md)を確認してください。
 
+## DBを使わないTask保存（プレビュー）
+
+POSIXのローカル環境では、Taskの作成・読込・外部metadataの重複取込みをFile Adapterで確認できます。
+
+```sh
+.venv/bin/sf state --backend file --root /tmp/sf-file-check create "DBなしの確認"
+```
+
+[確認手順と制約](docs/local-file-state.md)を参照してください。既存のWeb・Run・承認はSQLiteのままで、
+このコマンドは全WorkflowのDB不要化やIssue-to-PR自動実行を提供するものではありません。
+
 ## 現在のステータス
 
 **実験的MVP** — ローカルSQLiteによるTask/Run/Audit記録、Codex/Grok/Copilot Runtime Adapter、read-only smoke test、Codexによるサンプル限定のコード編集と単体テストを実装しています。`uv run sf analyze /path/to/repository --confirm-send` は指定されたローカルGitリポジトリから制限付きのテキストsnapshotをCopilotへ渡して解析します。SDK toolsは無効で、リポジトリ本体をworkspaceとして渡さず、Task/RunやFactory DBにはソース内容を保存しません。ファイルの編集・任意コマンド実行・隔離保証はありません。詳細は[解析の範囲と制約](docs/local-repository-analysis.md)を参照してください。`uv run sf dev-smoke --runtime codex` は使い捨て一時ディレクトリ内の同梱サンプルだけを編集します。編集可能なRuntimeは明示指定が必要で、現時点ではCodexのみ検証済みです。Factory Coreおよび共通AgentRuntime契約はCodexに依存しません。独立レビューの自動化、PR自動作成、MCP Server、Web UIからのタスク実行は未実装です。ローカルWeb UIではTask/Run/Runtimeを閲覧できます。GitHub Issues AdapterはIssueを読み取ってTaskに取り込めますが、現時点ではPython APIからの呼び出しのみです。
