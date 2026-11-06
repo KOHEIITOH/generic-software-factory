@@ -44,3 +44,18 @@ def test_acp_invalid_workspace(tmp_path: Path) -> None:
         assert False
     except ValueError:
         pass
+
+
+def test_acp_reports_redacted_failure_stage(tmp_path: Path) -> None:
+    agent = """
+import json, sys
+for line in sys.stdin:
+    req = json.loads(line)
+    print(json.dumps({"jsonrpc": "2.0", "id": req["id"],
+      "error": {"code": -32600, "message": "secret token 123"}}), flush=True)
+"""
+    runtime = AcpRuntime(AcpCommand((sys.executable, "-u", "-c", agent)))
+    result = runtime.execute(prompt="hello", workspace=tmp_path, timeout_seconds=5)
+    assert result.status == "failed"
+    assert result.error_message == "ACP initialize remote JSON-RPC error (code=-32600)"
+    assert "secret" not in result.error_message
