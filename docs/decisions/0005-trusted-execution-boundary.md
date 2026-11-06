@@ -37,6 +37,7 @@ Harness Validationのvalidも、承認やcommandの実行許可ではない。
   迂回しない。Docker registry設定は保持し、credential fileをAgentへmountしない。
 - containerは非root UID/GID、read-only rootfs、cap-drop ALL、no-new-privileges、
   network none、PID/CPU/memory制限、サイズ制限tmpfs、専用workspaceだけのrw mount。
+  初期R04aではホストmountを一切せず、専用workspaceもtmpfsとする。snapshotの受渡しは後続。
   host network/PID/IPC、privileged、Docker socket、ホストroot、credential mountは禁止。
 - 制御側の環境をcontainerに継承しない。Docker既定のproxy環境もオフライン実行では
   空に固定する。ネットワークが必要なRuntimeは後段の別policyで設計する。
