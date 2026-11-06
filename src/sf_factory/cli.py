@@ -51,6 +51,12 @@ def build_parser() -> argparse.ArgumentParser:
     discover.add_argument("--max-total-bytes", type=int, default=1048576)
     validate = harness_sub.add_parser("validate", help="validate candidates without applying them")
     validate.add_argument("repository", type=Path, help="explicit repository root")
+    compose = harness_sub.add_parser("compose", help="explicitly select validated rule sources")
+    compose.add_argument("repository", type=Path, help="explicit repository root")
+    compose.add_argument("--target", default=".", help="relative target scope")
+    compose.add_argument("--select", action="append", default=[], help="ordered rule source path")
+    compose.add_argument("--exclude", nargs=2, action="append", default=[],
+                         metavar=("PATH", "REASON"), help="excluded source and explicit reason")
     task = sub.add_parser("task", help="manage tasks")
     task_sub = task.add_subparsers(dest="task_command", required=True)
     create = task_sub.add_parser("create")
@@ -79,6 +85,17 @@ def main() -> int:
         from sf_factory.harness_discovery import DiscoveryLimits, discover_harness
 
         try:
+            if args.harness_command == "compose":
+                from sf_factory.harness_composition import compose_harness
+                from sf_factory.harness_validation import validate_harness
+
+                composition = compose_harness(
+                    validate_harness(args.repository.absolute()), target=args.target,
+                    selected=tuple(args.select), excluded=tuple(tuple(e) for e in args.exclude),
+                )
+                print(json.dumps({**asdict(composition), "bundle_hash": composition.bundle_hash},
+                                 ensure_ascii=True, indent=2))
+                return 0
             if args.harness_command == "validate":
                 from sf_factory.harness_validation import validate_harness
 
