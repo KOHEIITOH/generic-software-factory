@@ -15,14 +15,23 @@ workspaceとtmpは各16 MiBのtmpfsで、ホストmountは一切ありません�
 Dockerが既定で挿入するproxy環境は空にし、ホストの任意環境変数をcontainerへ渡しません。
 
 出力はpipeから上限まで読み、超過/timeoutでcontainerを強制削除し、CLIも終了させます。
-終了コードと成功/失敗/timeout/出力超過/回収失敗を区別します。回収に失敗した場合は
+終了コードと成功/失敗/timeout/出力超過/回収失敗/能力不足を区別します。回収に失敗した場合は
 container識別のため `sf.execution=offline-v1` labelで調査できます。他処理が作った
 containerを一括削除しないでください。ホスト/daemon停止時の永続的な回収はR07で扱います。
 
-## 実機試験
+## 実機試験と現在のブロッカー
 
 公式image `python@sha256:09a17cad02668ae61ece136b4fd36ac3849e14f670ebedb637ea3e15580525bc`
-をTLS/checksum検証付きで取得し、Linux Docker 29.9.2で確認しました。
+をTLS/checksum検証付きで取得しました。Linux Docker 29.9.2で初期負例試験は成功しましたが、
+追加確認で実際のcgroup値が要求値に一致しないことが判明しました。
+現環境はrootless、CgroupDriver=none、memory/swap/pids/cpu能力がすべてfalseです。
+初期314テスト成功を資源制限まで含む隔離成立の証拠にはしません。
+
+実行器はdaemonのcgroup v2能力が揃わなければcontainerを作成せず
+`unavailable/daemon_cannot_enforce_resource_limits`で拒否するよう修正しました。
+この環境では拒否の実機確認のみ可能で、資源制限を含む4つの実機試験はskippedです。
+実行対応を主張するには、cgroupを委譲したDocker環境で以下を再実行し、skipなしで
+container内のmemory.max、memory.swap.max、pids.max、cpu.maxも検証する必要があります。
 
 ```sh
 SF_TEST_DOCKER_IMAGE=python@sha256:09a17cad02668ae61ece136b4fd36ac3849e14f670ebedb637ea3e15580525bc \

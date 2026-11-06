@@ -4,7 +4,7 @@ import subprocess
 
 import pytest
 
-from sf_factory.docker_execution import _docker, run_offline_command
+from sf_factory.docker_execution import _docker, resource_limits_available, run_offline_command
 
 IMAGE = os.environ.get('SF_TEST_DOCKER_IMAGE', '')
 
@@ -31,6 +31,7 @@ def test_inspect_mismatch_never_starts_container(monkeypatch):
             return subprocess.CompletedProcess([], 0, '[{}]', '')
         return subprocess.CompletedProcess([], 0, '', '')
 
+    monkeypatch.setattr('sf_factory.docker_execution.resource_limits_available', lambda: True)
     monkeypatch.setattr('sf_factory.docker_execution._docker', fake)
     result = run_offline_command(image='python@sha256:' + 'a' * 64, argv=('python',))
     assert result.status == 'failed'
@@ -41,12 +42,24 @@ def test_inspect_mismatch_never_starts_container(monkeypatch):
 real_docker = pytest.mark.skipif(not IMAGE, reason='requires explicit SF_TEST_DOCKER_IMAGE digest')
 
 
+def require_resources():
+    if not resource_limits_available():
+        pytest.skip('daemon cannot enforce CPU/memory/PID limits; isolation not validated')
+
+
 @real_docker
 def test_real_offline_filesystem_and_identity():
+    require_resources()
     code = '''
 import os, socket
 from pathlib import Path
 assert os.getuid() == 65534
+assert Path('/sys/fs/cgroup/memory.max').read_text().strip() == '268435456'
+assert Path('/sys/fs/cgroup/memory.swap.max').read_text().strip() == '0'
+assert Path('/sys/fs/cgroup/pids.max').read_text().strip() == '64'
+quota, period = map(int, Path('/sys/fs/cgroup/cpu.max').read_text().split())
+assert quota == period
+assert 'NoNewPrivs:\t1' in Path('/proc/self/status').read_text()
 assert not Path('/var/run/docker.sock').exists()
 assert not Path('/workspace/.git').exists()
 assert not Path('/workspace/generic-software-factory').exists()
@@ -87,6 +100,7 @@ print('isolation checks passed')
 
 @real_docker
 def test_real_timeout_cleans_child_processes():
+    require_resources()
     result = run_offline_command(
         image=IMAGE,
         argv=('python', '-c', 'import subprocess,time; subprocess.Popen(["sleep","30"]);'
@@ -101,6 +115,7 @@ def test_real_timeout_cleans_child_processes():
 
 @real_docker
 def test_real_output_limit_is_enforced():
+    require_resources()
     result = run_offline_command(
         image=IMAGE, argv=('python', '-c', 'print("x"*1000000)'), max_output_bytes=128,
     )
@@ -115,6 +130,7 @@ def test_cleanup_failure_cannot_be_success(monkeypatch):
             return subprocess.CompletedProcess([], 1, '', 'unavailable')
         return subprocess.CompletedProcess([], 0, '[{}]', '')
 
+    monkeypatch.setattr('sf_factory.docker_execution.resource_limits_available', lambda: True)
     monkeypatch.setattr('sf_factory.docker_execution._docker', fake)
     result = run_offline_command(image='python@sha256:' + 'a' * 64, argv=('python',))
     assert result.status == 'cleanup_failed'
@@ -123,7 +139,43 @@ def test_cleanup_failure_cannot_be_success(monkeypatch):
 
 @real_docker
 def test_real_command_failure_is_preserved():
+    require_resources()
     result = run_offline_command(image=IMAGE, argv=('python', '-c', 'raise SystemExit(7)'))
     assert result.status == 'failed'
     assert result.exit_code == 7
+    assert result.cleaned_up
+
+
+def test_unsupported_daemon_never_creates_container(monkeypatch):
+    calls = []
+
+    def fake(args, **kwargs):
+        calls.append(args)
+        return subprocess.CompletedProcess([], 0, '{"driver":"none","version":"2"}', '')
+
+    monkeypatch.setattr('sf_factory.docker_execution._docker', fake)
+    result = run_offline_command(image='python@sha256:' + 'a' * 64, argv=('python',))
+    assert result.status == 'unavailable'
+    assert result.cleaned_up
+    assert result.reason == 'daemon_cannot_enforce_resource_limits'
+    assert [c[0] for c in calls] == ['info']
+
+
+@pytest.mark.parametrize('body', [
+    '{}', 'not-json', '{"driver":"systemd","version":"2","memory":true}',
+    '{"driver":"none","version":"2","memory":true,"swap":true,"pids":true,"cpu":true}',
+])
+def test_resource_capabilities_fail_closed(monkeypatch, body):
+    monkeypatch.setattr('sf_factory.docker_execution._docker',
+                        lambda *a, **k: subprocess.CompletedProcess([], 0, body, ''))
+    assert not resource_limits_available()
+
+
+@real_docker
+def test_real_daemon_resource_gate():
+    if resource_limits_available():
+        pytest.skip('unsupported-daemon scenario requires daemon without resource enforcement')
+    result = run_offline_command(image=IMAGE, argv=('python', '-c', 'print("must not run")'))
+    assert result.status == 'unavailable'
+    assert result.output == ''
     assert result.cleaned_up

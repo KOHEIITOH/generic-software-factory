@@ -22,7 +22,7 @@ _TMPFS = {'/workspace': 'rw,nosuid,nodev,noexec,size=16m,mode=1777',
 
 
 ExecutionStatus = Literal[
-    'succeeded', 'failed', 'timed_out', 'output_limit', 'cleanup_failed'
+    'succeeded', 'failed', 'timed_out', 'output_limit', 'cleanup_failed', 'unavailable'
 ]
 
 
@@ -33,6 +33,7 @@ class DockerExecutionResult:
     output: str
     image: str
     cleaned_up: bool
+    reason: str = ''
 
 
 def _docker_env() -> dict[str, str]:
@@ -47,6 +48,22 @@ def _docker(args: list[str], *, timeout: int = 15) -> subprocess.CompletedProces
         ['docker', '--host=unix:///var/run/docker.sock', *args],
         env=_docker_env(), capture_output=True, text=True, timeout=timeout, check=False,
     )
+
+
+def resource_limits_available() -> bool:
+    """Inspect the pinned daemon's enforcement capabilities, not requested values."""
+    template = (
+        '{"driver":{{json .CgroupDriver}},"version":{{json .CgroupVersion}},'
+        '"memory":{{json .MemoryLimit}},"swap":{{json .SwapLimit}},'
+        '"pids":{{json .PidsLimit}},"cpu":{{json .CPUCfsQuota}}}'
+    )
+    try:
+        result = _docker(['info', '--format', template])
+        info = json.loads(result.stdout) if result.returncode == 0 else {}
+        return (info.get('driver') in {'systemd', 'cgroupfs'} and info.get('version') == '2'
+                and all(info.get(key) is True for key in ('memory', 'swap', 'pids', 'cpu')))
+    except (OSError, ValueError, TypeError, AttributeError, subprocess.SubprocessError):
+        return False
 
 
 def _verified(document: dict, image: str, argv: tuple[str, ...]) -> bool:
@@ -106,6 +123,10 @@ def run_offline_command(
         raise ValueError('timeout must be between 1 and 60 seconds')
     if type(max_output_bytes) is not int or not 1 <= max_output_bytes <= 1048576:
         raise ValueError('invalid output budget')
+    if not resource_limits_available():
+        return DockerExecutionResult(
+            'unavailable', None, '', image, True, 'daemon_cannot_enforce_resource_limits'
+        )
     name = 'sf-offline-' + uuid.uuid4().hex
     arguments = [
         'create', '--pull=never', '--name', name, '--label', 'sf.execution=offline-v1',
