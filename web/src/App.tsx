@@ -45,6 +45,9 @@ export default function App() {
   const [repository, setRepository] = useState("KOHEIITOH/generic-software-factory");
   const [githubRepositories, setGithubRepositories] = useState<{full_name:string;can_push:boolean}[]>([]);
   const [githubRepoMessage, setGithubRepoMessage] = useState("");
+  const [demoPrBusy, setDemoPrBusy] = useState(false);
+  const [demoPrMessage, setDemoPrMessage] = useState("");
+  const [demoPrUrl, setDemoPrUrl] = useState("");
   const [issueNumber, setIssueNumber] = useState("");
   const [issuePreview, setIssuePreview] = useState<{ repository: string; number: string; prompt: string; url: string } | null>(null);
   const [issueList, setIssueList] = useState<Issue[]>([]);
@@ -180,6 +183,24 @@ export default function App() {
     } catch (error) {
       setGithubRepoMessage(error instanceof Error ? error.message : "取得エラー");
     }
+  }
+
+  async function createDemoPR() {
+    if (demoPrBusy || !githubRepositories.some(item => item.full_name === repository && item.can_push)) return;
+    if (!window.confirm(repository + " にデモ用のブランチとDraft PRを作成します。アプリコードは変更しません。実行しますか？")) return;
+    setDemoPrBusy(true); setDemoPrMessage(""); setDemoPrUrl("");
+    try {
+      const response = await fetch("/api/github/demo/draft-pr", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repository, confirmed: true }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "PR作成に失敗しました");
+      setDemoPrUrl(data.url);
+      setDemoPrMessage("Draft PR #" + data.number + " を作成しました");
+    } catch (error) {
+      setDemoPrMessage(error instanceof Error ? error.message : "PR作成エラー");
+    } finally { setDemoPrBusy(false); }
   }
 
   async function loadIssues(page = 1) {
