@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from sf_factory.factory import Factory
+from sf_factory.factory_selection import open_factory
 from sf_factory.github_issues_source import GitHubIssuesSource
 
 
@@ -70,7 +70,7 @@ def install_github_issue_routes(app: FastAPI, data_dir: Path | None) -> None:
                 != "application/json"):
             raise HTTPException(status_code=403, detail="Same-origin JSON request required")
         issue = _fetch(selection.repository, selection.number)
-        task_id = Factory(data_dir or Path(".sf-factory")).import_external_task(
+        task_id = open_factory(data_dir or Path(".sf-factory")).import_external_task(
             provider=issue.provider, instance=issue.instance,
             external_id=issue.external_id, prompt=issue.prompt,
             external_url=issue.external_url,

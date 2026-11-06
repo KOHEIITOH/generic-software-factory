@@ -64,7 +64,7 @@ def test_local_documentation_routes(tmp_path) -> None:
 
 
 def test_create_local_task_requires_same_origin_and_never_runs(tmp_path) -> None:
-    from sf_factory.factory import Factory
+    from sf_factory.factory_selection import open_factory
 
     headers = {"Origin": "http://127.0.0.1:8000"}
     with TestClient(create_app(data_dir=tmp_path), base_url="http://127.0.0.1:8000") as client:
@@ -79,4 +79,4 @@ def test_create_local_task_requires_same_origin_and_never_runs(tmp_path) -> None
         created = client.post("/api/tasks", headers=headers, json={"prompt": "  hello  "})
         assert created.status_code == 201
         assert client.get("/api/tasks").json()["tasks"][0]["prompt"] == "hello"
-    assert Factory(tmp_path).list_runs() == []
+    assert open_factory(tmp_path).list_runs() == []

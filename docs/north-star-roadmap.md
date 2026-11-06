@@ -242,3 +242,10 @@ PRごとに下表へ計画ID、実装範囲、証拠、制約を追記し、該�
 承認原子性と復旧、Bedrock Provider再利用、Docker配布とECS実行の分離を整理した。
 初期はユーザー確認済みの直列実行とする。M1〜M5のゴールは変更しない。
 現時点では文書のみで、DB不要運転/ECS deploy/Bedrock自律開発が実装済みという意味ではない。
+
+### ローカルWebの保存先接続
+
+[一コマンドで起動するWebと保存先](local-web-storage.md)で、新規POSIX保存先のFile自動選択と
+既存SQLiteの維持を管理する。Task/Project/Repository/binding/read-only RunはFile対応。
+Harness承認とprepared Runの原子性、証跡、Worker生存照合・復旧はまだ移行していない。
+M2/M3全体の完了、IssueからDraft PRまでの自律実装成功とは区別する。

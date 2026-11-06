@@ -8,23 +8,18 @@ from __future__ import annotations
 from fastapi import FastAPI, HTTPException
 
 from sf_factory.agent_registry import default_runtime_registry
-from sf_factory.factory import Factory
+from sf_factory.factory_selection import open_factory
 from sf_factory.policy import Capability, ExecutionPolicy, ExecutionRequest
 
 
 def install_implementation_preflight_routes(app: FastAPI, data_dir) -> None:
     @app.get("/api/tasks/{task_id}/implementation-preflight")
     def implementation_preflight(task_id: str):
-        factory = Factory(data_dir)
-        with factory._connect() as db:
-            task = db.execute(
-                "SELECT t.id, s.provider, s.instance, tr.repository, tr.local_path "
-                "FROM tasks t LEFT JOIN task_sources s ON s.task_id=t.id "
-                "LEFT JOIN task_repositories tr ON tr.task_id=t.id "
-                "WHERE t.id=?", (task_id,),
-            ).fetchone()
-        if task is None:
-            raise HTTPException(status_code=404, detail="Task not found")
+        factory = open_factory(data_dir)
+        try:
+            task = factory.task_repository(task_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail="Task not found") from exc
         blockers = []
         if task["provider"] != "github":
             blockers.append("GitHub Issue source required")

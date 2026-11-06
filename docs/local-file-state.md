@@ -1,8 +1,9 @@
 # ローカルでDBなしのTask保存を試す
 
 初期StateStoreのFile Adapterと、Task保存用のCLIを追加しました。
-**Taskの作成・取得・外部identityの重複取込みが対象です。Web/Run/承認/evidenceのFile移行はまだです。**
-既存の`sf task`や`sf web`はSQLiteを使う従来動作を維持します。
+このページはTask保存Adapter単体の確認用です。Web起動に追加手順は必要ありません。
+`uv run sf web --rebuild` の自動選択と対応範囲は[Web保存の手順](local-web-storage.md)を参照してください。
+既存SQLiteの保存先は維持します。Harness承認/prepared Run/evidenceのFile移行は後続です。
 
 ## 試す
 
@@ -57,7 +58,7 @@ SQLite Adapterも同じTask保存CLIで比較できます。保存先は分け�
 - 書込後のfsync失敗では保存結果が不明な場合があります。成功とせず、import再試行は同じidentityで
   照合・durability確認します。通常createは別Taskを作る操作なので、応答喪失時に盲目的に繰り返さないでください。
 - 既存factory.sqlite3のあるrootをFile用に指定すると拒否します。逆にFile用rootへSQLite Adapterや
-  Factoryを起動することも拒否し、黙って別のDBを作りません。既存データの移行ではありません。
+  SQLite専用Factoryを直接起動することも拒否し、黙って別のDBを作りません。既存データの移行ではありません。
   export/importで既存IDを維持する移行はP05で実装します。
 
 テストでは共通契約をFile/SQLiteへ適用し、SQLite接続禁止下のFile CLI、別プロセスの同時import、
