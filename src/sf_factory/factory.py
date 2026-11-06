@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from sf_factory.agent_registry import AgentRuntimeRegistry, default_runtime_registry
+from sf_factory.evidence_state import EvidenceState
 from sf_factory.harness_state import HarnessState
 from sf_factory.policy import Capability, ExecutionPolicy, ExecutionRequest
 from sf_factory.repository_contracts import ProjectRegistry
@@ -117,6 +118,11 @@ class Factory:
                 (task_id, "task.repository_bound", _now()),
             )
         return {"task_id": task_id, "repository": repository, "local_path": str(root)}
+
+    def evidence_state(self) -> EvidenceState:
+        from sf_factory.sqlite_evidence_state import SqliteEvidenceState
+
+        return SqliteEvidenceState(self)
 
     def source_state(self) -> SourceState:
         from sf_factory.source_state import SqliteSourceState
