@@ -65,3 +65,15 @@ def test_rejects_existing_destination(tmp_path: Path) -> None:
     destination.mkdir()
     with pytest.raises(ValueError, match="already exists"):
         prepare_issue_worktree(checkout, "org/repo", destination, "sf/issue-59")
+
+
+def test_rejects_symlink_into_checkout(tmp_path: Path) -> None:
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
+    make_repo(checkout)
+    alias = tmp_path / "alias"
+    alias.symlink_to(checkout, target_is_directory=True)
+    with pytest.raises(ValueError, match="outside"):
+        prepare_issue_worktree(
+            checkout, "org/repo", alias / "nested", "sf/issue-59"
+        )
