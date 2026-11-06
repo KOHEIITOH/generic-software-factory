@@ -140,8 +140,10 @@ class Factory:
         with self._connect() as db:
             rows = db.execute(
                 'SELECT t.id,t.prompt,t.created_at,s.provider,s.instance, '
-                's.external_id,s.external_url '
+                's.external_id,s.external_url,tr.repository AS bound_repository, '
+                'tr.local_path AS bound_local_path '
                 'FROM tasks t LEFT JOIN task_sources s ON s.task_id=t.id '
+                'LEFT JOIN task_repositories tr ON tr.task_id=t.id '
                 'ORDER BY t.created_at DESC, t.id DESC LIMIT ?',
                 (limit,),
             ).fetchall()
