@@ -38,6 +38,11 @@ class Factory:
                     id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT,
                     task_id TEXT NOT NULL, event TEXT NOT NULL, at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS run_harness_manifests (
+                    run_id TEXT PRIMARY KEY REFERENCES runs(id),
+                    approval_id TEXT NOT NULL UNIQUE REFERENCES harness_approvals(id),
+                    manifest TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS task_repositories (
                     task_id TEXT PRIMARY KEY REFERENCES tasks(id),
                     repository TEXT NOT NULL, local_path TEXT NOT NULL,
@@ -176,7 +181,15 @@ class Factory:
             row = db.execute("SELECT * FROM runs WHERE id=?", (run_id,)).fetchone()
             if row is None:
                 raise ValueError("run not found")
-            return dict(row)
+            result = dict(row)
+            manifest = db.execute(
+                "SELECT manifest FROM run_harness_manifests WHERE run_id=?", (run_id,),
+            ).fetchone()
+            if manifest is not None:
+                import json
+
+                result["harness_manifest"] = json.loads(manifest["manifest"])
+            return result
 
     def run_task(self, task_id: str, runtime_name: str, timeout_seconds: int = 120) -> dict:
         if runtime_name not in self.runtime_registry.names():
