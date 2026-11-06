@@ -11,19 +11,19 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from sf_factory.agent_registry import default_runtime_registry
-from sf_factory.factory import Factory
+from sf_factory.factory_selection import data_directory, open_factory
 from sf_factory.github_issue_web import install_github_issue_routes
 from sf_factory.github_pr_demo_web import install_github_pr_demo_routes
 from sf_factory.github_repository_web import install_github_repository_routes
 from sf_factory.implementation_preflight_web import install_implementation_preflight_routes
-from sf_factory.local_project_registry import LocalProjectRegistry
 from sf_factory.repo_discovery import discover_git_root
 from sf_factory.repository_contracts import Project, Repository, Visibility
+from sf_factory.state_store import StateConflict, StateUnavailable
 
 
 class InspectRepositoryRequest(BaseModel):
@@ -59,12 +59,23 @@ def _check_local_origin(request: Request) -> None:
 
 
 def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> FastAPI:
+    data_dir = data_directory(data_dir)
     app = FastAPI(
         title="Software Factory Local API",
         description="Local dashboard API (experimental)",
         version="0.1.0",
         docs_url="/docs",
     )
+
+    @app.exception_handler(StateUnavailable)
+    def state_unavailable(request: Request, exc: StateUnavailable):
+        return JSONResponse(status_code=503, content={
+            "detail": "State storage is unavailable; existing data was not reset"
+        })
+
+    @app.exception_handler(StateConflict)
+    def state_conflict(request: Request, exc: StateConflict):
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
 
     @app.get("/api/health")
     def health() -> dict[str, str]:
@@ -97,11 +108,11 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
 
     @app.get('/api/tasks')
     def tasks() -> dict[str, list[dict]]:
-        return {'tasks': Factory(data_dir or Path('.sf-factory')).list_tasks()}
+        return {'tasks': open_factory(data_dir or Path('.sf-factory')).list_tasks()}
 
     @app.get('/api/runs')
     def runs() -> dict[str, list[dict]]:
-        return {'runs': Factory(data_dir or Path('.sf-factory')).list_runs()}
+        return {'runs': open_factory(data_dir or Path('.sf-factory')).list_runs()}
 
     @app.post("/api/tasks", status_code=201)
     def create_task(payload: CreateTaskRequest, request: Request) -> dict[str, str]:
@@ -109,7 +120,7 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
         prompt = payload.prompt.strip()
         if not prompt:
             raise HTTPException(status_code=422, detail="Task must not be blank")
-        task_id = Factory(data_dir or Path(".sf-factory")).create_task(prompt)
+        task_id = open_factory(data_dir or Path(".sf-factory")).create_task(prompt)
         return {"task_id": task_id}
 
 
@@ -119,7 +130,7 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
     ) -> dict[str, str]:
         _check_local_origin(request)
         try:
-            return Factory(data_dir or Path(".sf-factory")).bind_task_repository(
+            return open_factory(data_dir or Path(".sf-factory")).bind_task_repository(
                 task_id, payload.repository, Path(payload.local_path)
             )
         except (OSError, ValueError) as exc:
@@ -127,8 +138,8 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
 
     @app.get("/api/projects")
     def projects() -> dict[str, list[dict[str, str]]]:
-        factory = Factory(data_dir or Path(".sf-factory"))
-        registry = LocalProjectRegistry(factory.db)
+        factory = open_factory(data_dir or Path(".sf-factory"))
+        registry = factory.project_registry()
         return {
             "projects": [
                 {"id": p.id, "name": p.name, "owner_id": p.owner_id}
@@ -142,7 +153,7 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
         name = payload.name.strip()
         if not name:
             raise HTTPException(status_code=422, detail="Project name must not be blank")
-        registry = LocalProjectRegistry(Factory(data_dir or Path(".sf-factory")).db)
+        registry = open_factory(data_dir or Path(".sf-factory")).project_registry()
         project = Project(id=uuid4().hex, name=name, owner_id="local")
         registry.add_project(project)
         return {"id": project.id, "name": project.name, "owner_id": project.owner_id}
@@ -155,7 +166,7 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
         provider_id, external_id = payload.provider_id.strip(), payload.external_id.strip()
         if not provider_id or not external_id:
             raise HTTPException(status_code=422, detail="Repository fields must not be blank")
-        registry = LocalProjectRegistry(Factory(data_dir or Path(".sf-factory")).db)
+        registry = open_factory(data_dir or Path(".sf-factory")).project_registry()
         if not any(p.id == project_id for p in registry.list_projects("local")):
             raise HTTPException(status_code=404, detail="Project not found")
         repo = Repository(
@@ -164,7 +175,7 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
         )
         try:
             registry.add_repository(repo)
-        except sqlite3.IntegrityError:
+        except (sqlite3.IntegrityError, StateConflict):
             raise HTTPException(status_code=409, detail="Repository already registered")
         return {
             "id": repo.id, "project_id": repo.project_id,
@@ -174,8 +185,8 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
 
     @app.get("/api/projects/{project_id}/repositories")
     def project_repositories(project_id: str) -> dict[str, list[dict[str, str]]]:
-        factory = Factory(data_dir or Path(".sf-factory"))
-        registry = LocalProjectRegistry(factory.db)
+        factory = open_factory(data_dir or Path(".sf-factory"))
+        registry = factory.project_registry()
         if not any(p.id == project_id for p in registry.list_projects("local")):
             raise HTTPException(status_code=404, detail="Project not found")
         return {

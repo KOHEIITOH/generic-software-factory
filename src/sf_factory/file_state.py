@@ -68,43 +68,8 @@ class FileStateStore:
 
     @contextmanager
     def _locked(self) -> Iterator[int]:
-        if fcntl is None:
-            raise StateUnavailable('File locking is unavailable')
-        directory = lock = None
-        acquired = False
-        try:
-            directory = os.open(self.directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-            lock = os.open('.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK,
-                           0o600, dir_fd=directory)
-            if not stat.S_ISREG(os.fstat(lock).st_mode):
-                raise StateCorrupt('invalid state lock file')
-            deadline = time.monotonic() + self.lock_timeout
-            while True:
-                try:
-                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    acquired = True
-                    break
-                except BlockingIOError:
-                    if time.monotonic() >= deadline:
-                        raise StateUnavailable('File state lock timed out') from None
-                    time.sleep(0.01)
+        with lock_directory(self.directory, lock_timeout=self.lock_timeout) as directory:
             yield directory
-        except OSError as exc:
-            raise StateUnavailable('File state operation failed') from exc
-        finally:
-            try:
-                try:
-                    if lock is not None:
-                        try:
-                            if acquired:
-                                fcntl.flock(lock, fcntl.LOCK_UN)
-                        finally:
-                            os.close(lock)
-                finally:
-                    if directory is not None:
-                        os.close(directory)
-            except OSError as exc:
-                raise StateUnavailable('File state lock cleanup failed') from exc
 
     def _read(self, directory: int, task_id: str) -> dict:
         if not isinstance(task_id, str) or not re.fullmatch(r'[a-f0-9]{32}', task_id):
@@ -228,3 +193,45 @@ def _unique_object(pairs):
             raise ValueError('duplicate state record key')
         result[key] = value
     return result
+
+
+@contextmanager
+def lock_directory(path: Path, *, lock_timeout: float = 5.0) -> Iterator[int]:
+    """Use the same bounded, no-follow POSIX lock for selection and state writes."""
+    if fcntl is None:
+        raise StateUnavailable('File locking is unavailable')
+    directory = lock = None
+    acquired = False
+    try:
+        directory = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        lock = os.open('.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK,
+                       0o600, dir_fd=directory)
+        if not stat.S_ISREG(os.fstat(lock).st_mode):
+            raise StateCorrupt('invalid state lock file')
+        deadline = time.monotonic() + lock_timeout
+        while True:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                acquired = True
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise StateUnavailable('File state lock timed out') from None
+                time.sleep(0.01)
+        yield directory
+    except OSError as exc:
+        raise StateUnavailable('File state operation failed') from exc
+    finally:
+        try:
+            try:
+                if lock is not None:
+                    try:
+                        if acquired:
+                            fcntl.flock(lock, fcntl.LOCK_UN)
+                    finally:
+                        os.close(lock)
+            finally:
+                if directory is not None:
+                    os.close(directory)
+        except OSError as exc:
+            raise StateUnavailable('File state lock cleanup failed') from exc

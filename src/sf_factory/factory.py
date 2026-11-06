@@ -9,6 +9,7 @@ from pathlib import Path
 
 from sf_factory.agent_registry import AgentRuntimeRegistry, default_runtime_registry
 from sf_factory.policy import Capability, ExecutionPolicy, ExecutionRequest
+from sf_factory.repository_contracts import ProjectRegistry
 from sf_factory.sqlite_state import SqliteStateStore
 from sf_factory.state_store import StateConflict, StateStore
 
@@ -24,7 +25,7 @@ class Factory:
         self.root = root.expanduser().resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         if (self.root / 'tasks-v1').exists():
-            raise StateConflict('File task state exists here; File workflows are not supported yet')
+            raise StateConflict('File state exists; use open_factory or a separate SQLite root')
         self.workspaces = self.root / "workspaces"
         self.workspaces.mkdir(exist_ok=True)
         self.db = self.root / "factory.sqlite3"
@@ -115,6 +116,24 @@ class Factory:
             )
         return {"task_id": task_id, "repository": repository, "local_path": str(root)}
 
+    def project_registry(self) -> ProjectRegistry:
+        from sf_factory.local_project_registry import LocalProjectRegistry
+
+        return LocalProjectRegistry(self.db)
+
+    def task_repository(self, task_id: str) -> dict:
+        """Return source/binding metadata without exposing the storage connection."""
+        with self._connect() as db:
+            row = db.execute(
+                "SELECT t.id,s.provider,s.instance,tr.repository,tr.local_path "
+                "FROM tasks t LEFT JOIN task_sources s ON s.task_id=t.id "
+                "LEFT JOIN task_repositories tr ON tr.task_id=t.id WHERE t.id=?",
+                (task_id,),
+            ).fetchone()
+        if row is None:
+            raise ValueError('task not found')
+        return dict(row)
+
     def list_tasks(self, limit: int = 50) -> list[dict]:
         if not 1 <= limit <= 100:
             raise ValueError('limit must be between 1 and 100')
@@ -173,23 +192,14 @@ class Factory:
         )
         if not policy_result.allowed:
             raise ValueError(f"execution denied by policy: {policy_result.reason}")
-        with self._connect() as db:
-            task = db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
-        if task is None:
-            raise ValueError("task not found")
+        task = self.task_store.get_task(task_id)
         run_id = uuid.uuid4().hex
         workspace = self.workspaces / run_id
         workspace.mkdir(mode=0o700)
-        with self._connect() as db:
-            db.execute(
-                "INSERT INTO runs(id,task_id,runtime,status,workspace,started_at) "
-                "VALUES (?,?,?,?,?,?)",
-                       (run_id, task_id, runtime_name, "running", str(workspace), _now()))
-            db.execute("INSERT INTO audit(run_id,task_id,event,at) VALUES (?,?,?,?)",
-                       (run_id, task_id, "run.started", _now()))
+        self._start_run(run_id, task_id, runtime_name, workspace)
         try:
             runtime = self.runtime_registry.create(runtime_name)
-            result = runtime.execute(prompt=task["prompt"], workspace=workspace,
+            result = runtime.execute(prompt=task.prompt, workspace=workspace,
                                      timeout_seconds=timeout_seconds)
             status = result.status
             output = result.output
@@ -200,10 +210,23 @@ class Factory:
             status, output, error_kind, error_message, exit_code = (
                 "failed", "", "runtime_error", str(exc), None
             )
+        self._finish_run(run_id, task_id, status, output, error_kind, error_message, exit_code)
+        return self.show_run(run_id)
+
+    def _start_run(self, run_id: str, task_id: str, runtime: str, workspace: Path) -> None:
+        with self._connect() as db:
+            db.execute(
+                "INSERT INTO runs(id,task_id,runtime,status,workspace,started_at) "
+                "VALUES (?,?,?,?,?,?)",
+                (run_id, task_id, runtime, "running", str(workspace), _now()),
+            )
+            db.execute("INSERT INTO audit(run_id,task_id,event,at) VALUES (?,?,?,?)",
+                       (run_id, task_id, "run.started", _now()))
+
+    def _finish_run(self, run_id, task_id, status, output, error_kind, error_message, exit_code):
         with self._connect() as db:
             db.execute("""UPDATE runs SET status=?,ended_at=?,output=?,error_kind=?,
                        error_message=?,exit_code=? WHERE id=?""",
                        (status, _now(), output, error_kind, error_message, exit_code, run_id))
             db.execute("INSERT INTO audit(run_id,task_id,event,at) VALUES (?,?,?,?)",
                        (run_id, task_id, "run." + status, _now()))
-        return self.show_run(run_id)

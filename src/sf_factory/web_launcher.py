@@ -36,7 +36,19 @@ def launch_web(*, rebuild: bool = False) -> int:
     except ImportError:
         print("Web dependencies missing. Run: uv sync --extra web", file=sys.stderr)
         return 2
-    app = create_app(static_dir=frontend / "dist")
+    from sf_factory.factory_selection import data_directory, open_factory
+    from sf_factory.file_dashboard import FileDashboardFactory
+    from sf_factory.state_store import StateConflict, StateUnavailable
+
+    try:
+        factory = open_factory(data_directory())
+    except (OSError, ValueError, StateConflict, StateUnavailable) as exc:
+        print(f"Could not open dashboard storage: {exc}", file=sys.stderr)
+        return 2
+    backend = ("File (no DB)" if isinstance(factory, FileDashboardFactory)
+               else "SQLite (existing/configured)")
+    print(f"Storage: {backend}; {factory.root}")
+    app = create_app(static_dir=frontend / "dist", data_dir=factory.root)
     url = "http://127.0.0.1:8000"
     print(f"Software Factory dashboard: {url}")
     try:

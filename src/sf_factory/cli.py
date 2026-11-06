@@ -255,10 +255,11 @@ def main() -> int:
             return 2
         print(json.dumps({"repository_root": str(root), "provider": "local-git"}, indent=2))
         return 0
-    from sf_factory.factory import Factory
+    from sf_factory.factory_selection import data_directory, open_factory
+    from sf_factory.state_store import StateConflict, StateUnavailable
 
-    factory = Factory(Path(".sf-factory"))
     try:
+        factory = open_factory(data_directory())
         if args.command == "task":
             if args.task_command == "create":
                 print(factory.create_task(args.prompt))
@@ -277,7 +278,7 @@ def main() -> int:
                 print(json.dumps(report, indent=2))
                 return 0 if report["evidence_complete"] else 1
             print(json.dumps(factory.show_run(args.run_id), indent=2))
-    except (ValueError, PermissionError) as exc:
+    except (ValueError, PermissionError, OSError, StateConflict, StateUnavailable) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
     return 0
