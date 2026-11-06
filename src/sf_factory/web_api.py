@@ -23,6 +23,10 @@ from sf_factory.repo_discovery import discover_git_root
 from sf_factory.repository_contracts import Project, Repository, Visibility
 
 
+class InspectRepositoryRequest(BaseModel):
+    path: str = Field(min_length=1, max_length=1000)
+
+
 class CreateTaskRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=10000)
 
@@ -67,6 +71,17 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
         except (OSError, ValueError):
             return {"detected": False, "repository_root": None, "provider": None}
         return {"detected": True, "repository_root": str(root), "provider": "local-git"}
+
+    @app.post("/api/quick/repository/inspect")
+    def inspect_quick_repository(
+        payload: InspectRepositoryRequest, request: Request
+    ) -> dict[str, str]:
+        _check_local_origin(request)
+        try:
+            root = discover_git_root(Path(payload.path))
+        except (OSError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {"repository_root": str(root), "provider": "local-git"}
 
     @app.get("/api/runtimes")
     def runtimes() -> dict[str, list[str]]:
