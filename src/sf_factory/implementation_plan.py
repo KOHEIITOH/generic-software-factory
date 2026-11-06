@@ -55,6 +55,9 @@ def plan_implementation(
             )
         except PermissionError as exc:
             blockers.append(str(exc))
+    # A caller-supplied boolean is not proof of OS sandbox enforcement.
+    # Keep the plan non-executable until a trusted executor verifies isolation.
+    blockers.append("Trusted isolated executor is not connected")
     return ImplementationPlan(
         task_id=task_id,
         repository=repository,
