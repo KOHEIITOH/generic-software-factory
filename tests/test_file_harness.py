@@ -188,12 +188,13 @@ def test_legacy_dashboard_upgrades_without_replacing_tasks_or_projects(tmp_path)
     path = tmp_path / 'dashboard-v1/state.json'
     record = json.loads(path.read_text())
     record.pop('harness')
+    record.pop('snapshots')
     record['schema_version'] = 1
     path.write_text(json.dumps(record))
     reopened = open_factory(tmp_path)
     assert reopened.show_task(task)['task']['prompt'] == 'Keep'
     assert reopened.project_registry().list_projects('local')[0].id == 'p'
-    assert json.loads(path.read_text())['schema_version'] == 2
+    assert json.loads(path.read_text())['schema_version'] == 3
 
 
 @pytest.mark.parametrize('flag,value', [('approved', 1), ('consumed', True), ('revoked', True)])

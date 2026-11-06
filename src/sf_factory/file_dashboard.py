@@ -1,7 +1,7 @@
 """File adapter for the existing local dashboard and read-only Runtime Runs.
 
 No SQL compatibility layer. Harness approval/prepare uses atomic File state;
-quality evidence and snapshots still fail closed through the SQL-only boundary.
+quality evidence still fails closed through the SQL-only boundary.
 """
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from sf_factory.file_document import read_document, write_document
 from sf_factory.file_state import FileStateStore
 from sf_factory.harness_state import HarnessState
 from sf_factory.repository_contracts import Project, ProjectRegistry, Repository, Visibility
+from sf_factory.source_state import SourceState
 from sf_factory.state_store import StateConflict, StateCorrupt, StateNotFound, StateUnavailable
 
 
@@ -43,7 +44,8 @@ class FileDashboardFactory(Factory):
             try:
                 if created:
                     write_document(directory, {
-                        'schema_version': 2, 'version': 1,
+                        'schema_version': 3, 'version': 1,
+                        'snapshots': {},
                         'harness': self._empty_harness(),
                         'bindings': {}, 'runs': {}, 'events': [],
                         'projects': {}, 'repositories': {},
@@ -55,8 +57,10 @@ class FileDashboardFactory(Factory):
                         os.close(parent)
                 record = read_document(directory)
                 self._validate(record)
-                if record['schema_version'] == 1:
-                    record.update(schema_version=2, harness=self._empty_harness())
+                if record['schema_version'] < 3:
+                    if record['schema_version'] == 1:
+                        record['harness'] = self._empty_harness()
+                    record.update(schema_version=3, snapshots={})
                     record['version'] += 1
                     self._validate(record)
                     write_document(directory, record)
@@ -67,7 +71,7 @@ class FileDashboardFactory(Factory):
     def db(self) -> Path:
         raise StateUnavailable(
             'This operation requires the SQLite workflow adapter; '
-            'Quality evidence and source snapshots are not supported in File mode yet'
+            'Quality evidence is not supported in File mode yet'
         )
 
     def _connect(self):
@@ -79,9 +83,11 @@ class FileDashboardFactory(Factory):
         try:
             if (set(record) != ({'schema_version', 'version', 'bindings', 'runs', 'events',
                                  'projects', 'repositories'} |
-                                ({'harness'} if record.get('schema_version') == 2 else set()))
+                                ({'harness'} if record.get('schema_version') in {2, 3}
+                                 else set()) |
+                                ({'snapshots'} if record.get('schema_version') == 3 else set()))
                     or type(record['schema_version']) is not int
-                    or record['schema_version'] not in {1, 2}
+                    or record['schema_version'] not in {1, 2, 3}
                     or type(record['version']) is not int or record['version'] < 1):
                 raise ValueError('unsupported dashboard schema or revision')
             for name in ('bindings', 'runs', 'projects', 'repositories'):
@@ -133,10 +139,14 @@ class FileDashboardFactory(Factory):
                         or (event['run_id'] is not None
                             and event['run_id'] not in record['runs'])):
                     raise ValueError('invalid audit event')
-            if record['schema_version'] == 2:
+            if record['schema_version'] >= 2:
                 from sf_factory.file_harness_state import validate_harness_state
 
                 validate_harness_state(record)
+            if record['schema_version'] == 3:
+                from sf_factory.source_state import validate_source_state
+
+                validate_source_state(record)
         except (ValueError, TypeError, KeyError, AttributeError) as exc:
             raise StateCorrupt('invalid or unsupported dashboard state') from exc
 
@@ -266,6 +276,11 @@ class FileDashboardFactory(Factory):
         from sf_factory.file_harness_state import empty_harness
 
         return empty_harness()
+
+    def source_state(self) -> SourceState:
+        from sf_factory.source_state import FileSourceState
+
+        return FileSourceState(self)
 
     def harness_state(self) -> HarnessState:
         from sf_factory.file_harness_state import FileHarnessState

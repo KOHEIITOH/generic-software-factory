@@ -16,10 +16,9 @@ import subprocess
 import tempfile
 import time
 import uuid
-from contextlib import closing
 from pathlib import Path, PurePosixPath
 
-from sf_factory.factory import Factory, _now
+from sf_factory.factory import Factory
 from sf_factory.harness_discovery import _sensitive
 
 MAX_FILES = 1000
@@ -87,11 +86,8 @@ class SourceSnapshotService:
         if self.storage.is_symlink():
             raise ValueError('snapshot storage cannot be a symlink')
         self.storage.mkdir(mode=0o700, exist_ok=True)
-        with closing(factory._connect()) as db, db:
-            db.execute('''CREATE TABLE IF NOT EXISTS run_source_snapshots (
-                run_id TEXT PRIMARY KEY REFERENCES runs(id), snapshot_id TEXT NOT NULL UNIQUE,
-                fingerprint TEXT NOT NULL, manifest TEXT NOT NULL
-            )''')
+        self.state = factory.source_state()
+        _sync_directory(self.storage.parent)
 
     def create(self, run_id: str, *, root: Path) -> dict:
         run = self.factory.show_run(run_id)
@@ -101,15 +97,11 @@ class SourceSnapshotService:
         request = approved['request']
         if not root.is_absolute() or root != root.resolve(strict=True):
             raise ValueError('canonical repository root required')
-        with closing(self.factory._connect()) as db:
-            repository = db.execute(
-                'SELECT project_id,provider_id,external_id FROM repositories WHERE id=?',
-                (request['repository_id'],),
-            ).fetchone()
-            if (repository is None or repository['project_id'] != request['project_id']
-                    or repository['provider_id'] != 'local-git'
-                    or repository['external_id'] != str(root)):
-                raise ValueError('registered repository mismatch')
+        repositories = self.factory.project_registry().list_repositories(request['project_id'])
+        repository = next((r for r in repositories if r.id == request['repository_id']), None)
+        if (repository is None or repository.provider_id != 'local-git'
+                or repository.external_id != str(root)):
+            raise ValueError('registered repository mismatch')
         deadline = time.monotonic() + 30
         location = _git(root, ['rev-parse', '--show-toplevel'], 4096, deadline).decode().strip()
         if Path(location) != root:
@@ -171,30 +163,35 @@ class SourceSnapshotService:
                 if len(encoded_manifest) > 1048576:
                     raise ValueError('snapshot manifest budget exceeded')
                 (staging / 'manifest.json').write_bytes(encoded_manifest)
-                with closing(self.factory._connect()) as db, db:
-                    db.execute('BEGIN IMMEDIATE')
-                    current = db.execute('SELECT status FROM runs WHERE id=?', (run_id,)).fetchone()
-                    if current is None or current['status'] != 'prepared':
-                        raise ValueError('Run no longer prepared')
-                    db.execute('INSERT INTO run_source_snapshots VALUES (?,?,?,?)',
-                               (run_id, snapshot_id, fingerprint,
-                                json.dumps(manifest, sort_keys=True)))
-                    # Fresh UUID destination; an existing directory is never replaced.
-                    staging.rename(final)
-                    installed = True
-                    db.execute('INSERT INTO audit(run_id,task_id,event,at) VALUES (?,?,?,?)',
-                               (run_id, run['task_id'], 'run.source_snapshotted', _now()))
+                _sync_tree(staging)
+                # Publish durable payload first. Unregistered payload is an orphan,
+                # never a usable snapshot. Registration and audit then commit once.
+                # Atomically reserve an unused identity before installing anything.
+                # rename(staging, final) could overwrite an existing empty directory.
+                final.mkdir(mode=0o700)
+                installed = True
+                (staging / 'payload').rename(final / 'payload')
+                (staging / 'manifest.json').rename(final / 'manifest.json')
+                _sync_directory(final)
+                _sync_directory(self.storage)
+                self.state.register(run_id, snapshot_id, fingerprint, manifest)
         except BaseException:
             if installed:
-                shutil.rmtree(final)
+                # A post-publication state error may have committed. Never delete
+                # payload until a successful authoritative read proves it unreferenced.
+                try:
+                    registered = self.state.get(run_id)
+                except Exception:
+                    pass  # Keep the owned artifact for reconciliation; report failure.
+                else:
+                    if registered is None or registered['snapshot_id'] != snapshot_id:
+                        shutil.rmtree(final)
             raise
         return {'snapshot_id': snapshot_id, 'fingerprint': fingerprint, 'manifest': manifest}
 
     def verify(self, run_id: str) -> dict:
         """Rehash stored payload before use; never execute or extract it on the host."""
-        with closing(self.factory._connect()) as db:
-            row = db.execute('SELECT * FROM run_source_snapshots WHERE run_id=?',
-                             (run_id,)).fetchone()
+        row = self.state.get(run_id)
         if row is None:
             raise ValueError('snapshot not found')
         if not re.fullmatch(r'[a-f0-9]{32}', row['snapshot_id']):
@@ -280,3 +277,22 @@ def _file_paths(root_fd: int) -> set[str]:
                     raise ValueError('snapshot symlink or special file detected')
     walk(root_fd, ())
     return paths
+
+
+def _sync_directory(path: Path) -> None:
+    fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def _sync_tree(root: Path) -> None:
+    for directory, _, files in os.walk(root, topdown=False, followlinks=False):
+        for name in files:
+            fd = os.open(Path(directory) / name, os.O_RDONLY | os.O_NOFOLLOW)
+            try:
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+        _sync_directory(Path(directory))

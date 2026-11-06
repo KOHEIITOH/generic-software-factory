@@ -101,7 +101,7 @@ File Adapterを自動選択し、Task・Project/Repository・read-only Runの結
 
 [Webでの確認方法・保存先設定・制約](docs/local-web-storage.md)を参照してください。
 `sf state ...` は保存Adapter単体の確認用で、Web起動の追加手順ではありません。
-Harness承認・prepared RunもFile保存に対応。品質証跡・source snapshotのFile移行と、Issue-to-PR自動実行は未完了です。
+Harness承認・prepared RunもFile保存に対応。source snapshotもFile対応です。品質証跡のFile移行と、Issue-to-PR自動実行は未完了です。
 
 ## 現在のステータス
 
