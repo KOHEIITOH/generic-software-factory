@@ -18,8 +18,8 @@ from pydantic import BaseModel, Field
 from sf_factory.agent_registry import default_runtime_registry
 from sf_factory.factory import Factory
 from sf_factory.github_issue_web import install_github_issue_routes
-from sf_factory.github_repository_web import install_github_repository_routes
 from sf_factory.github_pr_demo_web import install_github_pr_demo_routes
+from sf_factory.github_repository_web import install_github_repository_routes
 from sf_factory.local_project_registry import LocalProjectRegistry
 from sf_factory.repo_discovery import discover_git_root
 from sf_factory.repository_contracts import Project, Repository, Visibility
