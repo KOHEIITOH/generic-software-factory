@@ -42,3 +42,36 @@ def test_quick_repository_handles_non_git_cwd(
         "repository_root": None,
         "provider": None,
     }
+
+
+def test_explicit_repository_inspection_requires_same_origin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    subprocess.run(["git", "init", "-q", str(repository)], check=True)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    monkeypatch.chdir(outside)
+    base = "http://127.0.0.1:8000"
+    with TestClient(create_app(data_dir=tmp_path / "data"), base_url=base) as client:
+        payload = {"path": str(repository)}
+        assert client.post("/api/quick/repository/inspect", json=payload).status_code == 403
+        assert client.post(
+            "/api/quick/repository/inspect",
+            headers={"Origin": "https://evil.example"},
+            json=payload,
+        ).status_code == 403
+        response = client.post(
+            "/api/quick/repository/inspect",
+            headers={"Origin": base},
+            json=payload,
+        )
+        invalid = client.post(
+            "/api/quick/repository/inspect",
+            headers={"Origin": base},
+            json={"path": str(outside)},
+        )
+    assert response.status_code == 200
+    assert response.json()["repository_root"] == str(repository.resolve())
+    assert invalid.status_code == 422
