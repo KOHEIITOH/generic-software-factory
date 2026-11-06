@@ -25,6 +25,7 @@ from sf_factory.run_evidence import (
     EvidenceSubject,
     RunEvidenceService,
 )
+from sf_factory.source_snapshot import SourceSnapshotService
 
 
 def git(root, *args):
@@ -52,6 +53,7 @@ def prepared(tmp_path, monkeypatch):
     bundled = Path(__file__).resolve().parents[1] / 'fixtures/calculator'
     for name in ('calculator.py', 'test_calculator.py'):
         (root / name).write_bytes((bundled / name).read_bytes())
+    (root / 'asset.bin').write_bytes(b'\x00\xffpublic-binary-fixture')
     commit(root)
     factory = Factory(tmp_path / 'data')
     task = factory.create_task('Implement a sample')
@@ -452,3 +454,102 @@ def test_cli_reads_current_evidence_and_rejects_wrong_revision(review_run, tmp_p
     captured = capsys.readouterr()
     assert captured.out == ''
     assert 'subject' in captured.err
+
+
+@pytest.fixture
+def snapshot_run(prepared):
+    root, factory, _, _, _ = prepared
+    run = prepare(prepared)
+    return SourceSnapshotService(factory), run['id'], root
+
+
+def test_snapshot_uses_approved_commit_without_git_or_untracked_host_files(snapshot_run):
+    service, run_id, root = snapshot_run
+    (root / 'host.env').write_text('host-only-canary')
+    (root / 'AGENTS.md').write_text('later worktree change')
+    snapshot = service.create(run_id, root=root)
+    assert service.verify(run_id) == snapshot
+    paths = {f['path'] for f in snapshot['manifest']['files']}
+    assert paths == {'AGENTS.md', 'calculator.py', 'test_calculator.py', 'asset.bin'}
+    payload = service.storage / snapshot['snapshot_id'] / 'payload'
+    assert (payload / 'AGENTS.md').read_text() == 'rules'
+    assert (payload / 'asset.bin').read_bytes() == b'\x00\xffpublic-binary-fixture'
+    assert not (payload / '.git').exists()
+    assert 'host-only-canary' not in repr(snapshot)
+    assert service.factory.show_run(run_id)['status'] == 'prepared'
+
+
+def test_snapshot_does_not_run_git_filters_or_hooks(snapshot_run, tmp_path):
+    service, run_id, root = snapshot_run
+    canary = tmp_path / 'external-filter-executed'
+    git(root, 'config', 'filter.untrusted.clean', 'touch ' + str(canary))
+    (root / '.git/info/attributes').write_text('*.md filter=untrusted\n')
+    snapshot = service.create(run_id, root=root)
+    assert service.verify(run_id) == snapshot
+    assert not canary.exists()
+
+
+@pytest.mark.parametrize('change', ['content', 'extra', 'symlink', 'manifest'])
+def test_snapshot_verification_rejects_tampering(snapshot_run, change):
+    service, run_id, root = snapshot_run
+    snapshot = service.create(run_id, root=root)
+    directory = service.storage / snapshot['snapshot_id']
+    if change == 'content':
+        (directory / 'payload/AGENTS.md').write_text('tampered')
+    elif change == 'extra':
+        (directory / 'payload/extra.py').write_text('injected')
+    elif change == 'symlink':
+        (directory / 'payload/AGENTS.md').unlink()
+        (directory / 'payload/AGENTS.md').symlink_to('/etc/passwd')
+    else:
+        (directory / 'manifest.json').write_text('{}')
+    with pytest.raises((ValueError, OSError)):
+        service.verify(run_id)
+
+
+@pytest.mark.parametrize('limit,value', [
+    ('MAX_FILES', 1), ('MAX_FILE_BYTES', 1), ('MAX_TOTAL_BYTES', 6),
+])
+def test_snapshot_limits_fail_without_partial_storage(snapshot_run, monkeypatch, limit, value):
+    service, run_id, root = snapshot_run
+    monkeypatch.setattr('sf_factory.source_snapshot.' + limit, value)
+    with pytest.raises(ValueError):
+        service.create(run_id, root=root)
+    assert list(service.storage.iterdir()) == []
+    with pytest.raises(ValueError):
+        service.verify(run_id)
+
+
+def test_snapshot_database_failure_removes_owned_payload(snapshot_run):
+    service, run_id, root = snapshot_run
+    with sqlite3.connect(service.factory.db) as db:
+        db.execute("CREATE TRIGGER reject_snapshot_audit BEFORE INSERT ON audit "
+                   "WHEN NEW.event='run.source_snapshotted' "
+                   "BEGIN SELECT RAISE(ABORT, 'simulated failure'); END")
+    with pytest.raises(sqlite3.IntegrityError):
+        service.create(run_id, root=root)
+    assert list(service.storage.iterdir()) == []
+    with pytest.raises(ValueError):
+        service.verify(run_id)
+
+
+def test_snapshot_cannot_overwrite_an_existing_run_snapshot(snapshot_run):
+    service, run_id, root = snapshot_run
+    first = service.create(run_id, root=root)
+    with pytest.raises(sqlite3.IntegrityError):
+        service.create(run_id, root=root)
+    assert service.verify(run_id) == first
+    assert len(list(service.storage.iterdir())) == 1
+
+
+def test_git_replace_refs_cannot_change_approved_snapshot(snapshot_run):
+    service, run_id, root = snapshot_run
+    original = git(root, 'rev-parse', 'HEAD:AGENTS.md')
+    replacement = subprocess.run(['git', '-C', str(root), 'hash-object', '-w', '--stdin'],
+                                 input='unapproved replacement', text=True,
+                                 capture_output=True, check=True).stdout.strip()
+    git(root, 'replace', original, replacement)
+    snapshot = service.create(run_id, root=root)
+    payload = service.storage / snapshot['snapshot_id'] / 'payload'
+    assert (payload / 'AGENTS.md').read_text() == 'rules'
+    assert service.verify(run_id) == snapshot

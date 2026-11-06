@@ -2,7 +2,7 @@
 
 - 更新日: 2026-11-06（日本時間）
 - 調査基準: `e2841cc6e2da8cb955eece15ba10b9d1ba8327ff`
-- 状態: **ユーザー確認済み。R01はPR #75でマージ済み。R02aはPR #76でマージ済み。R02bはPR #77でマージ済み。R03はPR #78でマージ済み。R04aはPR #79でマージ済み。現環境はcgroup不足で拒否。R05aはPR #80でマージ済み。R05bはPR #81でマージ済み。R06aはPR #82でマージ済み。R09aはPR #83でマージ済み。R10aはPR #84でマージ済み。GitHub-hosted runnerでオフライン隔離実機4試験が成功。**
+- 状態: **ユーザー確認済み。R01はPR #75でマージ済み。R02aはPR #76でマージ済み。R02bはPR #77でマージ済み。R03はPR #78でマージ済み。R04aはPR #79でマージ済み。現環境はcgroup不足で拒否。R05aはPR #80でマージ済み。R05bはPR #81でマージ済み。R06aはPR #82でマージ済み。R09aはPR #83でマージ済み。R10aはPR #84でマージ済み。R04bはPR #85でマージ済み。R04cの承認commit snapshotを実装。**
 - 対象: 既存コード・テスト・設計資料のギャップ分析と、M1〜M5への実装順序。
 
 ## 1. North Starと判断基準
@@ -220,7 +220,8 @@ PRごとに下表へ計画ID、実装範囲、証拠、制約を追記し、該�
 | R06a | マージ済み（[#82](https://github.com/KOHEIITOH/generic-software-factory/pull/82)） | [Prepared Runs](prepared-harness-runs.md) | 実Git/DBのrollback・同時作成試験 | snapshot・実行状態遷移・Quality証拠は後続 |
 | R09a | マージ済み（[#83](https://github.com/KOHEIITOH/generic-software-factory/pull/83)） | [Run Check Evidence](run-check-evidence.md) | Run・版・試行・失敗件数の接続試験 | 実collector真正性/独立レビュー/実行接続は後続 |
 | R10a | マージ済み（[#84](https://github.com/KOHEIITOH/generic-software-factory/pull/84)） | [Run Review Evidence](run-review-evidence.md) | 厳密schema・版・試行・coverage試験 | 実モデル/collector真正性/修正/提出は後続 |
-| R04b | CI実機検証成功・PR準備 | [実行記録](https://github.com/KOHEIITOH/generic-software-factory/actions/runs/42211599041) | 必須4試験実行、skipなし | ローカルのcgroup制約は残る。AI/ソース転送は未接続 |
+| R04b | マージ済み（[#85](https://github.com/KOHEIITOH/generic-software-factory/pull/85)） | [実行記録](https://github.com/KOHEIITOH/generic-software-factory/actions/runs/42211599041) | 必須4試験実行、skipなし | ローカルのcgroup制約は残る。AI/ソース転送は未接続 |
+| R04c | 実装・検証中 | [Source Snapshots](source-snapshots.md) | 実Git blob/hash/改変検出/失敗回収試験 | 実行先転送・AI変更受入れ・提出は後続 |
 | R01 | マージ済み | [#75](https://github.com/KOHEIITOH/generic-software-factory/pull/75) | `test_harness_discovery.py` 15件 | Validation・API・承認・適用は未実装。詳細は [Discovery仕様](harness-discovery.md) |
 
 確認を求める内容は、**M3を最初の実用実証とし、R01/R02とM2の隔離基盤を先行して最小の縦断経路を作る順序、およびR01の初期スコープ**。ユーザーからこの順序での継続実装の了承を得たため、追加の定例確認を挟まず進める。Gitサービス追加、Runtime追加、Release自動化などを先に広げない。
