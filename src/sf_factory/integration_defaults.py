@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from sf_factory.repository_contracts import RepositoryBindingAdapter
-from sf_factory.source_control import SourceControl
+from sf_factory.source_control import ChangeSourceControl
 
 if TYPE_CHECKING:
     from sf_factory.task_sources import TaskSourceAdapter
@@ -23,7 +23,7 @@ def repository_binding() -> RepositoryBindingAdapter:
     return GitHubRepositoryBinding()
 
 
-def source_control() -> SourceControl:
+def source_control() -> ChangeSourceControl:
     from sf_factory.github_source_control import GitHubSourceControl
 
     return GitHubSourceControl()

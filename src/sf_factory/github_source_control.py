@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import re
 from pathlib import PurePosixPath
@@ -9,9 +10,16 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
+from sf_factory.change_proposal import _change_path
 from sf_factory.github_auth import environment_token
 from sf_factory.repository_contracts import RepositoryCapabilities
-from sf_factory.source_control import PullRequestReference, RepositoryInfo, SourceControlError
+from sf_factory.source_control import (
+    CommitChange,
+    PreparedCommit,
+    PullRequestReference,
+    RepositoryInfo,
+    SourceControlError,
+)
 
 _REPOSITORY = re.compile(r'^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$')
 
@@ -119,3 +127,96 @@ class GitHubSourceControl:
                 or url != f'https://github.com/{repository}/pull/{number}'):
             raise SourceControlError('invalid_response', 'Invalid GitHub pull request response')
         return PullRequestReference(str(number), url)
+
+    def prepare_commit(self, repository: str, *, parent_revision: str,
+                       changes: tuple[CommitChange, ...], message: str) -> PreparedCommit:
+        """Create unreferenced Git objects only. Never move a branch or open a PR.
+
+        A failed POST can leave an object behind. Caller must journal intent before
+        use; no automatic retry or claim that the whole delivery is transactional.
+        """
+        base = _base(repository)
+        if (not isinstance(parent_revision, str)
+                or not re.fullmatch(r'[a-f0-9]{40}', parent_revision)
+                or not isinstance(message, str) or not message.strip() or len(message) > 4096
+                or not isinstance(changes, tuple) or not 1 <= len(changes) <= 32):
+            raise ValueError('bounded exact commit subject required')
+        paths: set[str] = set()
+        total = 0
+        for change in changes:
+            if not isinstance(change, CommitChange):
+                raise ValueError('typed commit change required')
+            _change_path(change.path)
+            if (change.path in paths or type(change.executable) is not bool
+                    or not isinstance(change.after, bytes) or len(change.after) > 1048576
+                    or (change.before is not None and (not isinstance(change.before, bytes)
+                        or len(change.before) > 1048576)) or change.before == change.after):
+                raise ValueError('bounded unique changed bytes required')
+            paths.add(change.path)
+            total += len(change.after) + len(change.before or b'')
+        if total > 16 * 1024 * 1024:
+            raise ValueError('commit byte budget exceeded')
+        for path in paths:
+            if any(parent.as_posix() in paths for parent in PurePosixPath(path).parents):
+                raise ValueError('file/directory collision')
+
+        def sha(value: object) -> str:
+            if not isinstance(value, str) or not re.fullmatch(r'[a-f0-9]{40}', value):
+                raise SourceControlError('invalid_response', 'Invalid Git object identity')
+            return value
+
+        def blob(data: bytes) -> str:
+            return hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+
+        parent = self._request(base + '/git/commits/' + parent_revision)
+        if parent.get('sha') != parent_revision or not isinstance(parent.get('tree'), dict):
+            raise SourceControlError('invalid_response', 'Parent commit identity mismatch')
+        tree_id = sha(parent['tree'].get('sha'))
+        tree = self._request(base + '/git/trees/' + tree_id + '?recursive=1')
+        entries = tree.get('tree')
+        if (tree.get('sha') != tree_id or tree.get('truncated') is not False
+                or not isinstance(entries, list) or len(entries) > 10000):
+            raise SourceControlError('invalid_response', 'Complete parent tree required')
+        inventory: dict[str, dict] = {}
+        for entry in entries:
+            if (not isinstance(entry, dict) or not isinstance(entry.get('path'), str)
+                    or entry['path'] in inventory):
+                raise SourceControlError('invalid_response', 'Invalid parent tree inventory')
+            inventory[entry['path']] = entry
+        # Validate every precondition before the first POST.
+        for change in changes:
+            existing = inventory.get(change.path)
+            if change.before is None:
+                if existing is not None or change.executable:
+                    raise SourceControlError('invalid_response', 'New file base/mode mismatch')
+                for path, entry in inventory.items():
+                    if (path.startswith(change.path + '/') or
+                        (change.path.startswith(path + '/') and entry.get('type') != 'tree')):
+                        raise SourceControlError('invalid_response', 'Parent path collision')
+            elif (existing is None or existing.get('type') != 'blob'
+                  or existing.get('sha') != blob(change.before)
+                  or existing.get('mode') != ('100755' if change.executable else '100644')):
+                raise SourceControlError('invalid_response', 'Changed file base/mode mismatch')
+        updates = []
+        for change in changes:
+            uploaded = self._request(base + '/git/blobs', 'POST', {
+                'content': base64.b64encode(change.after).decode(), 'encoding': 'base64'})
+            blob_id = sha(uploaded.get('sha'))
+            if blob_id != blob(change.after):
+                raise SourceControlError('invalid_response', 'Uploaded byte identity mismatch')
+            updates.append({'path': change.path,
+                            'mode': '100755' if change.executable else '100644',
+                            'type': 'blob', 'sha': blob_id})
+        created_tree = self._request(base + '/git/trees', 'POST', {
+            'base_tree': tree_id, 'tree': updates})
+        candidate_tree = sha(created_tree.get('sha'))
+        commit = self._request(base + '/git/commits', 'POST', {
+            'message': message, 'tree': candidate_tree, 'parents': [parent_revision]})
+        commit_id = sha(commit.get('sha'))
+        parents = commit.get('parents')
+        if (not isinstance(commit.get('tree'), dict)
+                or commit['tree'].get('sha') != candidate_tree
+                or not isinstance(parents, list) or len(parents) != 1
+                or not isinstance(parents[0], dict) or parents[0].get('sha') != parent_revision):
+            raise SourceControlError('invalid_response', 'Prepared commit subject mismatch')
+        return PreparedCommit(commit_id, candidate_tree, parent_revision)
