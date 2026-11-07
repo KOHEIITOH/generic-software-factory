@@ -42,3 +42,11 @@ class SourceControl(Protocol):
 
     def create_draft_pull_request(self, repository: str, *, title: str, head: str,
                                   base: str, body: str) -> PullRequestReference: ...
+
+
+@dataclass(frozen=True)
+class CommitChange:
+    path: str
+    before: bytes | None
+    after: bytes
+    executable: bool = False
