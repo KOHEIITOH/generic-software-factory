@@ -50,3 +50,15 @@ class CommitChange:
     before: bytes | None
     after: bytes
     executable: bool = False
+
+
+@dataclass(frozen=True)
+class PreparedCommit:
+    external_id: str
+    tree_id: str
+    parent_id: str
+
+
+class ChangeSourceControl(SourceControl, Protocol):
+    def prepare_commit(self, repository: str, *, parent_revision: str,
+                       changes: tuple[CommitChange, ...], message: str) -> PreparedCommit: ...
