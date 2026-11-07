@@ -9,6 +9,11 @@ import pytest
 from sf_factory.bedrock_provider import BedrockModelProvider
 
 
+@pytest.fixture(autouse=True)
+def client_configuration(monkeypatch):
+    monkeypatch.setitem(sys.modules, "botocore.config", SimpleNamespace(Config=lambda **kw: kw))
+
+
 def test_bedrock_converse(monkeypatch):
     client = Mock()
     client.converse.return_value = {
@@ -20,7 +25,9 @@ def test_bedrock_converse(monkeypatch):
     result = BedrockModelProvider("test-model", "ap-northeast-1").generate("Hi")
     assert result.text == "Hello world"
     assert result.input_tokens == 4
-    boto3.client.assert_called_once_with("bedrock-runtime", region_name="ap-northeast-1")
+    boto3.client.assert_called_once_with("bedrock-runtime", region_name="ap-northeast-1",
+        config={"connect_timeout": 10, "read_timeout": 60,
+                "retries": {"mode": "standard", "max_attempts": 2}})
     assert client.converse.call_args.kwargs["modelId"] == "test-model"
 
 

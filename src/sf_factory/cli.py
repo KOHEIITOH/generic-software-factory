@@ -16,6 +16,15 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("doctor", help="check local prerequisites")
     web = sub.add_parser("web", help="start the local dashboard (builds UI if needed)")
     web.add_argument("--rebuild", action="store_true", help="rebuild frontend assets")
+    issue = sub.add_parser("issue", help="explicit local Issue development controller")
+    develop = issue.add_subparsers(dest="issue_command", required=True).add_parser("develop")
+    develop.add_argument("--config", required=True, type=Path,
+                         help="operator-owned config outside the target repository")
+    develop.add_argument("--confirm-run", action="store_true",
+                         help="authorize scoped inference, isolated tests and a Draft PR")
+    develop.add_argument("--confirm-bedrock", action="store_true",
+                         help="authorize Bedrock inference charges on this local machine")
+    develop.add_argument("--resume", help="reconcile one reviewed Run without inference or replay")
     integration = sub.add_parser("integration", help="inspect default integration configuration")
     integration.add_subparsers(dest="integration_command", required=True).add_parser("show")
     runtime = sub.add_parser("runtime", help="inspect registered runtimes")
@@ -104,6 +113,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
+    if args.command == "issue":
+        from sf_factory.issue_development_cli import run_local_development
+
+        return run_local_development(config_path=args.config, confirmed=args.confirm_run,
+                                     confirm_bedrock=args.confirm_bedrock, resume=args.resume)
     if args.command == "integration":
         from sf_factory.integration_defaults import describe_integrations
 

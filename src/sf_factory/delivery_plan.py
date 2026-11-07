@@ -31,13 +31,14 @@ class DeliveryPlan:
     source_fingerprint: str
     proposal_fingerprint: str
     changes: tuple[CommitChange, ...]
+    issue_url: str | None = None
 
     @property
     def fingerprint(self) -> str:
         payload = {'run_id': self.run_id, 'repository': self.repository,
             'base_branch': self.base_branch, 'parent_revision': self.parent_revision,
             'bundle_hash': self.bundle_hash, 'source_fingerprint': self.source_fingerprint,
-            'proposal_fingerprint': self.proposal_fingerprint,
+            'proposal_fingerprint': self.proposal_fingerprint, 'issue_url': self.issue_url,
             'changes': [{'path': c.path, 'before_sha256': hashlib.sha256(c.before).hexdigest()
                          if c.before is not None else None,
                          'after_sha256': hashlib.sha256(c.after).hexdigest(),
@@ -56,7 +57,7 @@ class DeliveryPlan:
 
 def build_delivery_plan(
     *, scope: ProposalScope, proposal: ChangeProposal, source_files: Mapping[str, bytes],
-    snapshot: dict, repository: str, base_branch: str,
+    snapshot: dict, repository: str, base_branch: str, issue_url: str | None = None,
 ) -> DeliveryPlan:
     """Require a full matching source inventory, not a model's scope/hash claim.
 
@@ -65,6 +66,10 @@ def build_delivery_plan(
     """
     _text(repository, 'repository identity')
     _text(base_branch, 'base branch')
+    if issue_url is not None:
+        _text(issue_url, 'Issue URL')
+        if not issue_url.startswith(('https://', 'http://')):
+            raise ValueError('HTTP Issue URL required')
     files = _source_files(source_files)
     candidate = candidate_files(proposal, scope=scope, source_files=files)
     if (not isinstance(snapshot, dict)
@@ -98,4 +103,4 @@ def build_delivery_plan(
     return DeliveryPlan(scope.run_id, repository, base_branch, scope.revision, scope.bundle_hash,
         scope.source_fingerprint, proposal.fingerprint,
         tuple(CommitChange(c.path, files.get(c.path), candidate[c.path],
-                           modes.get(c.path) == '100755') for c in proposal.changes))
+                           modes.get(c.path) == '100755') for c in proposal.changes), issue_url)

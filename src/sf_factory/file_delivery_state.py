@@ -95,6 +95,12 @@ class FileDeliveryState:
             write_document(directory, state)
         return record
 
+    def active_for_repository(self, repository: str) -> DeliveryRecord | None:
+        with lock_directory(self.directory) as directory:
+            state = self._read(directory)
+            return next((_decode(row) for row in state['runs'].values()
+                         if row['repository'] == repository and row['stage'] != 'delivered'), None)
+
     def get(self, run_id: str) -> DeliveryRecord:
         with lock_directory(self.directory) as directory:
             state = self._read(directory)

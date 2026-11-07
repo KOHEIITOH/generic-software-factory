@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import secrets
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -14,13 +15,18 @@ from sf_factory.run_review import _unique
 # This program is trusted controller code passed as argv, not generated code.
 # Isolated Python (-I) never imports the repository into this parent process.
 _WORKER = r'''
-import base64, hashlib, json, os, selectors, signal, stat, subprocess, sys, time
+import base64, ctypes, hashlib, json, os, selectors, signal, stat, subprocess, sys, time
 from pathlib import Path, PurePosixPath
+# Same-UID candidate code must not read/alter this collector via /proc or ptrace.
+libc = ctypes.CDLL(None, use_errno=True)
+if libc.prctl(4, 0, 0, 0, 0) != 0 or libc.prctl(3, 0, 0, 0, 0) != 0:
+    raise ValueError('private collector process required')
 raw = sys.stdin.buffer.read(16777217)
 if len(raw) > 16777216:
     raise ValueError('input limit')
 data = json.loads(raw)
-if (set(data) != {'schema_version','subject','files','argv','timeout_seconds','output_limit'}
+if (set(data) != {'schema_version','challenge','subject','files','argv',
+                 'timeout_seconds','output_limit'}
         or type(data['schema_version']) is not int or data['schema_version'] != 1):
     raise ValueError('input schema')
 root = Path('/workspace')
@@ -146,7 +152,7 @@ def run_candidate_check(
         raise ValueError('check timeout must be between one and 55 seconds')
     if type(max_output_bytes) is not int or not 1 <= max_output_bytes <= 32768:
         raise ValueError('invalid command output budget')
-    payload = json.dumps({'schema_version': 1, 'subject': {
+    payload = json.dumps({'schema_version': 1, 'challenge': secrets.token_hex(32), 'subject': {
         'run_id': scope.run_id, 'revision': scope.revision, 'bundle_hash': scope.bundle_hash,
         'source_fingerprint': scope.source_fingerprint,
         'proposal_fingerprint': proposal.fingerprint}, 'files': [

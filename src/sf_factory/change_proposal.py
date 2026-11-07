@@ -151,7 +151,8 @@ def candidate_files(proposal: ChangeProposal, *, scope: ProposalScope,
 
 
 def propose_changes(*, provider: ModelProvider, scope: ProposalScope,
-                    source_files: Mapping[str, bytes], instruction: str) -> ChangeProposal:
+                    source_files: Mapping[str, bytes], instruction: str,
+                    reference_paths: tuple[str, ...] = ()) -> ChangeProposal:
     """Trusted controller only, after inference/context approval; may incur usage.
 
     ModelProvider is text-only, not a host AgentRuntime. This data scope does not
@@ -169,7 +170,20 @@ def propose_changes(*, provider: ModelProvider, scope: ProposalScope,
             raise ValueError('binary context is unsupported')
         context.append({'path': path, 'before_sha256': hashlib.sha256(before).hexdigest()
                         if before is not None else None, 'content': body})
-    data = json.dumps({'scope': asdict(scope), 'instruction': instruction, 'files': context},
+    if (not isinstance(reference_paths, tuple) or len(reference_paths) > 32
+            or len(set(reference_paths)) != len(reference_paths)):
+        raise ValueError('bounded unique read-only references required')
+    references = []
+    for path in reference_paths:
+        _path(path)
+        if path not in files:
+            raise ValueError('reference absent from verified snapshot')
+        body = files[path].decode('utf-8')
+        if '\x00' in body:
+            raise ValueError('binary reference is unsupported')
+        references.append({'path': path, 'content': body, 'read_only': True})
+    data = json.dumps({'scope': asdict(scope), 'instruction': instruction, 'files': context,
+                      'read_only_references': references},
                       sort_keys=True, ensure_ascii=True)
     if len(data) > MAX_CONTEXT_CHARACTERS:
         raise ValueError('selected context exceeds budget')

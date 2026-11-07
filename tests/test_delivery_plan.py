@@ -107,3 +107,12 @@ def test_exact_bytes_and_modes_are_part_of_identity():
     assert replace(plan, changes=(replace(change, after=b'other'),)).fingerprint != plan.fingerprint
     different_mode = replace(plan, changes=(replace(change, executable=False),))
     assert different_mode.fingerprint != plan.fingerprint
+
+
+def test_issue_reference_is_bound_to_the_exact_delivery_plan():
+    kwargs = fixture()
+    first = build_delivery_plan(**kwargs, issue_url='https://fixture.invalid/issues/1')
+    second = build_delivery_plan(**kwargs, issue_url='https://fixture.invalid/issues/2')
+    assert first.fingerprint != second.fingerprint
+    with pytest.raises(ValueError):
+        build_delivery_plan(**kwargs, issue_url='javascript:unexpected')

@@ -3,12 +3,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
 
 from sf_factory.change_proposal import ChangeProposal, ProposalScope
 from sf_factory.run_evidence import CheckObservation, CheckRequirement
-from sf_factory.workspace_check import run_candidate_check
+from sf_factory.workspace_check import WorkspaceCheckResult, run_candidate_check
 
 
 @dataclass(frozen=True)
@@ -27,7 +27,8 @@ class BehavioralCheck:
 
 
 def collect_behavioral_check(*, check: BehavioralCheck, image: str, scope: ProposalScope,
-                             proposal: ChangeProposal, source_files: Mapping[str, bytes]
+                             proposal: ChangeProposal, source_files: Mapping[str, bytes],
+                             on_result: Callable[[WorkspaceCheckResult], None] | None = None
                              ) -> CheckObservation:
     """Count one actual scenario invocation, never parse a model's test-count claim.
 
@@ -36,6 +37,8 @@ def collect_behavioral_check(*, check: BehavioralCheck, image: str, scope: Propo
     """
     result = run_candidate_check(image=image, scope=scope, proposal=proposal,
                                  source_files=source_files, argv=check.argv)
+    if on_result is not None:
+        on_result(result)
     digest = hashlib.sha256(json.dumps({'check': asdict(check), 'result': asdict(result)},
         sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     completed = (result.status == 'succeeded' and result.exit_code == 0
