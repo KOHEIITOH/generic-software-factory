@@ -1,0 +1,85 @@
+"""Compose the local operator entry using default integrations and optional AI."""
+from __future__ import annotations
+
+import json
+import os
+import stat
+from pathlib import Path
+
+from sf_factory.development_config import DevelopmentConfig
+from sf_factory.file_state import _unique_object
+from sf_factory.issue_development import DevelopmentStopped, develop_issue
+from sf_factory.model_provider import ModelProvider, ModelResponse
+
+
+class _NoInference:
+    def generate(self, prompt: str) -> ModelResponse:
+        raise RuntimeError('resume never starts inference')
+
+
+def load_config(path: Path) -> DevelopmentConfig:
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, 'rb') as stream:
+        metadata = os.fstat(stream.fileno())
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > 262144:
+            raise ValueError('bounded regular config file required')
+        if metadata.st_uid != os.getuid() or metadata.st_mode & 0o022:
+            raise PermissionError('config must be operator-owned and not writable by others')
+        raw = stream.read(262145)
+    if len(raw) > 262144:
+        raise ValueError('config exceeds budget')
+    document = json.loads(raw, object_pairs_hook=_unique_object)
+    config = DevelopmentConfig.from_document(document)
+    if path.resolve(strict=True).is_relative_to(config.root):
+        raise PermissionError('execution config must be outside the target repository')
+    return config
+
+
+def run_local_development(*, config_path: Path, confirmed: bool, confirm_bedrock: bool,
+                          resume: str | None) -> int:
+    # No provider/network/file state initialization before explicit operator consent.
+    if confirmed is not True:
+        print(json.dumps({'status': 'confirmation_required', 'required': '--confirm-run'}))
+        return 2
+    try:
+        config = load_config(config_path)
+        implementation: ModelProvider
+        review: ModelProvider
+        if resume is not None:
+            implementation, review = _NoInference(), _NoInference()
+        elif config.provider == 'bedrock':
+            if confirm_bedrock is not True:
+                print(json.dumps({'status': 'confirmation_required',
+                                  'required': '--confirm-bedrock'}))
+                return 2
+            from sf_factory.bedrock_provider import BedrockModelProvider
+            from sf_factory.model_provider_status import bedrock_configuration
+
+            settings = bedrock_configuration()
+            if not settings.configured or not settings.model_id or not settings.region_name:
+                raise ValueError('Bedrock SDK, model ID and region must be configured')
+            max_tokens = int(os.environ.get('SF_BEDROCK_MAX_TOKENS', '8192'))
+            implementation = BedrockModelProvider(settings.model_id, settings.region_name,
+                                                  max_tokens=max_tokens)
+            review = BedrockModelProvider(settings.model_id, settings.region_name,
+                                           max_tokens=max_tokens)
+        else:
+            from sf_factory.copilot_model_provider import CopilotModelProvider
+
+            implementation, review = CopilotModelProvider(), CopilotModelProvider()
+        from sf_factory.factory_selection import open_factory
+        from sf_factory.integration_defaults import source_control, task_source
+
+        result = develop_issue(factory=open_factory(config.data_root), config=config,
+            source=task_source(config.repository), scm=source_control(),
+            implementer=implementation, reviewer=review, confirmed=True, resume=resume)
+        print(json.dumps(result))
+        return 0
+    except DevelopmentStopped as exc:
+        print(json.dumps({'status': 'stopped', 'run_id': exc.run_id, 'reason': str(exc)}))
+        return 1
+    except Exception:
+        # SDK/network/config exceptions can include prompt, headers or local secrets.
+        print(json.dumps({'status': 'blocked',
+                          'reason': 'configuration or prerequisite check failed'}))
+        return 2

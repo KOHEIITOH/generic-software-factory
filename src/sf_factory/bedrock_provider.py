@@ -22,8 +22,8 @@ class BedrockModelProvider:
             raise ValueError("model_id is required")
         if not self.region_name.strip():
             raise ValueError("region_name is required")
-        if not 1 <= self.max_tokens <= 8192:
-            raise ValueError("max_tokens must be between 1 and 8192")
+        if type(self.max_tokens) is not int or not 1 <= self.max_tokens <= 32768:
+            raise ValueError("max_tokens must be between 1 and 32768")
         if not 0.0 <= self.temperature <= 1.0:
             raise ValueError("temperature must be between 0 and 1")
 
@@ -32,11 +32,14 @@ class BedrockModelProvider:
             raise ValueError("prompt must not be empty")
         try:
             boto3 = import_module("boto3")
+            config_type = import_module("botocore.config").Config
         except ImportError as exc:
             raise RuntimeError("Install the bedrock extra: pip install -e '.[bedrock]'") from exc
 
         try:
-            client = boto3.client("bedrock-runtime", region_name=self.region_name)
+            client = boto3.client("bedrock-runtime", region_name=self.region_name,
+                config=config_type(connect_timeout=10, read_timeout=60,
+                                   retries={"mode": "standard", "max_attempts": 2}))
             response: dict[str, Any] = client.converse(
                 modelId=self.model_id,
                 messages=[{"role": "user", "content": [{"text": prompt}]}],

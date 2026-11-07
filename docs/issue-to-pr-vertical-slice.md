@@ -19,9 +19,9 @@ fixtureやmockだけの成功、デモmarker PR、事前チェック、読み取
 | --- | --- | --- |
 | Issue中心の閲覧 | 既存Issue identityのまま複数Runを表示。独立Task作成を主画面から外し、旧API/データを維持 | PR #101で実装済み |
 | 安全な実行入力 | source、変更案、承認済みcommandを検証済み実行器へ渡せる。host実行へfallbackしない | PR #102でbounded stdinを接続。候補sourceの隔離内materialization/check接続を追加、実Docker CIで検証 |
-| AI実装 | 推論/Runtimeを安全な境界で接続し、実要件から変更を生成する。credentialをWorkerへ漏らさない | scope固定の変更案データ検証を追加。実provider/承認/実行への接続は未完了 |
-| 実チェック・レビュー | 実際のartifact/revision/diffとcollectorを証跡へ固定する | 候補commandの隔離実行を追加。実test-count collector/独立reviewの接続は未完了 |
-| 実変更の配送 | 検証済みの同一変更を承認範囲内でDraft PRへ届け、結果不明時を照合する | 全source照合・配送plan固定と未参照candidate commit準備を追加。branch/PR配送・永続intent・照合は未接続 |
+| AI実装 | 推論/Runtimeを安全な境界で接続し、実要件から変更を生成する。credentialをWorkerへ漏らさない | scope固定の変更案に、ローカルoperator設定とBedrock/ツールなしCopilot推論を接続。実サービス通しはPCで未確認 |
+| 実チェック・レビュー | 実際のartifact/revision/diffとcollectorを証跡へ固定する | 承認済み挙動シナリオの実観測と別session/requestレビューをローカルcontrollerへ接続。汎用pytest件数collectorは未対応 |
+| 実変更の配送 | 検証済みの同一変更を承認範囲内でDraft PRへ届け、結果不明時を照合する | exact plan、永続intent、branch/PR照合とローカルGuardを接続。実サービス配送はPCで未確認 |
 | Webから実行 | operator認証、明示承認、同一repo直列、永続状態、再起動時の安全停止を備える | 未接続 |
 | 実通し試験 | 試験用Issue等からAI実装・実テスト・レビュー・Draft PRを実サービスで確認 | 未完了 |
 
@@ -38,3 +38,5 @@ Issue一覧のlimitは外部Issueを選んだ後に適用し、ローカルTask�
 実行可能としない。AI CLIのlogin表示も実際の推論成功を証明しない。
 実行器または認証が未対応の場合、できたように表示せず、実通し試験を未完了として扱う。
 AWS作成・デプロイ・有料Bedrock呼出しは従来どおり別の承認対象。
+
+ローカルCLIの設定・実行・復旧手順は[PCでのIssue実行](local-issue-development.md)を参照。

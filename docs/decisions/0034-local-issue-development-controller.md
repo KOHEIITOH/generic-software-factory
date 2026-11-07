@@ -1,0 +1,28 @@
+# 0034: operator-owned設定からローカルIssue実行を接続する
+
+CLI sf issue developだけを入口とし、repository外の厳密JSON設定と明示confirmを要求する。
+Webに新しい実行口を作らない。CoreはTaskSource、SourceControl、ModelProviderと既存の
+Harness/SourceSnapshot/Evidence契約を再利用する。GitHub初期設定はcomposition側に維持する。
+
+推論前に要件・設定・承認scopeを永続化し、既存Harness承認を消費したprepared Runを作る。
+実装とレビューのsession/request provenanceをadapter応答から取得し、同一sessionの自己
+レビューを拒否する。元source・変更案・許可済み挙動テスト・独立レビューが揃ったときだけ
+Guardがexact planを配送へ渡す。Evidenceの汎用eligible_for_delivery=falseは変更しない。
+
+Docker事前確認が推論より先。候補コードは既存のverified offline Docker内だけで実行し、
+host worktreeを変更しない。collectorをnon-dumpableにし、requestごとのrandom challengeで
+候補codeが/proc/ptraceを介して親の検証事実やrequest bindingを偽造するのを防ぐ。
+これらの前提が成立しないimage/daemonは拒否する。
+
+File保存と同一rootのprocess lockで直列化する。配送停止後のresumeは同一設定/artifactと
+ローカル承認を再検証し、推論や不明なbranch/PR作成を繰り返さない。expired承認は明示的な
+ローカルresume呼出しで同じscopeにだけ更新する。merge/deploy/cloud作成は含まない。
+
+BedrockはPCのAWS標準認証を使い、明示confirm-bedrock時だけ推論する。別stateless Converseで
+独立レビューを行う。出力上限・timeout・SDK retryを設定し、無限の自動修正は行わない。
+既存のツールなしCopilot SDKも選べる。ツールが有効なhost Codex CLIは接続しない。
+
+実Git/File/evidenceで縦断テストし、成功・不正モデル応答・未実行テスト・must-fix・同一session・
+改変scope・途中停止/復旧を検証する。厳格Docker CIに実隔離を使う縦断ケースとparent保護を
+追加し、必要13ケースのskipを許さない。AIとSCMのfixtureを実サービス成功と混同しない。
+PCの実Bedrock/実GitHubでの最終通し試験は利用者の実行結果で確認する。

@@ -141,3 +141,38 @@ def test_real_candidate_timeout_is_reaped():
                    timeout_seconds=1)
     assert result.status == 'timed_out', result
     assert result.cleaned_up
+
+
+def test_each_check_has_an_unpredictable_request_binding(monkeypatch):
+    requests = []
+    generate = fake_report()
+    def execute(**kwargs):
+        requests.append(json.loads(kwargs['input_bytes']))
+        return generate(**kwargs)
+    monkeypatch.setattr('sf_factory.workspace_check.run_offline_command', execute)
+    first, second = check(), check()
+    assert len(requests[0]['challenge']) == 64
+    assert requests[0]['challenge'] != requests[1]['challenge']
+    assert first.request_sha256 != second.request_sha256
+
+
+@real_docker
+def test_real_parent_process_provenance_is_private():
+    resources()
+    files, scope, proposal = fixture_data()
+    script = '''import os
+parent = os.getppid()
+for name in ('mem','fd/0'):
+    try:
+        fd = os.open('/proc/'+str(parent)+'/'+name,os.O_RDONLY|os.O_NONBLOCK)
+    except PermissionError:
+        print('protected')
+    else:
+        os.close(fd)
+        print('UNPROTECTED')
+'''
+    result = run_candidate_check(image=IMAGE, scope=scope, proposal=proposal, source_files=files,
+                                 argv=('python', '-c', script))
+    assert result.status == 'succeeded'
+    assert result.output == 'protected\nprotected\n'
+    assert result.cleaned_up and result.source_unchanged

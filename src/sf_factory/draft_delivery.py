@@ -85,7 +85,8 @@ def deliver_draft(*, plan: DeliveryPlan, state: DeliveryState,
         if prior is None:
             returned = scm.create_draft_pull_request(plan.repository,
                 title='Software Factory: Run ' + plan.run_id, head=plan.branch,
-                base=plan.base_branch, body=plan.marker)
+                base=plan.base_branch, body=plan.marker +
+                ('\n\nIssue: ' + plan.issue_url if plan.issue_url else ''))
             prior = existing_pr()
             if prior != returned:
                 raise StateConflict('PR outcome unresolved; do not replay')

@@ -7,6 +7,9 @@ on:
       - "src/sf_factory/docker_execution.py"
       - "src/sf_factory/change_proposal.py"
       - "src/sf_factory/workspace_check.py"
+      - "src/sf_factory/issue_development.py"
+      - "src/sf_factory/behavioral_check.py"
+      - "tests/test_issue_development.py"
       - "tests/test_workspace_check.py"
       - "tests/test_docker_execution.py"
       - "pyproject.toml"
@@ -16,6 +19,9 @@ on:
       - "src/sf_factory/docker_execution.py"
       - "src/sf_factory/change_proposal.py"
       - "src/sf_factory/workspace_check.py"
+      - "src/sf_factory/issue_development.py"
+      - "src/sf_factory/behavioral_check.py"
+      - "tests/test_issue_development.py"
       - "tests/test_workspace_check.py"
       - "tests/test_docker_execution.py"
       - "pyproject.toml"
@@ -59,8 +65,8 @@ jobs:
             docker --host=unix:///var/run/docker.sock pull "$SF_TEST_DOCKER_IMAGE"
       - name: Exercise required isolation checks
         run: |
-          uv run pytest tests/test_docker_execution.py tests/test_workspace_check.py -q \
-            -k 'real_offline_filesystem_and_identity or real_timeout_cleans_child_processes or real_output_limit_is_enforced or real_command_failure_is_preserved or real_bounded_input_roundtrip or real_stdin_backpressure_cannot_bypass_timeout or real_input_command_failure_is_not_success or real_candidate_runs_approved_fixture_tests or real_candidate_failure_preserves_actual_test_failure or real_candidate_source_mutation_is_rejected or real_candidate_timeout_is_reaped' \
+          uv run pytest tests/test_docker_execution.py tests/test_workspace_check.py tests/test_issue_development.py -q \
+            -k 'real_offline_filesystem_and_identity or real_timeout_cleans_child_processes or real_output_limit_is_enforced or real_command_failure_is_preserved or real_bounded_input_roundtrip or real_stdin_backpressure_cannot_bypass_timeout or real_input_command_failure_is_not_success or real_candidate_runs_approved_fixture_tests or real_candidate_failure_preserves_actual_test_failure or real_candidate_source_mutation_is_rejected or real_candidate_timeout_is_reaped or real_parent_process_provenance_is_private or real_local_issue_workflow_with_offline_docker' \
             --junitxml="$RUNNER_TEMP/offline-isolation.xml"
       - name: Reject missing or skipped isolation checks
         run: |
@@ -70,7 +76,7 @@ jobs:
           from xml.etree import ElementTree
           report = Path(os.environ["RUNNER_TEMP"]) / "offline-isolation.xml"
           cases = ElementTree.parse(report).findall(".//testcase")
-          assert len(cases) == 11, "Expected all eleven required isolation checks"
+          assert len(cases) == 13, "Expected all thirteen required isolation checks"
           assert all(not any(case.findall(tag) for tag in ("failure", "error", "skipped"))
                      for case in cases), "Required isolation checks must execute and pass"
           PY

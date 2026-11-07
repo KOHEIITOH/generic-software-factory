@@ -58,6 +58,8 @@ class DeliveryState(Protocol):
 
     def get(self, run_id: str) -> DeliveryRecord: ...
 
+    def active_for_repository(self, repository: str) -> DeliveryRecord | None: ...
+
     def advance(self, run_id: str, fingerprint: str, *, expected: str, stage: str,
                 commit: PreparedCommit | None = None,
                 pull_request: PullRequestReference | None = None) -> DeliveryRecord:
