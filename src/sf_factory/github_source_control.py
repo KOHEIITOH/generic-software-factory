@@ -7,7 +7,7 @@ import json
 import re
 from pathlib import PurePosixPath
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 from sf_factory.change_proposal import _change_path
@@ -41,7 +41,8 @@ def _branch(branch: str) -> str:
 
 
 class GitHubSourceControl:
-    def _request(self, path: str, method: str = 'GET', payload: dict | None = None) -> dict:
+    def _request(self, path: str, method: str = 'GET', payload: dict | None = None,
+                 *, collection: bool = False, optional: bool = False) -> dict:
         token = environment_token()
         if not token:
             raise SourceControlError('not_configured', 'GitHub credentials are not configured')
@@ -57,7 +58,10 @@ class GitHubSourceControl:
                 if len(raw) > 1048576:
                     raise SourceControlError('invalid_response', 'GitHub response exceeds limit')
                 result = json.loads(raw)
+                paginated = bool(response.headers.get('Link')) if collection else False
         except HTTPError as exc:
+            if optional and method == 'GET' and exc.code == 404:
+                return {'_sf_missing_ref': True}
             if exc.code in (401, 403, 404):
                 raise SourceControlError(
                     'access_denied', 'GitHub access denied or unavailable',
@@ -67,6 +71,10 @@ class GitHubSourceControl:
             raise SourceControlError('unavailable', 'GitHub unavailable') from exc
         except (ValueError, RecursionError) as exc:
             raise SourceControlError('invalid_response', 'Invalid GitHub response') from exc
+        if collection:
+            if not isinstance(result, list) or paginated or len(result) >= 100:
+                raise SourceControlError('invalid_response', 'Complete bounded PR list required')
+            return {'items': result}
         if not isinstance(result, dict):
             raise SourceControlError('invalid_response', 'Unexpected GitHub response')
         return result
@@ -220,3 +228,63 @@ class GitHubSourceControl:
                 or not isinstance(parents[0], dict) or parents[0].get('sha') != parent_revision):
             raise SourceControlError('invalid_response', 'Prepared commit subject mismatch')
         return PreparedCommit(commit_id, candidate_tree, parent_revision)
+
+    def verified_branch_revision(self, repository: str, branch: str) -> str | None:
+        data = self._request(_base(repository) + '/git/ref/heads/' + _branch(branch), optional=True)
+        if data == {'_sf_missing_ref': True}:
+            return None
+        obj = data.get('object')
+        if (data.get('ref') != 'refs/heads/' + branch or not isinstance(obj, dict)
+                or obj.get('type') != 'commit' or not isinstance(obj.get('sha'), str)
+                or not re.fullmatch(r'[a-f0-9]{40}', obj['sha'])):
+            raise SourceControlError('invalid_response', 'Exact branch commit required')
+        return obj['sha']
+
+    def ensure_branch(self, repository: str, branch: str, revision: str) -> None:
+        """Create once if absent, or verify exact existing ref. Never force update."""
+        _base(repository)
+        _branch(branch)
+        if not isinstance(revision, str) or not re.fullmatch(r'[a-f0-9]{40}', revision):
+            raise ValueError('exact candidate revision required')
+        existing = self.verified_branch_revision(repository, branch)
+        if existing is None:
+            self.create_branch(repository, branch, revision)
+            existing = self.verified_branch_revision(repository, branch)
+        if existing != revision:
+            raise SourceControlError('invalid_response', 'Existing branch differs from candidate')
+
+    def find_draft_pull_request(self, repository: str, *, head: str, base: str,
+                                revision: str, marker: str) -> PullRequestReference | None:
+        """Read-only reconciliation; closed/changed/ambiguous PRs block delivery."""
+        prefix = _base(repository)
+        _branch(head)
+        _branch(base)
+        if (not isinstance(revision, str) or not re.fullmatch(r'[a-f0-9]{40}', revision)
+                or not isinstance(marker, str) or not marker.strip() or len(marker) > 512):
+            raise ValueError('exact bounded PR reconciliation subject required')
+        query = urlencode({'state': 'all', 'head': repository.split('/')[0] + ':' + head,
+                           'per_page': 100})
+        data = self._request(prefix + '/pulls?' + query, collection=True)
+        items = data.get('items')
+        if not isinstance(items, list) or len(items) > 1:
+            raise SourceControlError('invalid_response', 'Ambiguous candidate pull requests')
+        if not items:
+            return None
+        item = items[0]
+        if not isinstance(item, dict):
+            raise SourceControlError('invalid_response', 'Invalid pull request identity')
+        for field, ref in (('head', head), ('base', base)):
+            subject = item.get(field)
+            repo = subject.get('repo') if isinstance(subject, dict) else None
+            if (not isinstance(subject, dict) or subject.get('ref') != ref
+                    or not isinstance(repo, dict) or not isinstance(repo.get('full_name'), str)
+                    or repo['full_name'].casefold() != repository.casefold()):
+                raise SourceControlError('invalid_response', 'PR repository/branch mismatch')
+        number = item.get('number')
+        if (type(number) is not int or number < 1
+                or item.get('html_url') != f'https://github.com/{repository}/pull/{number}'
+                or item['head'].get('sha') != revision or item.get('draft') is not True
+                or item.get('state') != 'open' or item.get('merged_at') is not None
+                or not isinstance(item.get('body'), str) or marker not in item['body']):
+            raise SourceControlError('invalid_response', 'Existing PR differs from delivery intent')
+        return PullRequestReference(str(number), item['html_url'])
