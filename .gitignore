@@ -8,3 +8,8 @@ __pycache__/
 web/node_modules/
 web/dist/
 web/.vite/
+
+# Local installer outputs; dependency locks are not versioned in this repository yet.
+*.egg-info/
+/uv.lock
+/web/package-lock.json
