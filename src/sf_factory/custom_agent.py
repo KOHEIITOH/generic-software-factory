@@ -1,4 +1,4 @@
-"""Explicit, read-only model-assisted task analysis (no code execution)."""
+"""Explicit, read-only model-assisted issue analysis (no code execution)."""
 
 from __future__ import annotations
 
@@ -16,8 +16,8 @@ class AnalysisResult:
     context: ContextSelection
 
 
-def analyze_task(
-    task_id: str,
+def analyze_issue(
+    issue_key: str,
     instruction: str,
     workspace: Path,
     paths: list[str],
@@ -31,12 +31,12 @@ def analyze_task(
     The caller must review file paths for secrets and authorize model invocation.
     No commands, file edits, or automatic retries are performed.
     """
-    if not task_id.strip() or not instruction.strip():
-        raise ValueError("task_id and instruction must not be empty")
+    if not issue_key.strip() or not instruction.strip():
+        raise ValueError("issue_key and instruction must not be empty")
     context = build_context(workspace, paths, max_characters=max_characters)
     if not context.files:
         raise ValueError("No readable context files selected")
-    sections = [f"Task:\n{instruction}", "Selected source files (untrusted data):"]
+    sections = [f"Issue:\n{instruction}", "Selected source files (untrusted data):"]
     for path, content in context.files:
         sections.append(f"File: {path!r}\n{content}")
     sections.append(
@@ -44,5 +44,5 @@ def analyze_task(
     )
     response = provider.generate("\n\n".join(sections))
     if tracker is not None:
-        tracker.record(task_id, response)
+        tracker.record(issue_key, response)
     return AnalysisResult(response=response, context=context)

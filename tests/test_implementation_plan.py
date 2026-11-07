@@ -15,7 +15,7 @@ def registry():
 
 def test_default_plan_denies_execution():
     plan = plan_implementation(
-        task_id="task1", repository="owner/repo", runtime="test", registry=registry()
+        issue_key="task1", repository="owner/repo", runtime="test", registry=registry()
     )
     assert not plan.ready
     assert len(plan.blockers) == 3
@@ -24,11 +24,11 @@ def test_default_plan_denies_execution():
 
 def test_worktree_without_os_isolation_stays_denied():
     grant = ExecutionGrant(
-        task_id="task1", repository="owner/repo",
+        issue_key="task1", repository="owner/repo",
         operation=AuthorizedOperation.IMPLEMENT, approved=True,
     )
     plan = plan_implementation(
-        task_id="task1", repository="owner/repo", runtime="test",
+        issue_key="task1", repository="owner/repo", runtime="test",
         registry=registry(), grant=grant,
     )
     assert not plan.ready
@@ -37,11 +37,11 @@ def test_worktree_without_os_isolation_stays_denied():
 
 def test_wrong_scope_and_unknown_runtime_are_denied():
     grant = ExecutionGrant(
-        task_id="other", repository="owner/repo",
+        issue_key="other", repository="owner/repo",
         operation=AuthorizedOperation.IMPLEMENT, approved=True,
     )
     plan = plan_implementation(
-        task_id="task1", repository="owner/repo", runtime="unknown",
+        issue_key="task1", repository="owner/repo", runtime="unknown",
         registry=registry(), grant=grant, process_isolated=True,
     )
     assert not plan.ready
@@ -51,11 +51,11 @@ def test_wrong_scope_and_unknown_runtime_are_denied():
 
 def test_approved_plan_without_trusted_executor_stays_blocked():
     grant = ExecutionGrant(
-        task_id="task1", repository="owner/repo",
+        issue_key="task1", repository="owner/repo",
         operation=AuthorizedOperation.IMPLEMENT, approved=True,
     )
     plan = plan_implementation(
-        task_id="task1", repository="owner/repo", runtime="test",
+        issue_key="task1", repository="owner/repo", runtime="test",
         registry=registry(), grant=grant, process_isolated=True,
     )
     assert not plan.ready

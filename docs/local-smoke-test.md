@@ -102,30 +102,10 @@ Grok Build smoke test completed.
 
 The adapter uses Grok's headless JSON output and an explicit allowlist containing only `read_file`, `grep`, and `list_dir`. It also blocks subagent spawning and MCP tool calls. It does not enable always-approve mode, shell access, file editing, or writing. The optional OS-level sandbox is not configured by this adapter yet; this smoke test only validates a harmless read-only prompt in an empty temporary directory.
 
-## 6. Optional: run the Copilot SDK smoke test
+## External Issue development
 
-The Copilot SDK is not required for the default setup. It uses the local Copilot CLI authentication; credentials are not stored in Factory configuration or its database. To install and use it:
-
-```bash
-uv sync --python 3.13 --extra dev --extra copilot
-copilot login
-uv run sf copilot-smoke
-```
-
-Use an organization-approved GitHub Copilot account and confirm that SDK / CLI use is permitted.
-
-The Factory Runtime Adapter can also run a persisted Task with `--runtime copilot`:
-
-```bash
-uv run sf task create "Explain this project"
-uv run sf task run <task-id> --runtime copilot
-```
-
-This currently runs against the Factory-created empty workspace, not a cloned or imported repository. The SDK session is configured with an empty tool allowlist and file-change tracking disabled. This does not establish OS-level process isolation or prove safety equivalent to Codex or Grok; repository intake, editing, and workflow execution are not included.
-
-Each Task execution requires an explicit runtime selection, for example
-`uv run sf task run <task-id> --runtime copilot`. Omitting `--runtime` is an
-error; Factory does not automatically select Codex or any other agent.
+Standalone Task commands are removed. Use [local Issue development](local-issue-development.md)
+and [external Issue references](external-issue-model.md).
 
 ## 7. Run local quality checks
 

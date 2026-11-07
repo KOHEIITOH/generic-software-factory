@@ -20,7 +20,7 @@ def open_factory(root: Path, *, backend: str | None = None) -> Factory:
         raise ValueError('SF_STATE_BACKEND must be auto, file or sqlite')
     root = root.expanduser().resolve()
     # Reserve backend initialization across Web workers. Existing callers that
-    # construct a legacy Factory/TaskStore directly must still use separate roots.
+    # construct a Factory/IssueStore directly must still use separate backend roots.
     if os.name == 'posix':
         from sf_factory.file_state import lock_directory
 
@@ -32,7 +32,7 @@ def open_factory(root: Path, *, backend: str | None = None) -> Factory:
 
 def _open_selected(root: Path, selected: str) -> Factory:
     has_sqlite = os.path.lexists(root / 'factory.sqlite3')
-    has_file = any(os.path.lexists(root / name) for name in ('tasks-v1', 'dashboard-v1'))
+    has_file = any(os.path.lexists(root / name) for name in ('issues-v2', 'dashboard-v2'))
     if has_sqlite and has_file:
         raise StateConflict('Mixed File/SQLite state root; restore or select a separate root')
     if selected == 'auto':

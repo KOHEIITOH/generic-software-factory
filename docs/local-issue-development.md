@@ -5,7 +5,8 @@
 ローカルOSのoperatorが、対象repository外に保存した設定を明示して起動するCLI。
 `uv run sf web --rebuild`の閲覧機能と起動方法は維持し、Webの実行ボタンはまだ追加しない。
 この経路はGitHubを標準Adapterに使うが、共通controllerはTaskSource/SourceControl契約で動く。
-DBは不要。既存data rootがSQLiteなら保持し、新しいPOSIX rootはFileを使用する。
+DBは不要。新しいIssue形式のSQLiteは保持し、新しいPOSIX rootはFileを使用する。
+旧Task形式のrootはサポートしないため、[新しい保存先](external-issue-model.md)でIssueを取り込み直す。
 
 ここでのBedrock呼出しは**PCで明示実行すると課金が発生し得る**。この開発環境では
 実Bedrock/実GitHub配送の通し成功を確認していない。CIの縦断テストは実Git/File/Dockerを

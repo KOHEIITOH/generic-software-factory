@@ -1,4 +1,4 @@
-"""Registry preserves existing task tables and scopes projects by owner."""
+"""Registry preserves existing issue tables and scopes projects by owner."""
 
 import sqlite3
 from pathlib import Path
@@ -12,8 +12,8 @@ from sf_factory.repository_contracts import Project, Repository, Visibility
 def test_additive_schema_and_multiple_repositories(tmp_path: Path) -> None:
     database = tmp_path / "factory.sqlite3"
     with sqlite3.connect(database) as db:
-        db.execute("CREATE TABLE tasks (id TEXT PRIMARY KEY, prompt TEXT)")
-        db.execute("INSERT INTO tasks VALUES ('old', 'keep')")
+        db.execute("CREATE TABLE issues (id TEXT PRIMARY KEY, prompt TEXT)")
+        db.execute("INSERT INTO issues VALUES ('old', 'keep')")
     registry = LocalProjectRegistry(database)
     registry.add_project(Project("p", "Example", "local"))
     registry.add_repository(Repository("fe", "p", "local-git", "/fe", Visibility.LOCAL))
@@ -22,7 +22,7 @@ def test_additive_schema_and_multiple_repositories(tmp_path: Path) -> None:
     assert registry.list_projects("other") == ()
     assert registry.list_projects("local") == (Project("p", "Example", "local"),)
     with sqlite3.connect(database) as db:
-        assert db.execute("SELECT prompt FROM tasks WHERE id='old'").fetchone()[0] == "keep"
+        assert db.execute("SELECT prompt FROM issues WHERE id='old'").fetchone()[0] == "keep"
 
 
 def test_missing_project_and_duplicate_repository_fail(tmp_path: Path) -> None:

@@ -10,14 +10,15 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from issue_fixtures import seed_issue
 
 from sf_factory.factory import Factory
 from sf_factory.harness_approval import HarnessApprovalRequest
 from sf_factory.harness_composition import compose_harness
 from sf_factory.harness_runs import HarnessRunService
 from sf_factory.harness_validation import validate_harness
+from sf_factory.local_issue_projects import LocalIssueProjects
 from sf_factory.local_project_registry import LocalProjectRegistry
-from sf_factory.local_task_projects import LocalTaskProjects
 from sf_factory.repository_contracts import Project, Repository, Visibility
 from sf_factory.run_evidence import (
     CheckObservation,
@@ -56,14 +57,14 @@ def prepared(tmp_path, monkeypatch):
     (root / 'asset.bin').write_bytes(b'\x00\xffpublic-binary-fixture')
     commit(root)
     factory = Factory(tmp_path / 'data')
-    task = factory.create_task('Implement a sample')
+    issue = seed_issue(factory, 'Implement a sample')
     service = HarnessRunService(factory)
     registry = LocalProjectRegistry(factory.db)
     registry.add_project(Project('project', 'Demo', 'local'))
     registry.add_repository(Repository('repo', 'project', 'local-git', str(root), Visibility.LOCAL))
-    LocalTaskProjects(factory.db).assign(task, 'project')
+    LocalIssueProjects(factory.db).assign(issue, 'project')
     composition = compose_harness(validate_harness(root), target='.', selected=('AGENTS.md',))
-    request = HarnessApprovalRequest('project', 'repo', task, git(root, 'rev-parse', 'HEAD'),
+    request = HarnessApprovalRequest('project', 'repo', issue, git(root, 'rev-parse', 'HEAD'),
                                      composition.bundle_hash)
     approval = service.approvals.record(request, reviewer='verified-human', approved=True,
                                         expires_at=datetime.now(UTC) + timedelta(hours=1))

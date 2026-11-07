@@ -203,9 +203,9 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
                 raise StateConflict('clean local HEAD must match remote default branch')
             issue = source.fetch_issue(config.issue)
             if issue.external_id != config.issue:
-                raise ValueError('task source returned a different Issue')
-            task_id = factory.import_external_task(**asdict(issue))
-            factory.bind_task_repository(task_id, info.external_id, config.root)
+                raise ValueError('issue source returned a different Issue')
+            issue_key = factory.import_issue(**asdict(issue))
+            factory.bind_issue_repository(issue_key, info.external_id, config.root)
             key = hashlib.sha256((info.external_id + '\0' + str(config.root)).encode()).hexdigest()
             project_id, repository_id = key[:32], key[32:]
             registry = factory.project_registry()
@@ -215,14 +215,14 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
                 registry.add_repository(Repository(repository_id, project_id, 'local-git',
                                                     str(config.root), Visibility.LOCAL))
             state = factory.harness_state()
-            previous = state.task_projects.project_for_task(task_id)
+            previous = state.issue_projects.project_for_issue(issue_key)
             if previous is None:
-                state.task_projects.assign(task_id, project_id)
+                state.issue_projects.assign(issue_key, project_id)
             elif previous != project_id:
                 raise StateConflict('Issue belongs to a different project')
             composition = compose_harness(validate_harness(config.root), target='.',
                 selected=config.selected_harness, excluded=config.excluded_harness)
-            request = HarnessApprovalRequest(project_id, repository_id, task_id, revision,
+            request = HarnessApprovalRequest(project_id, repository_id, issue_key, revision,
                                              composition.bundle_hash)
             expiry = datetime.now(UTC) + timedelta(hours=1)
             approval = state.approvals.record(request, reviewer='local-cli-operator',
@@ -230,6 +230,8 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
             run = HarnessRunService(factory).prepare(root=config.root, request=request,
                 approval_id=approval, target='.', selected=config.selected_harness,
                 excluded=config.excluded_harness, controller='local-cli')
+            issue = ExternalIssue(**{key: run['issue_snapshot'][key] for key in (
+                'provider', 'instance', 'external_id', 'prompt', 'external_url')})
             run_id = run['id']
             snapshots = SourceSnapshotService(factory)
             snapshots.create(run_id, root=config.root)

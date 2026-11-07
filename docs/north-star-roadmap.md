@@ -264,3 +264,9 @@ PR #97でCoreのorigin/source規則をAdapterへ、PR #98でDraft PRデモのRES
 既存TaskSource/Repository契約を再利用し、GitHubを組立・Web初期値・設定例の標準へ揃える。
 他サービスの追加実装やplugin基盤は作らず、共通WorkflowにGitHub型を持ち込まない。
 この方針対応はM3自動実装・配送の完了とは区別する。
+
+## 依頼モデルの更新
+
+独立Taskの管理・保存・旧API/CLIは削除済み。外部Issue参照へRun・承認・証跡を直接関連付け、
+各Runに要件snapshotを固定する。旧形式の移行は行わず、新しい保存先で開始する。
+詳細は[外部Issueモデル](external-issue-model.md)を参照。M3の実サービス最終通し試験は引き続きPCで未確認。

@@ -30,13 +30,9 @@ class InspectRepositoryRequest(BaseModel):
     path: str = Field(min_length=1, max_length=1000)
 
 
-class BindTaskRepositoryRequest(BaseModel):
+class BindIssueRepositoryRequest(BaseModel):
     repository: str = Field(min_length=3, max_length=200)
     local_path: str = Field(min_length=1, max_length=1000)
-
-
-class CreateTaskRequest(BaseModel):
-    prompt: str = Field(min_length=1, max_length=10000)
 
 
 class CreateProjectRequest(BaseModel):
@@ -116,32 +112,18 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
     def imported_issues() -> dict:
         return {'issues': open_factory(data_dir).issue_history()}
 
-    @app.get('/api/tasks')
-    def tasks() -> dict[str, list[dict]]:
-        return {'tasks': open_factory(data_dir or Path('.sf-factory')).list_tasks()}
-
     @app.get('/api/runs')
     def runs() -> dict[str, list[dict]]:
         return {'runs': open_factory(data_dir or Path('.sf-factory')).list_runs()}
 
-    @app.post("/api/tasks", status_code=201)
-    def create_task(payload: CreateTaskRequest, request: Request) -> dict[str, str]:
-        _check_local_origin(request)
-        prompt = payload.prompt.strip()
-        if not prompt:
-            raise HTTPException(status_code=422, detail="Task must not be blank")
-        task_id = open_factory(data_dir or Path(".sf-factory")).create_task(prompt)
-        return {"task_id": task_id}
-
-
-    @app.post("/api/tasks/{task_id}/repository")
-    def bind_task_repository(
-        task_id: str, payload: BindTaskRepositoryRequest, request: Request
+    @app.post("/api/issues/{issue_key}/repository")
+    def bind_issue_repository(
+        issue_key: str, payload: BindIssueRepositoryRequest, request: Request
     ) -> dict[str, str]:
         _check_local_origin(request)
         try:
-            return open_factory(data_dir or Path(".sf-factory")).bind_task_repository(
-                task_id, payload.repository, Path(payload.local_path)
+            return open_factory(data_dir or Path(".sf-factory")).bind_issue_repository(
+                issue_key, payload.repository, Path(payload.local_path)
             )
         except (OSError, ValueError) as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc

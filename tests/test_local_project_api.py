@@ -1,8 +1,8 @@
 """Local project read-only API regression tests."""
-
 from pathlib import Path
 
 import pytest
+from issue_fixtures import seed_issue
 
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
@@ -38,7 +38,7 @@ def test_project_listing_and_origin_guard(tmp_path: Path) -> None:
 
 def test_empty_project_listing_does_not_change_tasks(tmp_path: Path) -> None:
     factory = Factory(tmp_path)
-    task = factory.create_task("existing")
+    issue = seed_issue(factory, "existing")
     with TestClient(create_app(data_dir=tmp_path)) as client:
         assert client.get("/api/projects").json() == {"projects": []}
-    assert Factory(tmp_path).show_task(task)["task"]["prompt"] == "existing"
+    assert Factory(tmp_path).show_issue(issue)["issue"]["prompt"] == "existing"

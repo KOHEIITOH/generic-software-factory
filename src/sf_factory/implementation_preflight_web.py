@@ -13,19 +13,19 @@ from sf_factory.policy import Capability, ExecutionPolicy, ExecutionRequest
 
 
 def install_implementation_preflight_routes(app: FastAPI, data_dir) -> None:
-    @app.get("/api/tasks/{task_id}/implementation-preflight")
-    def implementation_preflight(task_id: str):
+    @app.get("/api/issues/{issue_key}/implementation-preflight")
+    def implementation_preflight(issue_key: str):
         factory = open_factory(data_dir)
         try:
-            task = factory.task_repository(task_id)
+            issue = factory.issue_repository(issue_key)
         except ValueError as exc:
-            raise HTTPException(status_code=404, detail="Task not found") from exc
+            raise HTTPException(status_code=404, detail="Issue not found") from exc
         blockers = []
-        if task["provider"] != "github":
+        if issue["provider"] != "github":
             blockers.append("GitHub Issue source required")
-        if not task["repository"] or not task["local_path"]:
+        if not issue["repository"] or not issue["local_path"]:
             blockers.append("Verified local repository binding required")
-        elif task["instance"].casefold() != task["repository"].casefold():
+        elif issue["instance"].casefold() != issue["repository"].casefold():
             blockers.append("Issue and bound repository differ")
         policy = ExecutionPolicy()
         write = policy.evaluate(
@@ -40,8 +40,8 @@ def install_implementation_preflight_routes(app: FastAPI, data_dir) -> None:
             blockers.append("External GitHub actions are disabled by default")
         blockers.append("Isolated write-capable agent execution is not implemented")
         return {
-            "task_id": task_id,
-            "repository": task["repository"],
+            "issue_key": issue_key,
+            "repository": issue["repository"],
             "runtimes": list(default_runtime_registry().names()),
             "ready_for_implementation": False,
             "blockers": blockers,

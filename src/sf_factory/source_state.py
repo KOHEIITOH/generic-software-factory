@@ -54,8 +54,8 @@ class SqliteSourceState:
                        (run_id, snapshot_id, fingerprint, json.dumps(manifest, sort_keys=True)))
             from sf_factory.factory import _now
 
-            db.execute('INSERT INTO audit(run_id,task_id,event,at) VALUES (?,?,?,?)',
-                       (run_id, run['task_id'], 'run.source_snapshotted', _now()))
+            db.execute('INSERT INTO audit(run_id,issue_key,event,at) VALUES (?,?,?,?)',
+                       (run_id, run['issue_key'], 'run.source_snapshotted', _now()))
 
     def get(self, run_id: str) -> dict | None:
         with closing(self.factory._connect()) as db:
@@ -85,7 +85,7 @@ class FileSourceState:
             }
             from sf_factory.factory import _now
 
-            state['events'].append({'run_id': run_id, 'task_id': run['task_id'],
+            state['events'].append({'run_id': run_id, 'issue_key': run['issue_key'],
                                     'event': 'run.source_snapshotted', 'at': _now()})
 
     def get(self, run_id: str) -> dict | None:

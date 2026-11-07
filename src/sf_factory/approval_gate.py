@@ -14,13 +14,13 @@ class ActionKind(StrEnum):
 
 @dataclass(frozen=True)
 class ProposedAction:
-    task_id: str
+    issue_key: str
     kind: ActionKind
     summary: str
 
     def __post_init__(self) -> None:
-        if not self.task_id.strip() or not self.summary.strip():
-            raise ValueError("task_id and summary are required")
+        if not self.issue_key.strip() or not self.summary.strip():
+            raise ValueError("issue_key and summary are required")
         if not isinstance(self.kind, ActionKind):
             raise ValueError("kind must be an ActionKind")
 

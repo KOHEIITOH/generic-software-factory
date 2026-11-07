@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 from multiprocessing import get_context
 
 import pytest
+from issue_fixtures import seed_issue
 from test_harness_runs import commit, git
 
 from sf_factory.factory_selection import open_factory
@@ -34,14 +35,14 @@ def file_prepared(tmp_path, monkeypatch):
     (root / 'AGENTS.md').write_text('fixture rules')
     commit(root)
     factory = open_factory(tmp_path / 'data')
-    task = factory.create_task('Fixture task')
+    issue = seed_issue(factory, 'Fixture issue')
     registry = factory.project_registry()
     registry.add_project(Project('project', 'Example', 'local'))
     registry.add_repository(Repository('repo', 'project', 'local-git', str(root), Visibility.LOCAL))
     state = factory.harness_state()
-    state.task_projects.assign(task, 'project')
+    state.issue_projects.assign(issue, 'project')
     bundle = compose_harness(validate_harness(root), target='.', selected=('AGENTS.md',))
-    request = HarnessApprovalRequest('project', 'repo', task, git(root, 'rev-parse', 'HEAD'),
+    request = HarnessApprovalRequest('project', 'repo', issue, git(root, 'rev-parse', 'HEAD'),
                                      bundle.bundle_hash)
     service = HarnessRunService(factory)
     approval = service.approvals.record(request, reviewer='human', approved=True,
@@ -95,13 +96,13 @@ def test_bad_scope_or_stale_approval_does_not_create_run(file_prepared, change):
 
 def test_failed_replace_leaves_approval_reusable_and_no_run(file_prepared, monkeypatch):
     _, factory, service, _, approval = file_prepared
-    before = (factory.root / 'dashboard-v1/state.json').read_bytes()
+    before = (factory.root / 'dashboard-v2/state.json').read_bytes()
     with monkeypatch.context() as patch:
         patch.setattr('sf_factory.file_document.os.replace',
                       lambda *args, **kwargs: (_ for _ in ()).throw(OSError('fixture')))
         with pytest.raises(StateUnavailable):
             prepare(file_prepared)
-    assert (factory.root / 'dashboard-v1/state.json').read_bytes() == before
+    assert (factory.root / 'dashboard-v2/state.json').read_bytes() == before
     assert len(service.approvals.events(approval)) == 1
     assert prepare(file_prepared)['status'] == 'prepared'
 
@@ -183,25 +184,25 @@ def test_uncertain_directory_sync_keeps_decision_and_run_together(file_prepared,
 
 def test_legacy_dashboard_upgrades_without_replacing_tasks_or_projects(tmp_path):
     factory = open_factory(tmp_path)
-    task = factory.create_task('Keep')
+    seed_issue(factory, 'Keep')
     factory.project_registry().add_project(Project('p', 'Keep project', 'local'))
-    path = tmp_path / 'dashboard-v1/state.json'
+    path = tmp_path / 'dashboard-v2/state.json'
     record = json.loads(path.read_text())
     record.pop('harness')
     record.pop('snapshots')
     record.pop('evidence')
     record['schema_version'] = 1
     path.write_text(json.dumps(record))
-    reopened = open_factory(tmp_path)
-    assert reopened.show_task(task)['task']['prompt'] == 'Keep'
-    assert reopened.project_registry().list_projects('local')[0].id == 'p'
-    assert json.loads(path.read_text())['schema_version'] == 4
+    before = path.read_bytes()
+    with pytest.raises(StateCorrupt):
+        open_factory(factory.root)
+    assert path.read_bytes() == before
 
 
 @pytest.mark.parametrize('flag,value', [('approved', 1), ('consumed', True), ('revoked', True)])
 def test_corrupt_decision_flags_or_audit_are_rejected(file_prepared, flag, value):
     _, factory, _, _, approval = file_prepared
-    path = factory.root / 'dashboard-v1/state.json'
+    path = factory.root / 'dashboard-v2/state.json'
     record = json.loads(path.read_text())
     record['harness']['approvals'][approval][flag] = value
     path.write_text(json.dumps(record))
@@ -213,8 +214,8 @@ def test_corrupt_decision_flags_or_audit_are_rejected(file_prepared, flag, value
 
 def test_task_project_assignment_is_once_only(file_prepared):
     _, factory, _, request, _ = file_prepared
-    mapping = factory.harness_state().task_projects
-    assert mapping.project_for_task(request.task_id) == 'project'
-    assert mapping.tasks_for_project('project') == (request.task_id,)
+    mapping = factory.harness_state().issue_projects
+    assert mapping.project_for_issue(request.issue_key) == 'project'
+    assert mapping.issues_for_project('project') == (request.issue_key,)
     with pytest.raises(StateConflict):
-        mapping.assign(request.task_id, 'project')
+        mapping.assign(request.issue_key, 'project')

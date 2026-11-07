@@ -49,7 +49,7 @@ class SqliteEvidenceState:
         with closing(self.factory._connect()) as db, db:
             db.execute('BEGIN IMMEDIATE')
             row = db.execute(
-                'SELECT r.task_id,r.status,m.manifest FROM runs r '
+                'SELECT r.issue_key,r.status,m.manifest FROM runs r '
                 'JOIN run_harness_manifests m ON m.run_id=r.id WHERE r.id=?', (run_id,),
             ).fetchone()
             rules.registration(dict(row) if row is not None else None, subject)
@@ -59,8 +59,8 @@ class SqliteEvidenceState:
                 _encoded({'requirements': [asdict(c) for c in sorted(checks, key=lambda c: c.id)]}),
                 collector, max_attempts,
             ))
-            db.execute('INSERT INTO audit(run_id,task_id,event,at) VALUES (?,?,?,?)',
-                       (run_id, row['task_id'], 'run.check_plan_registered', _now()))
+            db.execute('INSERT INTO audit(run_id,issue_key,event,at) VALUES (?,?,?,?)',
+                       (run_id, row['issue_key'], 'run.check_plan_registered', _now()))
 
     def record(
         self, run_id: str, subject: EvidenceSubject, *, attempt: int,
@@ -81,22 +81,22 @@ class SqliteEvidenceState:
             db.execute('INSERT INTO run_check_observations VALUES (?,?,?,?,?)', (
                 run_id, attempt, observation.check_id, _encoded(asdict(observation)), _now(),
             ))
-            task_id = db.execute('SELECT task_id FROM runs WHERE id=?', (run_id,)).fetchone()[0]
-            db.execute('INSERT INTO audit(run_id,task_id,event,at) VALUES (?,?,?,?)',
-                       (run_id, task_id, 'run.check_observed', _now()))
+            issue_key = db.execute('SELECT issue_key FROM runs WHERE id=?', (run_id,)).fetchone()[0]
+            db.execute('INSERT INTO audit(run_id,issue_key,event,at) VALUES (?,?,?,?)',
+                       (run_id, issue_key, 'run.check_observed', _now()))
 
     def register_review(
         self, run_id: str, *, reviewer: str, implementer: str, changed_paths: tuple[str, ...],
     ) -> None:
         with closing(self.factory._connect()) as db, db:
             db.execute('BEGIN IMMEDIATE')
-            run = db.execute('SELECT status,task_id FROM runs WHERE id=?', (run_id,)).fetchone()
+            run = db.execute('SELECT status,issue_key FROM runs WHERE id=?', (run_id,)).fetchone()
             if run is None or run['status'] != 'prepared':
                 raise ValueError('prepared Run required')
             db.execute('INSERT INTO run_review_plans VALUES (?,?,?,?)',
                        (run_id, reviewer, implementer, _encoded({'paths': sorted(changed_paths)})))
-            db.execute('INSERT INTO audit(run_id,task_id,event,at) VALUES (?,?,?,?)',
-                       (run_id, run['task_id'], 'run.review_plan_registered', _now()))
+            db.execute('INSERT INTO audit(run_id,issue_key,event,at) VALUES (?,?,?,?)',
+                       (run_id, run['issue_key'], 'run.review_plan_registered', _now()))
 
     def record_review(
         self, run_id: str, subject: EvidenceSubject, *, attempt: int, reviewer: str, response: str,
@@ -107,7 +107,7 @@ class SqliteEvidenceState:
                 'SELECT p.subject,r.reviewer,r.paths FROM run_evidence_plans p '
                 'JOIN run_review_plans r ON r.run_id=p.run_id WHERE p.run_id=?', (run_id,),
             ).fetchone()
-            run = db.execute('SELECT status,task_id FROM runs WHERE id=?', (run_id,)).fetchone()
+            run = db.execute('SELECT status,issue_key FROM runs WHERE id=?', (run_id,)).fetchone()
             latest = db.execute('SELECT COALESCE(MAX(attempt),0) FROM run_check_observations '
                                 'WHERE run_id=?', (run_id,)).fetchone()[0]
             rules.review_observation(dict(plan) if plan is not None else None,
@@ -118,8 +118,8 @@ class SqliteEvidenceState:
                                    required_paths=tuple(json.loads(plan['paths'])['paths']))
             db.execute('INSERT INTO run_review_observations VALUES (?,?,?,?)',
                        (run_id, attempt, _encoded(asdict(summary)), _now()))
-            db.execute('INSERT INTO audit(run_id,task_id,event,at) VALUES (?,?,?,?)',
-                       (run_id, run['task_id'], 'run.review_observed', _now()))
+            db.execute('INSERT INTO audit(run_id,issue_key,event,at) VALUES (?,?,?,?)',
+                       (run_id, run['issue_key'], 'run.review_observed', _now()))
 
     def assessment(self, run_id: str, subject: EvidenceSubject):
         with closing(self.factory._connect()) as db, db:

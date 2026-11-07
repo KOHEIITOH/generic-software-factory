@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from issue_fixtures import seed_issue
 
 from sf_factory.agent_registry import AgentRuntimeRegistry, default_runtime_registry
 from sf_factory.factory import Factory
@@ -23,8 +24,8 @@ def test_custom_runtime_uses_same_factory_path(tmp_path: Path) -> None:
     registry = AgentRuntimeRegistry()
     registry.register("custom", FakeRuntime)
     factory = Factory(tmp_path, runtime_registry=registry)
-    task_id = factory.create_task("hello")
-    run = factory.run_task(task_id, "custom")
+    issue_key = seed_issue(factory, "hello")
+    run = factory.run_issue(issue_key, "custom")
     assert run["status"] == "succeeded"
     assert run["runtime"] == "custom"
     assert run["output"] == "OK"
@@ -43,7 +44,7 @@ def test_duplicate_or_blank_names_rejected() -> None:
 def test_unknown_runtime_rejected_before_workspace_creation(tmp_path: Path) -> None:
     registry = AgentRuntimeRegistry()
     factory = Factory(tmp_path, runtime_registry=registry)
-    task_id = factory.create_task("hello")
+    issue_key = seed_issue(factory, "hello")
     with pytest.raises(ValueError, match="unsupported runtime"):
-        factory.run_task(task_id, "unknown")
+        factory.run_issue(issue_key, "unknown")
     assert not list(factory.workspaces.iterdir())

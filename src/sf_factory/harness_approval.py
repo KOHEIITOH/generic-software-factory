@@ -39,16 +39,16 @@ def harness_bundle_hash(validation: HarnessValidation) -> str:
 class HarnessApprovalRequest:
     project_id: str
     repository_id: str
-    task_id: str
+    issue_key: str
     revision: str
     bundle_hash: str
     operation: str = 'apply_harness'
 
     def __post_init__(self) -> None:
-        for value in (self.project_id, self.repository_id, self.task_id):
+        for value in (self.project_id, self.repository_id, self.issue_key):
             if (not isinstance(value, str) or not value.strip()
                     or len(value) > 512 or '\x00' in value):
-                raise ValueError('bounded project, repository and task identifiers required')
+                raise ValueError('bounded project, repository and issue identifiers required')
         if not re.fullmatch(r'(?:[a-f0-9]{40}|[a-f0-9]{64})', self.revision):
             raise ValueError('exact repository revision required')
         if not re.fullmatch(r'[a-f0-9]{64}', self.bundle_hash):

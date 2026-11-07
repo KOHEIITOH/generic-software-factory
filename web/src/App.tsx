@@ -9,10 +9,10 @@ const plannedRuntimes = [
 type ApiState = "loading" | "connected" | "offline";
 type Project = { id: string; name: string; owner_id: string };
 type Repository = { id: string; project_id: string; provider_id: string; external_id: string; visibility: string };
-type Task = { id: string; prompt: string; created_at: string; provider?: string | null; instance?: string | null; bound_repository?: string | null; bound_local_path?: string | null; external_id?: string | null; external_url?: string | null; recent_runs: Run[]; total_runs: number };
+type ImportedIssue = { key: string; prompt: string; observed_at: string; provider: string; instance: string; bound_repository?: string | null; bound_local_path?: string | null; external_id: string; external_url?: string | null; recent_runs: Run[]; total_runs: number };
 type Issue = { repository: string; number: string; prompt: string; url: string };
-type Run = { id: string; task_id: string; runtime: string; status: string; started_at: string };
-type Preflight = { task_id: string; repository: string | null; runtimes: string[]; ready_for_implementation: boolean; blockers: string[]; execution_started: boolean };
+type Run = { id: string; issue_key: string; runtime: string; status: string; started_at: string };
+type Preflight = { issue_key: string; repository: string | null; runtimes: string[]; ready_for_implementation: boolean; blockers: string[]; execution_started: boolean };
 
 export default function App() {
   const [state, setState] = useState<ApiState>("loading");
@@ -37,10 +37,10 @@ export default function App() {
   const [repoMessage, setRepoMessage] = useState("");
   const [runtimes, setRuntimes] = useState<string[]>([]);
   const [error, setError] = useState("");
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [bindingTaskId, setBindingTaskId] = useState("");
+  const [issues, setIssues] = useState<ImportedIssue[]>([]);
+  const [bindingIssueKey, setBindingIssueKey] = useState("");
   const [bindingMessage, setBindingMessage] = useState("");
-  const [preflightByTask, setPreflightByTask] = useState<Record<string, Preflight>>({});
+  const [preflightByIssue, setPreflightByIssue] = useState<Record<string, Preflight>>({});
   const [preflightBusy, setPreflightBusy] = useState<string[]>([]);
   const [preflightErrors, setPreflightErrors] = useState<Record<string, string>>({});
   const [runs, setRuns] = useState<Run[]>([]);
@@ -156,20 +156,20 @@ export default function App() {
     } finally { setQuickRepoBusy(false); }
   }
 
-  async function checkImplementationPreflight(taskId: string) {
-    if (preflightBusy.includes(taskId)) return;
-    setPreflightBusy(previous => [...previous, taskId]);
-    setPreflightErrors(previous => ({ ...previous, [taskId]: "" }));
+  async function checkImplementationPreflight(issueKey: string) {
+    if (preflightBusy.includes(issueKey)) return;
+    setPreflightBusy(previous => [...previous, issueKey]);
+    setPreflightErrors(previous => ({ ...previous, [issueKey]: "" }));
     try {
-      const response = await fetch("/api/tasks/" + encodeURIComponent(taskId) + "/implementation-preflight");
+      const response = await fetch("/api/issues/" + encodeURIComponent(issueKey) + "/implementation-preflight");
       if (!response.ok) throw new Error("事前チェックに失敗しました（" + response.status + "）");
       const result: Preflight = await response.json();
-      setPreflightByTask(previous => ({ ...previous, [taskId]: result }));
+      setPreflightByIssue(previous => ({ ...previous, [issueKey]: result }));
     } catch (error) {
-      setPreflightByTask(previous => { const next = { ...previous }; delete next[taskId]; return next; });
-      setPreflightErrors(previous => ({ ...previous, [taskId]: error instanceof Error ? error.message : "取得エラー" }));
+      setPreflightByIssue(previous => { const next = { ...previous }; delete next[issueKey]; return next; });
+      setPreflightErrors(previous => ({ ...previous, [issueKey]: error instanceof Error ? error.message : "取得エラー" }));
     } finally {
-      setPreflightBusy(previous => previous.filter(id => id !== taskId));
+      setPreflightBusy(previous => previous.filter(id => id !== issueKey));
     }
   }
 
@@ -234,27 +234,27 @@ export default function App() {
     finally { setIssueBusy(false); }
   }
 
-  async function bindTaskRepository(task: Task) {
+  async function bindIssueRepository(issue: ImportedIssue) {
     if (!quickRepo) return;
-    setBindingTaskId(task.id);
+    setBindingIssueKey(issue.key);
     setBindingMessage("");
     try {
-      const response = await fetch("/api/tasks/" + encodeURIComponent(task.id) + "/repository", {
+      const response = await fetch("/api/issues/" + encodeURIComponent(issue.key) + "/repository", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repository: task.instance ?? "", local_path: quickRepo }),
+        body: JSON.stringify({ repository: issue.instance ?? "", local_path: quickRepo }),
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
         throw new Error(typeof body.detail === "string" ? body.detail : "Repository紐付けに失敗しました");
       }
       const data = await response.json();
-      setTasks(previous => previous.map(item => item.id === task.id ? { ...item, bound_repository: data.repository, bound_local_path: data.local_path } : item));
+      setIssues(previous => previous.map(item => item.key === issue.key ? { ...item, bound_repository: data.repository, bound_local_path: data.local_path } : item));
       setBindingMessage("Repository紐付け完了。AI実行はまだ行われません。");
     } catch (error) {
       setBindingMessage(error instanceof Error ? error.message : "紐付けエラー");
     } finally {
-      setBindingTaskId("");
+      setBindingIssueKey("");
     }
   }
 
@@ -268,10 +268,10 @@ export default function App() {
       });
       if (!response.ok) throw new Error("取り込みに失敗しました。");
       const data = await response.json();
-      setIssueMessage("取り込み完了: Task " + data.task_id);
+      setIssueMessage("Issueを取り込みました");
       setIssuePreview(null);
-      const tasksResponse = await fetch("/api/issues");
-      if (tasksResponse.ok) setTasks((await tasksResponse.json()).issues);
+      const issuesResponse = await fetch("/api/issues");
+      if (issuesResponse.ok) setIssues((await issuesResponse.json()).issues);
     } catch (error) { setIssueMessage(error instanceof Error ? error.message : "取り込みエラー"); }
     finally { setIssueBusy(false); }
   }
@@ -292,18 +292,18 @@ export default function App() {
           throw new Error("Unexpected runtime response");
         }
         setRuntimes(payload.runtimes as string[]);
-        const [taskResponse, runResponse] = await Promise.all([
+        const [issueResponse, runResponse] = await Promise.all([
           fetch("/api/issues", { signal: controller.signal }),
           fetch("/api/runs", { signal: controller.signal }),
         ]);
-        if (!taskResponse.ok || !runResponse.ok) throw new Error("Issue・Runの履歴を取得できませんでした");
-        const taskData: unknown = await taskResponse.json();
+        if (!issueResponse.ok || !runResponse.ok) throw new Error("Issue・Runの履歴を取得できませんでした");
+        const issueData: unknown = await issueResponse.json();
         const runData: unknown = await runResponse.json();
-        if (!taskData || typeof taskData !== "object" || !("issues" in taskData) || !Array.isArray(taskData.issues)
-          || !taskData.issues.every((item: unknown) => item && typeof item === "object" && "id" in item && typeof item.id === "string" && "prompt" in item && typeof item.prompt === "string" && "recent_runs" in item && Array.isArray(item.recent_runs) && "total_runs" in item && typeof item.total_runs === "number")) throw new Error("Unexpected issues response");
+        if (!issueData || typeof issueData !== "object" || !("issues" in issueData) || !Array.isArray(issueData.issues)
+          || !issueData.issues.every((item: unknown) => item && typeof item === "object" && "key" in item && typeof item.key === "string" && "prompt" in item && typeof item.prompt === "string" && "provider" in item && typeof item.provider === "string" && "instance" in item && typeof item.instance === "string" && "external_id" in item && typeof item.external_id === "string" && "recent_runs" in item && Array.isArray(item.recent_runs) && "total_runs" in item && typeof item.total_runs === "number")) throw new Error("Unexpected issues response");
         if (!runData || typeof runData !== "object" || !("runs" in runData) || !Array.isArray(runData.runs)
-          || !runData.runs.every((item: unknown) => item && typeof item === "object" && "id" in item && typeof item.id === "string" && "status" in item && typeof item.status === "string")) throw new Error("Unexpected runs response");
-        setTasks(taskData.issues as Task[]);
+          || !runData.runs.every((item: unknown) => item && typeof item === "object" && "key" in item && typeof item.key === "string" && "status" in item && typeof item.status === "string")) throw new Error("Unexpected runs response");
+        setIssues(issueData.issues as ImportedIssue[]);
         setRuns(runData.runs as Run[]);
         setState("connected");
       } catch (cause) {
@@ -329,14 +329,13 @@ export default function App() {
   }, []);
 
   const activeRuns = runs.filter(run => run.status === "running").length;
-  const linkedTasks = tasks.filter(task => task.provider).length;
   const formatDate = (date: string) => Number.isNaN(Date.parse(date)) ? date : new Date(date).toLocaleString("ja-JP");
 
   return (
     <div className="layout">
       <aside className="sidebar">
         <div className="brand"><span className="brand-icon">SF</span><span>Software Factory<small>DEVELOPMENT CONTROL CENTER</small></span></div>
-        <nav aria-label="Main navigation"><a className="selected" href="#overview">▦　概要</a><a href="#quick-start">▶　クイック開始</a><a href="#projects">▤　Project</a><a href="#runtimes">◈　AI Runtime</a><a href="#tasks">☷　IssueとRun</a><a href="#github-import">＋　Issue取り込み</a><a href="#runs">⑂　実行履歴</a><span className="nav-group-label">DOCUMENTATION</span><a href="/guide">▤　ユーザーガイド</a><a href="/onboarding">↗　オンボーディング</a></nav>
+        <nav aria-label="Main navigation"><a className="selected" href="#overview">▦　概要</a><a href="#quick-start">▶　クイック開始</a><a href="#projects">▤　Project</a><a href="#runtimes">◈　AI Runtime</a><a href="#issues">☷　IssueとRun</a><a href="#github-import">＋　Issue取り込み</a><a href="#runs">⑂　実行履歴</a><span className="nav-group-label">DOCUMENTATION</span><a href="/guide">▤　ユーザーガイド</a><a href="/onboarding">↗　オンボーディング</a></nav>
         <div className="sidebar-footer"><span className="sidebar-dot" /> LOCAL WORKSPACE <small>Factory Core · v0.1</small></div>
       </aside>
       <main>
@@ -353,14 +352,14 @@ export default function App() {
             <button type="submit" disabled={!quickRepoPath.trim() || quickRepoBusy}>{quickRepoBusy ? "確認中..." : "確認"}</button>
           </form>
           {quickRepoLoading ? <p role="status">Gitを確認中...</p> : quickRepo
-            ? <p className="quick-repo-status">検証済み（Task未連携）: <code>{quickRepo}</code></p>
+            ? <p className="quick-repo-status">検証済み（Issue未連携）: <code>{quickRepo}</code></p>
             : <p role="status">開発対象のパスを入力して確認してください。</p>}
           {quickRepoError && <p role="alert">{quickRepoError}</p>}
-          <a className="source-link quick-start-link" href="#tasks">Taskを作成する ↓</a>
-          <p className="quick-start-note">※ 現在はRepository確認とTask登録まで。AI実行は未対応です。</p>
+          <a className="source-link quick-start-link" href="#github-import">GitHub Issueを取り込む ↓</a>
+          <p className="quick-start-note">※ 開発実行はローカルCLIから行います。取り込みだけではAIを呼び出しません。</p>
         </section>
-        <div className="section-heading"><div><span className="eyebrow">FACTORY WORKSPACE</span><h2>ワークスペース</h2></div><span className="section-note">Issue {tasks.length}件 · 外部連携 {linkedTasks}件</span></div><section className="panel" id="projects">
-          <div className="panel-head"><span className="eyebrow">LOCAL PROJECTS</span><h2>Project・Repository</h2><p>複数Repositoryをまとめる場合に登録します。単一RepositoryのTask作成には登録不要です。登録だけではGit操作・AI実行は始まりません。</p></div>
+        <div className="section-heading"><div><span className="eyebrow">FACTORY WORKSPACE</span><h2>ワークスペース</h2></div><span className="section-note">取込済みIssue {issues.length}件</span></div><section className="panel" id="projects">
+          <div className="panel-head"><span className="eyebrow">LOCAL PROJECTS</span><h2>Project・Repository</h2><p>複数Repositoryをまとめる場合に登録します。単一RepositoryのIssue取り込みには登録不要です。登録だけではGit操作・AI実行は始まりません。</p></div>
           <form className="issue-form" onSubmit={event => { event.preventDefault(); void createProject(); }}>
             <label>新しいProject名<input aria-label="新しいProject名" maxLength={120} value={projectName} onChange={event => setProjectName(event.target.value)} placeholder="例: My Service" /></label>
             <button type="submit" disabled={projectBusy || !projectName.trim() || state !== "connected"}>{projectBusy ? "登録中..." : "Projectを登録"}</button>
@@ -436,7 +435,7 @@ export default function App() {
           {issueMessage && <p role="status">{issueMessage}</p>}
           {issuePreview && <div className="issue-preview"><strong>Issue #{issuePreview.number}</strong><pre>{issuePreview.prompt}</pre><a className="source-link" href={issuePreview.url} target="_blank" rel="noopener noreferrer">GitHubで開く ↗</a><button type="button" disabled={issueBusy} onClick={() => void importIssue()}>このIssueを取り込む</button></div>}
         </section>
-        <section className="panel" id="tasks"><div className="panel-head"><span className="eyebrow">ISSUE / RUN TRACKER</span><h2>IssueとRun</h2><p>依頼は元のIssueで管理し、同じIssueの実行結果をRunとして残します。現在は事前チェックまでで、自動実装はまだ接続中です。</p></div>{bindingMessage && <p role="status">{bindingMessage}</p>}{state === "connected" && (tasks.length ? <div className="runtime-list">{tasks.map(task => <div className="runtime" key={task.id}><details className="task-details"><summary><strong>{task.prompt.split("\n")[0].slice(0, 140) || "無題のIssue"}</strong><small>{task.provider ? `${task.provider.toUpperCase()} · ${task.instance ?? ""} · ${task.external_id ?? ""} · ` : "LOCAL · "}{formatDate(task.created_at)}</small></summary><p>取込時の要件スナップショットです。最新の要件は元Issueで確認してください。</p><pre className="task-detail-body">{task.prompt}</pre><div className="preflight-panel"><strong>Run履歴（合計 {task.total_runs}件・直近10件）</strong>{task.recent_runs.length ? <ul>{task.recent_runs.map(run => <li key={run.id}>{run.runtime} · {run.status} · {formatDate(run.started_at)}<small> · {run.id.slice(0, 12)}</small></li>)}</ul> : <p>まだRunはありません。取込や事前チェックでは実行は始まりません。</p>}<small>既存の読み取り専用実行やHarness準備も含みます。成功表示だけで実装・PR作成済みとは扱いません。</small></div><div className="preflight-panel"><button type="button" disabled={preflightBusy.includes(task.id)} onClick={() => void checkImplementationPreflight(task.id)}>{preflightBusy.includes(task.id) ? "チェック中..." : "AI実装の事前チェック"}</button>{preflightErrors[task.id] && <p role="alert">{preflightErrors[task.id]}</p>}{preflightByTask[task.id] && <div role="status"><strong>{preflightByTask[task.id].ready_for_implementation ? "実装準備完了" : "実装開始不可（確認のみ）"}</strong><p>対象: {preflightByTask[task.id].repository || "未紐付け"} / Runtime候補: {preflightByTask[task.id].runtimes.join(", ") || "なし"}</p><ul>{preflightByTask[task.id].blockers.map((blocker, index) => <li key={index}>{blocker}</li>)}</ul><small>このチェックではAI実行・コード変更・PR作成は行いません。</small></div>}</div></details>{task.provider === "github" && <button type="button" disabled={!quickRepo || bindingTaskId !== "" || !task.instance} onClick={() => void bindTaskRepository(task)}>{bindingTaskId === task.id ? "確認中..." : task.bound_repository && task.bound_local_path === quickRepo ? "紐付け済み" : "Repositoryを紐付け"}</button>}{task.external_url && <a className="source-link" href={task.external_url} target="_blank" rel="noopener noreferrer" aria-label="元Issueを開く">元Issue ↗</a>}</div>)}</div> : <p>まだIssueは取り込まれていません。上のGitHub連携からIssueを選択してください。</p>)}</section>
+        <section className="panel" id="issues"><div className="panel-head"><span className="eyebrow">ISSUE / RUN TRACKER</span><h2>IssueとRun</h2><p>依頼は元のIssueで管理し、同じIssueの実行結果をRunとして残します。画面では取り込み・紐付け・事前チェックを行えます。実装からDraft PRへの実行はローカルCLIを使います。</p></div>{bindingMessage && <p role="status">{bindingMessage}</p>}{state === "connected" && (issues.length ? <div className="runtime-list">{issues.map(issue => <div className="runtime" key={issue.key}><details className="issue-details"><summary><strong>{issue.prompt.split("\n")[0].slice(0, 140) || "無題のIssue"}</strong><small>{`${issue.provider.toUpperCase()} · ${issue.instance} · ${issue.external_id} · `}{formatDate(issue.observed_at)}</small></summary><p>直近に取り込んだIssueの内容です。各Runには実行時の要件を固定して保存します。</p><pre className="issue-detail-body">{issue.prompt}</pre><div className="preflight-panel"><strong>Run履歴（合計 {issue.total_runs}件・直近10件）</strong>{issue.recent_runs.length ? <ul>{issue.recent_runs.map(run => <li key={run.id}>{run.runtime} · {run.status} · {formatDate(run.started_at)}<small> · {run.id.slice(0, 12)}</small></li>)}</ul> : <p>まだRunはありません。取込や事前チェックでは実行は始まりません。</p>}<small>既存の読み取り専用実行やHarness準備も含みます。成功表示だけで実装・PR作成済みとは扱いません。</small></div><div className="preflight-panel"><button type="button" disabled={preflightBusy.includes(issue.key)} onClick={() => void checkImplementationPreflight(issue.key)}>{preflightBusy.includes(issue.key) ? "チェック中..." : "AI実装の事前チェック"}</button>{preflightErrors[issue.key] && <p role="alert">{preflightErrors[issue.key]}</p>}{preflightByIssue[issue.key] && <div role="status"><strong>{preflightByIssue[issue.key].ready_for_implementation ? "実装準備完了" : "実装開始不可（確認のみ）"}</strong><p>対象: {preflightByIssue[issue.key].repository || "未紐付け"} / Runtime候補: {preflightByIssue[issue.key].runtimes.join(", ") || "なし"}</p><ul>{preflightByIssue[issue.key].blockers.map((blocker, index) => <li key={index}>{blocker}</li>)}</ul><small>このチェックではAI実行・コード変更・PR作成は行いません。</small></div>}</div></details>{issue.provider === "github" && <button type="button" disabled={!quickRepo || bindingIssueKey !== "" || !issue.instance} onClick={() => void bindIssueRepository(issue)}>{bindingIssueKey === issue.key ? "確認中..." : issue.bound_repository && issue.bound_local_path === quickRepo ? "紐付け済み" : "Repositoryを紐付け"}</button>}{issue.external_url && <a className="source-link" href={issue.external_url} target="_blank" rel="noopener noreferrer" aria-label="元Issueを開く">元Issue ↗</a>}</div>)}</div> : <p>まだIssueは取り込まれていません。上のGitHub連携からIssueを選択してください。</p>)}</section>
         <section className="panel" id="runs"><div className="panel-head"><span className="eyebrow">EXECUTION HISTORY</span><h2>実行履歴</h2><p>直近の実行状態を表示します。自動更新・実行操作は今後追加します。</p></div>{state === "connected" && (runs.length ? <div className="runtime-list">{runs.map(run => <div className="runtime" key={run.id}><span><strong>{run.runtime} · {run.status}</strong><small>{run.id.slice(0, 12)} · {formatDate(run.started_at)}</small></span></div>)}</div> : <p>まだ実行履歴はありません。AI Runtimeで実行すると、ここに記録されます。</p>)}</section>
         <footer>Software Factory · ローカル管理画面 MVP · 操作機能は今後追加</footer>
       </main>

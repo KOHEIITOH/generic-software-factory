@@ -1,25 +1,5 @@
-# Task / Run MVP (PR #7)
+# 外部Issue / Run
 
-Local persistent orchestration. From repository root:
-
-```bash
-uv run sf task create "Reply with exactly HELLO"
-uv run sf task show <task-id>
-uv run sf task run <task-id> --runtime codex
-# Optional runtimes: --runtime grok or --runtime copilot
-uv run sf run show <run-id>
-```
-
-State is stored in `.sf-factory/factory.sqlite3`; each run receives an empty
-`.sf-factory/workspaces/<run-id>` directory. Add `.sf-factory/` to local ignore
-rules if needed. Do not commit its contents.
-
-**Safety boundary:** Codex is read-only. Grok uses the existing adapter's
-read-only tool policy; neither OS-level sandbox isolation nor network isolation
-is guaranteed. Copilot SDK uses the local Copilot CLI authentication and an
-empty tool allowlist, but does not provide equivalent isolation guarantees.
-Workspaces are empty, not copies of the target repository.
-Do not use this MVP to process company source, secrets, or untrusted tasks.
-No repository mutation, PR creation, approval, or autonomous recovery yet.
-A process crash may leave a run marked `running`; future recovery work
-will reconcile interrupted runs. SQLite audit records lifecycle events.
+独立Task MVPは廃止した。`sf task ...`、Task CRUDと旧保存構造は提供しない。
+現在の参照・要件snapshot・互換性は[外部Issueモデル](external-issue-model.md)、
+実行手順は[PCでのIssue開発](local-issue-development.md)を参照。
