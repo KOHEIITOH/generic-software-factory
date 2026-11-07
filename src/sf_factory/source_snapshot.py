@@ -190,6 +190,9 @@ class SourceSnapshotService:
         return {'snapshot_id': snapshot_id, 'fingerprint': fingerprint, 'manifest': manifest}
 
     def verify(self, run_id: str) -> dict:
+        return self.load(run_id)[0]
+
+    def load(self, run_id: str) -> tuple[dict, dict[str, bytes]]:
         """Rehash stored payload before use; never execute or extract it on the host."""
         row = self.state.get(run_id)
         if row is None:
@@ -202,6 +205,7 @@ class SourceSnapshotService:
         manifest = json.loads(row['manifest'])
         if _fingerprint(manifest) != row['fingerprint']:
             raise ValueError('snapshot manifest changed')
+        files: dict[str, bytes] = {}
         root_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
         try:
             stored_manifest = json.loads(_read_blob(root_fd, 'manifest.json', 1048576))
@@ -217,12 +221,13 @@ class SourceSnapshotService:
                     if (len(body) != file['bytes']
                             or hashlib.sha256(body).hexdigest() != file['sha256']):
                         raise ValueError('snapshot content changed')
+                    files[file['path']] = body
             finally:
                 os.close(fd)
         finally:
             os.close(root_fd)
         return {'snapshot_id': row['snapshot_id'], 'fingerprint': row['fingerprint'],
-                'manifest': manifest}
+                'manifest': manifest}, files
 
 
 def _read_blob(root_fd: int, relative: str, budget: int) -> bytes:

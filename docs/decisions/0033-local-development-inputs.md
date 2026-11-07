@@ -1,0 +1,18 @@
+# 0033: ローカル実行へ渡すsource・推論・挙動テストの事実を固定する
+
+SourceSnapshotService.loadは既存verifyと同じno-follow/全hash照合中に読んだbytesを返す。
+検証後に別のhost worktreeを読み直さない。返したmappingの変更は保存済みsnapshotへ影響しない。
+
+CopilotModelProviderは既存SDK Runtimeのavailable_tools=[]を使い、空の一時workspaceと
+新規client/sessionで推論する。ツールが有効なCodex CLIをpromptだけで無効化したとみなして
+ModelProviderへ変換しない。session provenanceをModelResponseのopaque optional fieldで渡す。
+Bedrockのstateless ConverseもRequestIdを返せるが、実呼出しはこの変更の対象外。
+
+BehavioralCheckはoperatorが推論前に承認するargvと期待stdoutの1シナリオを表す。
+隔離器による実commandの成功・cleanup・source不変・proposal一致と正確なstdoutをcontrollerが
+照合して、1シナリオの実行数を記録する。モデルやcommand出力の「100 tests passed」を
+テスト数として読まない。既存pytest/unittest全件数collectorの代用にはしない。
+タイムアウト、改ざん、cleanup不明、出力不一致は通過させない。
+
+これらはローカルcontroller接続の入力部品であり、単体では配送承認や実Issue-to-PR成功を
+証明しない。fixtureで失敗条件を検証し、実AI認証・Docker実通しは利用者PCで確認する。

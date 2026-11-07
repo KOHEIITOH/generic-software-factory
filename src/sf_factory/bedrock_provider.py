@@ -56,6 +56,7 @@ class BedrockModelProvider:
         usage = response.get("usage", {})
         return ModelResponse(
             provider="bedrock", model_id=self.model_id, text=text,
+            session_id=response.get("ResponseMetadata", {}).get("RequestId"),
             input_tokens=usage.get("inputTokens"),
             output_tokens=usage.get("outputTokens"),
             usage=TokenUsage(

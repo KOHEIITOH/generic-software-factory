@@ -178,3 +178,13 @@ def test_snapshot_identity_collision_never_replaces_existing_directory(snapshot,
         with pytest.raises(FileExistsError):
             service.create(run_id, root=root)
     assert service.verify(run_id) == record
+
+
+def test_load_returns_only_verified_immutable_payload_bytes(snapshot):
+    service, run_id, root = snapshot
+    descriptor = service.create(run_id, root=root)
+    record, files = service.load(run_id)
+    assert record == descriptor
+    assert files == {'AGENTS.md': b'fixture rules'}
+    files['AGENTS.md'] = b'caller changes its copy'
+    assert service.load(run_id)[1] == {'AGENTS.md': b'fixture rules'}

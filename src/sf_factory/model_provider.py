@@ -16,6 +16,7 @@ class ModelResponse:
     input_tokens: int | None = None
     output_tokens: int | None = None
     usage: TokenUsage | None = None
+    session_id: str | None = None
 
 
 class ModelProvider(Protocol):
