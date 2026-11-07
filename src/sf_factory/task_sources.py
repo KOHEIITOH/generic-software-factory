@@ -1,4 +1,4 @@
-"""Provider-neutral, read-only task source adapter contracts.
+"""Provider-neutral, read-only issue source adapter contracts.
 
 Adapters fetch external issue snapshots. The Factory owns persistence, identity
 mapping, and execution; adapters never receive the Factory database or run AI.
@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from sf_factory.factory import Factory
+from sf_factory.issue_reference import IssueReference
 
 
 @dataclass(frozen=True)
@@ -21,16 +22,9 @@ class ExternalIssue:
     external_url: str | None = None
 
     def __post_init__(self) -> None:
-        if not all(
-            isinstance(value, str) and value.strip()
-            for value in (self.provider, self.instance, self.external_id, self.prompt)
-        ):
-            raise ValueError("issue identity and prompt must be non-empty strings")
-        if any(
-            len(value) > 512
-            for value in (self.provider, self.instance, self.external_id)
-        ):
-            raise ValueError("issue identity field is too long")
+        IssueReference(self.provider, self.instance, self.external_id)
+        if not isinstance(self.prompt, str) or not self.prompt.strip():
+            raise ValueError('external Issue content must not be empty')
         if self.external_url is not None and (
             not isinstance(self.external_url, str)
             or not self.external_url.startswith(("https://", "http://"))
@@ -51,7 +45,7 @@ def import_issue(factory: Factory, adapter: TaskSourceAdapter, external_id: str)
     issue = adapter.fetch_issue(external_id)
     if issue.external_id != external_id:
         raise ValueError("adapter returned a different external issue")
-    return factory.import_external_task(
+    return factory.import_issue(
         provider=issue.provider,
         instance=issue.instance,
         external_id=issue.external_id,

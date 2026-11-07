@@ -1,6 +1,6 @@
-"""DB-free task storage on a local POSIX filesystem, with process locking.
+"""DB-free issue storage on a local POSIX filesystem, with process locking.
 
-A preview of task persistence, not a complete backend for Factory workflows.
+A preview of issue persistence, not a complete backend for Factory workflows.
 Files are private, bounded, versioned JSON; external imports use a stable key.
 """
 from __future__ import annotations
@@ -11,7 +11,6 @@ import os
 import re
 import stat
 import time
-import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict
@@ -19,14 +18,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from sf_factory.state_store import (
+    IssueSnapshot,
     StateConflict,
     StateCorrupt,
     StateNotFound,
     StatePermissionDenied,
     StateUnavailable,
-    TaskRecord,
-    validate_external,
-    validate_prompt,
 )
 
 try:
@@ -35,100 +32,77 @@ except ImportError:  # File mode must refuse unsupported locking, never use a so
     fcntl = None  # type: ignore[assignment]
 
 MAX_RECORD_BYTES = 1048576
-_NAMESPACE = uuid.UUID('da3eb37a-379f-4a11-8e21-c66a9c8789dd')
 
 
-class FileStateStore:
+class FileIssueStore:
+    """A cache indexed by external identity; only source observations can add records."""
     def __init__(self, root: Path, *, lock_timeout: float = 5.0):
         if os.name != 'posix' or fcntl is None or not hasattr(os, 'O_NOFOLLOW'):
-            raise StateUnavailable(
-                'File state requires supported POSIX locking and filesystem calls'
-            )
+            raise StateUnavailable('Issue File storage requires POSIX locking')
         if (isinstance(lock_timeout, bool) or not math.isfinite(lock_timeout)
                 or not 0 < lock_timeout <= 30):
-            raise ValueError('lock timeout must be between zero and thirty seconds')
+            raise ValueError('bounded lock timeout required')
         self.root = root.expanduser().resolve()
         self.lock_timeout = lock_timeout
-        try:
-            # Explicit existing parent keeps the durability boundary small and reviewable.
-            self.root.mkdir(mode=0o700, exist_ok=True)
-            if (self.root / 'factory.sqlite3').exists():
-                raise StateConflict('use a separate root; existing SQLite data is not migrated')
-            self.directory = self.root / 'tasks-v1'
-            self.directory.mkdir(mode=0o700, exist_ok=True)
-            for directory in (self.root.parent, self.root, self.directory):
-                fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-                try:
-                    os.fsync(fd)
-                finally:
-                    os.close(fd)
-        except OSError as exc:
-            raise StateUnavailable(
-                'File state root must support local directory durability'
-            ) from exc
+        if any(os.path.lexists(self.root / name) for name in ('tasks-v1', 'dashboard-v1')):
+            raise StateConflict('Legacy Task data is unsupported; use a fresh state root')
+        if (self.root / 'factory.sqlite3').exists():
+            raise StateConflict('use a separate root; SQLite data exists')
+        self.root.mkdir(mode=0o700, exist_ok=True)
+        self.directory = self.root / 'issues-v2'
+        self.directory.mkdir(mode=0o700, exist_ok=True)
+        for path in (self.root.parent, self.root, self.directory):
+            fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            try:
+                os.fsync(fd)
+            finally:
+                os.close(fd)
 
     @contextmanager
     def _locked(self) -> Iterator[int]:
         with lock_directory(self.directory, lock_timeout=self.lock_timeout) as directory:
             yield directory
 
-    def _read(self, directory: int, task_id: str) -> dict:
-        if not isinstance(task_id, str) or not re.fullmatch(r'[a-f0-9]{32}', task_id):
-            raise StateNotFound('task not found')
+    def _read(self, directory: int, issue_key: str) -> dict:
+        if not isinstance(issue_key, str) or not re.fullmatch(r'[a-f0-9]{64}', issue_key):
+            raise StateNotFound('issue not found')
         try:
-            fd = os.open(task_id + '.json', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+            fd = os.open(issue_key + '.json', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
                          dir_fd=directory)
         except FileNotFoundError as exc:
-            raise StateNotFound('task not found') from exc
+            raise StateNotFound('issue not found') from exc
         with os.fdopen(fd, 'rb') as stream:
-            metadata = os.fstat(stream.fileno())
-            if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > MAX_RECORD_BYTES:
-                raise StateCorrupt('state record type or size is invalid')
+            before = os.fstat(stream.fileno())
+            if not stat.S_ISREG(before.st_mode) or before.st_size > MAX_RECORD_BYTES:
+                raise StateCorrupt('invalid Issue snapshot type or size')
             raw = stream.read(MAX_RECORD_BYTES + 1)
             after = os.fstat(stream.fileno())
-        current = os.stat(task_id + '.json', dir_fd=directory, follow_symlinks=False)
-        identities = {(s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
-                      for s in (metadata, after, current)}
-        if len(raw) > MAX_RECORD_BYTES or len(identities) != 1:
-            raise StateCorrupt('state record changed or exceeded the size limit')
+        current = os.stat(issue_key + '.json', dir_fd=directory, follow_symlinks=False)
+        if (len(raw) > MAX_RECORD_BYTES or len({(s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns,
+                s.st_ctime_ns) for s in (before, after, current)}) != 1):
+            raise StateCorrupt('Issue snapshot changed while reading')
         try:
             record = json.loads(raw, object_pairs_hook=_unique_object)
-            if (not isinstance(record, dict) or set(record) != {
-                'schema_version', 'version', 'task', 'source', 'events'
-            } or type(record['schema_version']) is not int or record['schema_version'] != 1
-                    or type(record['version']) is not int or record['version'] != 1):
-                raise ValueError('unsupported record version')
-            task = record['task']
-            if (not isinstance(task, dict) or set(task) != {'id', 'prompt', 'created_at'}
-                    or task['id'] != task_id or not isinstance(task['created_at'], str)):
-                raise ValueError('invalid task record')
-            validate_prompt(task['prompt'])
-            if datetime.fromisoformat(task['created_at']).utcoffset() is None:
-                raise ValueError('timezone required')
-            source = record['source']
-            if source is not None:
-                if not isinstance(source, dict) or set(source) != {
-                    'provider', 'instance', 'external_id', 'external_url'
-                } or (source['external_url'] is not None
-                      and not isinstance(source['external_url'], str)):
-                    raise ValueError('invalid source')
-                validate_external(source['provider'], source['instance'], source['external_id'],
-                                  task['prompt'])
-            expected_event = 'task.imported' if source is not None else 'task.created'
-            if record['events'] != [{'event': expected_event, 'at': task['created_at']}]:
-                raise ValueError('invalid task event')
+            if (set(record) != {'schema_version', 'version', 'issue', 'events'}
+                    or type(record['schema_version']) is not int or record['schema_version'] != 2
+                    or type(record['version']) is not int or record['version'] < 1):
+                raise ValueError('invalid Issue cache schema')
+            issue = IssueSnapshot(**record['issue'])
+            if issue.key != issue_key or record['events'] != [
+                {'event': 'issue.observed', 'at': issue.observed_at}]:
+                raise ValueError('Issue reference mismatch')
             return record
         except (ValueError, TypeError, KeyError, RecursionError) as exc:
-            raise StateCorrupt('invalid or unsupported state record') from exc
+            raise StateCorrupt('invalid Issue snapshot') from exc
 
-    def _write_new(self, directory: int, task: TaskRecord, source: dict | None) -> None:
-        payload = json.dumps({
-            'schema_version': 1, 'version': 1, 'task': asdict(task), 'source': source,
-            'events': [{'event': 'task.imported' if source is not None else 'task.created',
-                        'at': task.created_at}],
-        }, sort_keys=True, ensure_ascii=True).encode()
+    def _write(self, directory: int, issue: IssueSnapshot, version: int) -> None:
+        payload = json.dumps({'schema_version': 2, 'version': version,
+            'issue': asdict(issue), 'events': [{'event': 'issue.observed',
+                                              'at': issue.observed_at}]},
+            sort_keys=True, ensure_ascii=True).encode()
         if len(payload) > MAX_RECORD_BYTES:
-            raise ValueError('task exceeds File state record size limit')
+            raise ValueError('Issue snapshot exceeds size limit')
+        import uuid
         temporary = '.' + uuid.uuid4().hex + '.tmp'
         fd = os.open(temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW,
                      0o600, dir_fd=directory)
@@ -137,7 +111,7 @@ class FileStateStore:
                 stream.write(payload)
                 stream.flush()
                 os.fsync(stream.fileno())
-            os.replace(temporary, task.id + '.json', src_dir_fd=directory, dst_dir_fd=directory)
+            os.replace(temporary, issue.key + '.json', src_dir_fd=directory, dst_dir_fd=directory)
             os.fsync(directory)
         finally:
             try:
@@ -145,46 +119,29 @@ class FileStateStore:
             except FileNotFoundError:
                 pass
 
-    def create_task(self, prompt: str) -> str:
-        validate_prompt(prompt)
+    def get_issue(self, issue_key: str) -> IssueSnapshot:
         with self._locked() as directory:
-            for _ in range(3):
-                task_id = uuid.uuid4().hex
-                try:
-                    self._read(directory, task_id)
-                except StateNotFound:
-                    task = TaskRecord(task_id, prompt, datetime.now(UTC).isoformat())
-                    self._write_new(directory, task, None)
-                    return task_id
-            raise StateConflict('could not allocate a unique task identity')
+            return IssueSnapshot(**self._read(directory, issue_key)['issue'])
 
-    def get_task(self, task_id: str) -> TaskRecord:
-        with self._locked() as directory:
-            return TaskRecord(**self._read(directory, task_id)['task'])
-
-    def import_external_task(
-        self, *, provider: str, instance: str, external_id: str,
-        prompt: str, external_url: str | None = None,
-    ) -> str:
-        validate_external(provider, instance, external_id, prompt)
-        if external_url is not None and not isinstance(external_url, str):
-            raise ValueError('external URL must be text')
-        identity = {'provider': provider, 'instance': instance, 'external_id': external_id}
-        task_id = uuid.uuid5(_NAMESPACE, json.dumps(identity, sort_keys=True)).hex
-        source = {**identity, 'external_url': external_url}
+    def import_issue(self, *, provider: str, instance: str, external_id: str,
+                     prompt: str, external_url: str | None = None) -> str:
+        issue = IssueSnapshot(provider, instance, external_id, prompt, external_url,
+                              datetime.now(UTC).isoformat())
         with self._locked() as directory:
             try:
-                existing = self._read(directory, task_id)
+                existing = self._read(directory, issue.key)
             except StateNotFound:
-                task = TaskRecord(task_id, prompt, datetime.now(UTC).isoformat())
-                self._write_new(directory, task, source)
-                return task_id
-            if existing['source'] is None or any(existing['source'][k] != v
-                                                  for k, v in identity.items()):
-                raise StateConflict('external identity key collision')
-            # Confirm directory durability even after an earlier uncertain fsync result.
-            os.fsync(directory)
-            return task_id
+                existing = None
+            if existing is not None:
+                previous = IssueSnapshot(**existing['issue'])
+                if (previous.provider, previous.instance, previous.external_id) != (
+                        provider, instance, external_id):
+                    raise StateConflict('Issue reference key collision')
+                if previous.prompt == prompt and previous.external_url == external_url:
+                    os.fsync(directory)
+                    return issue.key
+            self._write(directory, issue, existing['version'] + 1 if existing else 1)
+        return issue.key
 
 
 def _unique_object(pairs):

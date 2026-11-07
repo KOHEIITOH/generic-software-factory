@@ -256,7 +256,7 @@ Slack/Chat/Webhookが必要になった時点で、認証・再送対策を持�
 - SGだけで任意hostname allowlistが実現するとは扱わない。egress proxy等とVPC接続を別途設計し、metadata/credential endpointも検証。
 - FargateはTask資源制限の仕組みを使う。DockerのPID制限やcapability設定と同一機能があると仮定しない。
   必須の隔離要件をFargateで満たせなければ、EC2/別VM/別実行基盤を任意Adapterとして提示し、安全性を下げない。
-- Source/Artifactはtask_id/run_id/hashに固定。Taskのlocal pathを次のTaskでそのまま参照しない。
+- Source/Artifactはissue_key/run_id/hashに固定。Issueのlocal pathを次のIssueでそのまま参照しない。
 - deadline監視・停止はWorker内だけに頼らず、信頼されたController/外部監視が担う。
   Controller自体が停止しても孤立Workerを発見・回収できるよう、handleと期限を永続化する。
 
@@ -375,3 +375,5 @@ PIDだけ、起動時のrunning状態だけ、lease期限だけではWorker停�
 自動再実行は追加しない。終了済みRunへの遅延結果はSQLite/File双方で拒否する。
 次はExecution Adapterでprovider-neutralな実行identity/観測/停止/回収を定義し、
 古いWorkerの結果拒否と原子的checkpointを接続する。CAS guard単体を復旧完了とは扱わない。
+
+独立Taskは削除済み。状態の参照元は[外部Issue](external-issue-model.md)と各Runの固定snapshot。

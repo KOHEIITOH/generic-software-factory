@@ -26,9 +26,6 @@ def test_grok_smoke_command_parses() -> None:
     assert args.command == "grok-smoke"
 
 
-def test_task_run_accepts_copilot_runtime() -> None:
-    args = build_parser().parse_args(["task", "run", "task-id", "--runtime", "copilot"])
-    assert args.runtime == "copilot"
 
 
 def test_analyze_command_requires_explicit_send_confirmation() -> None:
@@ -79,30 +76,8 @@ def test_analyze_command_reports_scope_and_analysis(tmp_path: Path, monkeypatch,
     assert not (tmp_path / ".sf-factory").exists()
 
 
-def test_task_run_dispatches_to_copilot_runtime(tmp_path, monkeypatch, capsys) -> None:
-    calls: list[tuple[str, str, int]] = []
-
-    def fake_run_task(self, task_id: str, runtime_name: str, timeout_seconds: int) -> dict:
-        calls.append((task_id, runtime_name, timeout_seconds))
-        return {"id": "run-id", "status": "succeeded"}
-
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr("sf_factory.factory.Factory.run_task", fake_run_task)
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["sf", "task", "run", "task-id", "--runtime", "copilot", "--timeout", "45"],
-    )
-
-    assert main() == 0
-    assert calls == [("task-id", "copilot", 45)]
-    assert '"status": "succeeded"' in capsys.readouterr().out
 
 
-def test_task_run_requires_explicit_runtime() -> None:
-    with pytest.raises(SystemExit) as exc:
-        build_parser().parse_args(["task", "run", "task-id"])
-    assert exc.value.code == 2
 
 
 def test_dev_smoke_requires_explicit_editing_runtime() -> None:

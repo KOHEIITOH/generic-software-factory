@@ -5,6 +5,7 @@ import hashlib
 import json
 import uuid
 from collections.abc import Callable
+from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
 
 
 def empty_harness() -> dict:
-    return {'approvals': {}, 'approval_events': {}, 'task_projects': {}, 'manifests': {}}
+    return {'approvals': {}, 'approval_events': {}, 'issue_projects': {}, 'manifests': {}}
 
 
 def validate_harness_state(state: dict) -> None:
@@ -26,9 +27,9 @@ def validate_harness_state(state: dict) -> None:
     if set(harness) != set(empty_harness()) or not all(isinstance(v, dict)
                                                      for v in harness.values()):
         raise ValueError('invalid Harness collections')
-    for task, project in harness['task_projects'].items():
-        if not isinstance(task, str) or not task or project not in state['projects']:
-            raise ValueError('invalid Task/Project association')
+    for issue, project in harness['issue_projects'].items():
+        if not isinstance(issue, str) or not issue or project not in state['projects']:
+            raise ValueError('invalid Issue/Project association')
     if set(harness['approvals']) != set(harness['approval_events']):
         raise ValueError('missing approval audit')
     for key, row in harness['approvals'].items():
@@ -73,7 +74,7 @@ def validate_harness_state(state: dict) -> None:
                                  separators=(',', ':'), ensure_ascii=True)
         request = json.loads(row['request'])
         if (approval in used or not row['consumed'] or manifest['schema_version'] != 1
-                or manifest['request'] != request or run['task_id'] != request['task_id']
+                or manifest['request'] != request or run['issue_key'] != request['issue_key']
                 or hashlib.sha256(composition.encode()).hexdigest() != request['bundle_hash']):
             raise ValueError('inconsistent approved Run manifest')
         used.add(approval)
@@ -148,26 +149,27 @@ class FileApprovalDecisions:
             return tuple(state['harness']['approval_events'].get(approval_id, []))
 
 
-class FileTaskProjects:
+class FileIssueProjects:
     def __init__(self, factory: FileDashboardFactory):
         self.factory = factory
 
-    def assign(self, task_id: str, project_id: str) -> None:
-        self.factory.task_store.get_task(task_id)
+    def assign(self, issue_key: str, project_id: str) -> None:
+        self.factory.issue_store.get_issue(issue_key)
         with self.factory._document(edit=True) as state:
             if project_id not in state['projects']:
                 raise ValueError('project not found')
-            if task_id in state['harness']['task_projects']:
-                raise StateConflict('Task is already assigned')
-            state['harness']['task_projects'][task_id] = project_id
+            if issue_key in state['harness']['issue_projects']:
+                raise StateConflict('Issue is already assigned')
+            state['harness']['issue_projects'][issue_key] = project_id
 
-    def project_for_task(self, task_id: str) -> str | None:
+    def project_for_issue(self, issue_key: str) -> str | None:
         with self.factory._document() as state:
-            return state['harness']['task_projects'].get(task_id)
+            return state['harness']['issue_projects'].get(issue_key)
 
-    def tasks_for_project(self, project_id: str) -> tuple[str, ...]:
+    def issues_for_project(self, project_id: str) -> tuple[str, ...]:
         with self.factory._document() as state:
-            return tuple(sorted(task for task, project in state['harness']['task_projects'].items()
+            return tuple(sorted(issue for issue, project in
+                                state['harness']['issue_projects'].items()
                                 if project == project_id))
 
 
@@ -175,12 +177,12 @@ class FileHarnessState:
     def __init__(self, factory: FileDashboardFactory):
         self.factory = factory
         self.approvals = FileApprovalDecisions(factory)
-        self.task_projects = FileTaskProjects(factory)
+        self.issue_projects = FileIssueProjects(factory)
 
     @staticmethod
     def _check(state: dict, request: HarnessApprovalRequest, root: Path) -> None:
-        if state['harness']['task_projects'].get(request.task_id) != request.project_id:
-            raise ValueError('task must be assigned to the requested project')
+        if state['harness']['issue_projects'].get(request.issue_key) != request.project_id:
+            raise ValueError('issue must be assigned to the requested project')
         repository = state['repositories'].get(request.repository_id)
         if (repository is None or repository['project_id'] != request.project_id
                 or repository['provider_id'] != 'local-git'
@@ -188,7 +190,7 @@ class FileHarnessState:
             raise ValueError('registered local repository does not match requested scope')
 
     def check_registration(self, request: HarnessApprovalRequest, root: Path) -> None:
-        self.factory.task_store.get_task(request.task_id)
+        self.factory.issue_store.get_issue(request.issue_key)
         with self.factory._document() as state:
             self._check(state, request, root)
 
@@ -196,19 +198,20 @@ class FileHarnessState:
         self, *, root: Path, request: HarnessApprovalRequest, approval_id: str,
         controller: str, run_id: str, manifest: str, at: str,
     ) -> None:
-        self.factory.task_store.get_task(request.task_id)
+        snapshot = asdict(self.factory.issue_store.get_issue(request.issue_key))
         with self.factory._document(edit=True) as state:
             self._check(state, request, root)
             self.approvals._consume(state, approval_id, request, controller=controller)
             if run_id in state['runs']:
                 raise StateConflict('Run identity already exists')
             state['runs'][run_id] = {
-                'id': run_id, 'task_id': request.task_id, 'runtime': 'unassigned',
+                'id': run_id, 'issue_key': request.issue_key, 'issue_snapshot': snapshot,
+                'runtime': 'unassigned',
                 'status': 'prepared', 'workspace': '', 'started_at': at, 'ended_at': None,
                 'output': None, 'error_kind': None, 'error_message': None, 'exit_code': None,
             }
             state['harness']['manifests'][run_id] = {
                 'approval_id': approval_id, 'manifest': manifest,
             }
-            state['events'].append({'run_id': run_id, 'task_id': request.task_id,
+            state['events'].append({'run_id': run_id, 'issue_key': request.issue_key,
                                     'event': 'run.harness_prepared', 'at': at})

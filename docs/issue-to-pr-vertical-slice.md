@@ -10,14 +10,13 @@ fixtureやmockだけの成功、デモmarker PR、事前チェック、読み取
 
 - Issue: 開発依頼と更新元。別のTaskタイトル/本文を編集して二重管理しない。
 - Run: 同じIssueについての一回の試行。承認、入力snapshot、ログ、検証結果とPR参照を紐付ける。
-- 内部Task: 互換性のために残す外部Issue identityへの参照と取込時の要件snapshot。
-  既存Task/Run/承認のIDやデータを削除しない。新しいRunは実行承認時の要件を別途固定する必要がある。
+- 外部Issue参照: provider/instance/external_idで依頼を識別し、各Runへ実行時の要件を固定。独立Taskは削除済み。
 
 ## 段階と確認条件
 
 | 段階 | 完了条件 | 現状 |
 | --- | --- | --- |
-| Issue中心の閲覧 | 既存Issue identityのまま複数Runを表示。独立Task作成を主画面から外し、旧API/データを維持 | PR #101で実装済み |
+| Issue中心の閲覧 | 既存Issue identityのまま複数Runを表示。独立Taskの画面・API・CLI・保存構造を削除し、外部Issueへ直接関連付け | PR #101で実装済み |
 | 安全な実行入力 | source、変更案、承認済みcommandを検証済み実行器へ渡せる。host実行へfallbackしない | PR #102でbounded stdinを接続。候補sourceの隔離内materialization/check接続を追加、実Docker CIで検証 |
 | AI実装 | 推論/Runtimeを安全な境界で接続し、実要件から変更を生成する。credentialをWorkerへ漏らさない | scope固定の変更案に、ローカルoperator設定とBedrock/ツールなしCopilot推論を接続。実サービス通しはPCで未確認 |
 | 実チェック・レビュー | 実際のartifact/revision/diffとcollectorを証跡へ固定する | 承認済み挙動シナリオの実観測と別session/requestレビューをローカルcontrollerへ接続。汎用pytest件数collectorは未対応 |
@@ -28,8 +27,7 @@ fixtureやmockだけの成功、デモmarker PR、事前チェック、読み取
 ## 最初の閲覧変更
 
 `GET /api/issues`は保存済みの外部Issue参照とIssueごとの直近10 Run、全Run数を返す。
-ローカルTaskはこの一覧に混ぜず、既存`/api/tasks`・`/api/runs`やCLIでは保持する。
-Issue一覧のlimitは外部Issueを選んだ後に適用し、ローカルTaskに押し出されないようにする。
+旧Task形式は移行せず拒否し、新しい保存先で外部Issueを取り込み直す。
 過去のread-only/Harness準備Runも履歴に含むため、status=successだけでは実装・配送完了と表示しない。
 
 ## 環境依存と安全条件

@@ -13,7 +13,7 @@ from sf_factory.harness_approval import (
 from sf_factory.harness_validation import validate_harness
 
 NOW = datetime(2026, 11, 6, tzinfo=UTC)
-REQUEST = HarnessApprovalRequest('project', 'repo', 'task', 'a' * 40, 'b' * 64)
+REQUEST = HarnessApprovalRequest('project', 'repo', 'issue', 'a' * 40, 'b' * 64)
 
 
 @pytest.fixture(params=['sqlite', 'file'])
@@ -43,7 +43,7 @@ def test_decision_persists_and_is_consumed_once(approval_store, tmp_path):
 
 
 @pytest.mark.parametrize('field,value', [
-    ('project_id', 'other'), ('repository_id', 'other'), ('task_id', 'other'),
+    ('project_id', 'other'), ('repository_id', 'other'), ('issue_key', 'other'),
     ('revision', 'c' * 40), ('bundle_hash', 'd' * 64),
 ])
 def test_any_scope_change_rejects_without_consuming(approval_store, tmp_path, field, value):
@@ -101,7 +101,7 @@ def test_expiry_must_be_bounded_and_aware(approval_store, tmp_path, expires):
 
 
 @pytest.mark.parametrize('change', [
-    {'task_id': ''}, {'revision': 'main'}, {'bundle_hash': 'x'}, {'operation': 'merge'},
+    {'issue_key': ''}, {'revision': 'main'}, {'bundle_hash': 'x'}, {'operation': 'merge'},
 ])
 def test_invalid_scope_cannot_be_constructed(change):
     with pytest.raises(ValueError):

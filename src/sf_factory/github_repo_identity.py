@@ -43,13 +43,13 @@ def verify_github_origin(directory: Path, repository: str) -> Path:
 
 
 class GitHubRepositoryBinding:
-    """Keep GitHub task scope and origin rules outside Factory Core."""
+    """Keep GitHub issue scope and origin rules outside Factory Core."""
 
     def verify(self, *, provider: str, instance: str, repository: str,
                local_path: Path) -> Path:
         root = verify_github_origin(local_path, repository)
         if provider != 'github':
-            raise ValueError('task must originate from a GitHub Issue')
+            raise ValueError('issue must originate from a GitHub Issue')
         if instance.casefold() != repository.casefold():
             raise ValueError('Issue repository does not match selected repository')
         return root

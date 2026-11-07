@@ -74,8 +74,8 @@ h1{font-size:clamp(26px,3vw,38px);line-height:1.2}
 .quick-repo-status code{font-size:12px}
 .quick-start-link{display:inline-flex;margin:4px 0 0}
 
-/* Task descriptions stay collapsed until explicitly opened. */
-.task-details{flex:1;min-width:0}.task-details summary{cursor:pointer;list-style:revert;overflow-wrap:anywhere}.task-details summary strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}.task-details summary small{display:block;margin-top:5px}.task-detail-body{white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;margin:12px 0 0;font:inherit;font-size:13px;line-height:1.6}
+/* Issue descriptions stay collapsed until explicitly opened. */
+.issue-details{flex:1;min-width:0}.issue-details summary{cursor:pointer;list-style:revert;overflow-wrap:anywhere}.issue-details summary strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}.issue-details summary small{display:block;margin-top:5px}.issue-detail-body{white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;margin:12px 0 0;font:inherit;font-size:13px;line-height:1.6}
 
 /* GitHub workflow: compact, readable steps and responsive controls. */
 .github-workflow{display:grid;gap:14px;margin:16px 0 22px}
@@ -89,6 +89,6 @@ h1{font-size:clamp(26px,3vw,38px);line-height:1.2}
 .github-issue-heading{font-size:16px;margin:24px 0 14px;padding-top:20px;border-top:1px solid #304764}
 @media(max-width:640px){.github-step{padding:13px}.github-step .issue-form{align-items:stretch}.github-step .issue-form button{width:100%}}
 
-/* Task-level read-only implementation readiness. */
+/* Issue-level read-only implementation readiness. */
 .preflight-panel{margin-top:14px;padding:12px;border:1px solid #304764;border-radius:10px;display:grid;gap:10px;overflow-wrap:anywhere}
 .preflight-panel p{margin:6px 0}.preflight-panel ul{margin:8px 0;padding-left:22px}.preflight-panel li{margin:4px 0}.preflight-panel button{justify-self:start}

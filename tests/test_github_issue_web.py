@@ -21,7 +21,7 @@ def test_preview_and_confirmed_import(tmp_path):
             )
             assert preview.status_code == 200
             assert preview.json()["issue"]["prompt"] == "Fix a bug"
-            assert client.get("/api/tasks").json()["tasks"] == []
+            assert client.get("/api/issues").json()["issues"] == []
             payload = {"repository": "owner/repo", "number": 7}
             assert client.post("/api/github/import", json=payload).status_code == 403
             headers = {"Origin": "http://testserver"}
@@ -29,8 +29,8 @@ def test_preview_and_confirmed_import(tmp_path):
             second = client.post("/api/github/import", json=payload, headers=headers)
             assert first.status_code == 200
             assert second.status_code == 200
-            assert first.json()["task_id"] == second.json()["task_id"]
-            assert len(client.get("/api/tasks").json()["tasks"]) == 1
+            assert first.json()["issue_key"] == second.json()["issue_key"]
+            assert len(client.get("/api/issues").json()["issues"]) == 1
 
 
 def test_invalid_repository_rejected(tmp_path):
@@ -53,7 +53,7 @@ def test_issue_list_excludes_pull_requests(tmp_path):
             assert response.status_code == 200
             assert response.json()["issues"][0]["number"] == "7"
             assert response.json()["has_more"] is False
-            assert client.get("/api/tasks").json()["tasks"] == []
+            assert client.get("/api/issues").json()["issues"] == []
 
 
 def test_issue_list_invalid_repository(tmp_path):

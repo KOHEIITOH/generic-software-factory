@@ -1,7 +1,7 @@
 # ローカルWeb UI / API
 
 既定ではloopback専用のローカル管理画面です。開発依頼の入口はGitHub Issue、実行の記録はRunです。
-独立したTask登録フォームは主画面から外しましたが、旧Task API・データ・CLIは互換性のために残します。
+独立Taskの画面・API・CLI・保存構造は削除済みです。[外部Issueモデル](external-issue-model.md)を参照。
 **現在はIssue取込・関連付け・事前チェック・履歴表示までで、実装実行APIはまだ接続していません。**
 
 ## 起動
@@ -19,10 +19,9 @@ URLは`http://127.0.0.1:8000/`です。Dockerは閲覧・取込には不要で�
 - `GET /api/integrations`: 既定Providerと認証設定有無。トークン値を返さず認証実確認は行わない。
 - `GET /api/runtimes`: 登録名。認証・実行可能性の証明ではない。
 - `GET /api/issues`: 保存済み外部Issue参照、Issueごとの直近10 Runと全Run数。
-- `GET /api/tasks`: 旧Task一覧。ローカルTaskも含めて互換性を維持。
 - `GET /api/runs`: 全体の直近Run履歴。
 - `GET /api/github/repositories`、`/api/github/issues`、`/api/github/issue`: 既存GitHub Adapterの取得/プレビュー。
-- `GET /api/tasks/{id}/implementation-preflight`: 変更や実行を開始しない事前チェック。
+- `GET /api/issues/{issue_key}/implementation-preflight`: 変更や実行を開始しない事前チェック。
 
 `/guide`、`/onboarding`、`/docs`は説明・API仕様です。
 

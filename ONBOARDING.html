@@ -101,22 +101,15 @@ uv run sf copilot-smoke
 <li><strong>まずFactoryの動作を試したい:</strong> Codex CLIを使ったread-only smoke testが最も基本的な導線。</li>
 <li><strong>異なるRuntimeのAdapterを比較したい:</strong> Grok BuildやCopilot SDKも追加し、同じ無害な入力で接続確認。</li>
 <li><strong>Claude Code / Gemini CLIを使いたい:</strong> 現在はFactory Adapter未実装。単体での利用とFactory経由の利用を混同しない。</li>
-<li><strong>AWS Bedrock等でモデルを切り替えたい:</strong> 将来のModel Provider / Custom Agent拡張が必要。</li>
+<li><strong>AWS Bedrockを使いたい:</strong> Converse Model ProviderとローカルIssue開発CLIを利用可能。PCの認証・設定と通し試験が必要。</li>
 </ul>
 <p><strong>どのAIを選んでも、モデルの回答だけで品質合格としないこと。</strong> Quality Gateは独立した検証証拠を必要とし、信頼できる証拠収集Adapterと隔離実行は今後の課題です。</p>
 <p>詳細: <span title="技術資料: docs/agent-runtime-roadmap.md">Agent Runtime / Model Provider対応方針</span>、<span title="技術資料: docs/adapter-contracts.md">Adapter契約</span>。</p>
-<h2>5. Taskを作成して実行する（任意）</h2>
-<p>Runtimeの認証後、まず無害な質問で試してください。</p>
-<pre><code>
-uv run sf task create &quot;Explain what this project does&quot;
-
-</code></pre>
-<p>返されたTask IDを控え、例えば次のように実行します。</p>
-<pre><code>
-uv run sf task run &lt;task-id&gt; --runtime codex
-
-</code></pre>
-<p><code>&lt;task-id&gt;</code> は実際のIDに置き換えてください。実行結果とRun IDが表示されます。Task / Runはローカルの <code>.sf-factory</code> に記録されます。</p>
+<h2>5. 外部Issueを取り込んで実行する（任意）</h2>
+<p>依頼はGitHub Issueで管理します。Factory独自Taskの作成・旧Task CLIは削除済みです。</p>
+<p>画面でIssueを取り込み、開発実行はoperator設定を使うローカルCLIから行います。</p>
+<pre><code>uv run sf issue develop --config /absolute/path/to/operator-config.json --confirm-run --confirm-bedrock</code></pre>
+<p><a href="https://github.com/KOHEIITOH/generic-software-factory/blob/main/docs/local-issue-development.md">PCでの設定・実行・復旧手順</a>を参照してください。旧Task形式は移行せず、新しい保存先でIssueを取り込み直します。</p>
 <h2>6. よくあるつまずき</h2>
 <ul>
 <li><code>uv</code> / <code>git</code> が見つからない: インストール後にターミナルを再起動し、PATHを確認。</li>

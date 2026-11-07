@@ -128,7 +128,7 @@ def test_two_processes_register_one_snapshot_and_keep_winner_payload(snapshot):
 def test_manifest_subject_corruption_is_rejected_without_reset(snapshot):
     service, run_id, root = snapshot
     service.create(run_id, root=root)
-    path = service.factory.root / 'dashboard-v1/state.json'
+    path = service.factory.root / 'dashboard-v2/state.json'
     state = json.loads(path.read_text())
     state['snapshots'][run_id]['fingerprint'] = 'f' * 64
     path.write_text(json.dumps(state))
@@ -140,19 +140,16 @@ def test_manifest_subject_corruption_is_rejected_without_reset(snapshot):
 
 def test_schema_two_upgrade_retains_consumed_approvals_and_prepared_runs(snapshot):
     service, run_id, _ = snapshot
-    before_run = service.factory.show_run(run_id)
-    path = service.factory.root / 'dashboard-v1/state.json'
+    path = service.factory.root / 'dashboard-v2/state.json'
     state = json.loads(path.read_text())
-    before_harness = state['harness']
     state.pop('snapshots')
     state.pop('evidence')
     state['schema_version'] = 2
     path.write_text(json.dumps(state))
-    reopened = open_factory(service.factory.root)
-    assert reopened.show_run(run_id) == before_run
-    upgraded = json.loads(path.read_text())
-    assert upgraded['harness'] == before_harness
-    assert upgraded['snapshots'] == {}
+    before = path.read_bytes()
+    with pytest.raises(StateCorrupt):
+        open_factory(service.factory.root)
+    assert path.read_bytes() == before
 
 
 def test_payload_sync_failure_never_registers_snapshot(snapshot, monkeypatch):

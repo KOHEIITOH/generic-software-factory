@@ -178,7 +178,7 @@ def test_concurrent_observers_never_overwrite_each_other(evidence):
 
 def test_failed_write_does_not_append_observation_or_audit(evidence, monkeypatch):
     service, run_id, subject = evidence
-    path = service.factory.root / 'dashboard-v1/state.json'
+    path = service.factory.root / 'dashboard-v2/state.json'
     before = path.read_bytes()
     def fail(*args, **kwargs):
         raise OSError('fixture replace failure')
@@ -194,7 +194,7 @@ def test_failed_write_does_not_append_observation_or_audit(evidence, monkeypatch
 def test_corrupt_observation_is_not_silently_accepted(evidence):
     service, run_id, _ = evidence
     observe(evidence)
-    path = service.factory.root / 'dashboard-v1/state.json'
+    path = service.factory.root / 'dashboard-v2/state.json'
     state = json.loads(path.read_text())
     state['evidence']['checks'][run_id][0]['attempt'] = True
     path.write_text(json.dumps(state))
@@ -219,7 +219,7 @@ def test_uncertain_write_keeps_observation_and_audit_together(evidence, monkeypa
     assert service.assess(run_id, subject)['attempt'] == 1
     with pytest.raises(StateConflict):
         observe(evidence)
-    data = json.loads((service.factory.root / 'dashboard-v1/state.json').read_text())
+    data = json.loads((service.factory.root / 'dashboard-v2/state.json').read_text())
     events = [e for e in data['events'] if e['event'] == 'run.check_observed']
     assert len(events) == 1
 
@@ -244,17 +244,13 @@ def test_schema_three_upgrade_keeps_source_and_harness_state(file_prepared):
 
     root, factory, _, _, _ = file_prepared
     run = harness_fixtures.prepare(file_prepared)
-    snapshot = SourceSnapshotService(factory).create(run['id'], root=root)
-    path = factory.root / 'dashboard-v1/state.json'
+    SourceSnapshotService(factory).create(run['id'], root=root)
+    path = factory.root / 'dashboard-v2/state.json'
     state = json.loads(path.read_text())
-    old_harness = state['harness']
-    old_snapshots = state['snapshots']
     state.pop('evidence')
     state['schema_version'] = 3
     path.write_text(json.dumps(state))
-    reopened = open_factory(factory.root)
-    upgraded = json.loads(path.read_text())
-    assert upgraded['harness'] == old_harness
-    assert upgraded['snapshots'] == old_snapshots
-    assert SourceSnapshotService(reopened).verify(run['id']) == snapshot
-    assert upgraded['schema_version'] == 4
+    before = path.read_bytes()
+    with pytest.raises(StateCorrupt):
+        open_factory(factory.root)
+    assert path.read_bytes() == before

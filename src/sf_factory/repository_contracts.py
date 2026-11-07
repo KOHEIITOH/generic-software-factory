@@ -99,7 +99,7 @@ class ProjectRegistry(Protocol):
 class RepositoryBindingAdapter(Protocol):
     def verify(self, *, provider: str, instance: str, repository: str,
                local_path: Path) -> Path:
-        """Verify task scope and local identity; return a canonical existing root.
+        """Verify issue scope and local identity; return a canonical existing root.
 
         Provider naming, source-to-repository rules and remote URL parsing belong
         to the adapter. Verification must not mutate code or perform Git writes.

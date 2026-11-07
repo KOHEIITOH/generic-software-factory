@@ -27,7 +27,7 @@ class FileEvidenceState:
 
     @staticmethod
     def _audit(state: dict, run_id: str, event: str) -> None:
-        state['events'].append({'run_id': run_id, 'task_id': state['runs'][run_id]['task_id'],
+        state['events'].append({'run_id': run_id, 'issue_key': state['runs'][run_id]['issue_key'],
                                 'event': event, 'at': _now()})
 
     def register(self, run_id: str, subject: EvidenceSubject,

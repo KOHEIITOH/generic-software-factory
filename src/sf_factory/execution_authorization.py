@@ -27,7 +27,7 @@ class AuthorizedOperation(StrEnum):
 
 @dataclass(frozen=True)
 class ExecutionGrant:
-    task_id: str
+    issue_key: str
     repository: str
     operation: AuthorizedOperation
     approved: bool = False
@@ -36,19 +36,19 @@ class ExecutionGrant:
 def authorize_operation(
     grant: ExecutionGrant,
     *,
-    task_id: str,
+    issue_key: str,
     repository: str,
     operation: AuthorizedOperation,
     isolated: bool = False,
     timeout_seconds: int = 120,
 ) -> None:
-    """Fail closed unless the grant matches the exact task, repo and action."""
-    if not task_id or not repository:
-        raise PermissionError("task and repository are required")
+    """Fail closed unless the grant matches the exact issue, repo and action."""
+    if not issue_key or not repository:
+        raise PermissionError("issue and repository are required")
     if not grant.approved:
         raise PermissionError("explicit user approval required")
-    if grant.task_id != task_id or grant.repository != repository:
-        raise PermissionError("grant scope does not match task and repository")
+    if grant.issue_key != issue_key or grant.repository != repository:
+        raise PermissionError("grant scope does not match issue and repository")
     if grant.operation != operation:
         raise PermissionError("grant does not authorize this operation")
     if operation is AuthorizedOperation.IMPLEMENT:

@@ -33,7 +33,7 @@ def test_order_and_exclusions_are_explicit_and_hashed(tmp_path):
                                 selected=('harness/safety.md', 'AGENTS.md', 'app/AGENTS.md'))
     assert result.bundle_hash != reordered.bundle_hash
     excluded = compose_harness(validation, target='app', selected=('AGENTS.md', 'app/AGENTS.md'),
-                               excluded=(('harness/safety.md', 'not adopted for this task'),))
+                               excluded=(('harness/safety.md', 'not adopted for this issue'),))
     assert excluded.bundle_hash != result.bundle_hash
     changed_reason = compose_harness(validation, target='app',
                                      selected=('AGENTS.md', 'app/AGENTS.md'),

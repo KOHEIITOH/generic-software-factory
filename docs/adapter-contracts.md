@@ -36,8 +36,8 @@ Inbound InterfaceとOutbound Adapterを同一視しないこと。
 - `sf init`: Project Profile / Factory設定の初期化。
 - `sf validate`: 設定・Adapter・Policyの静的検証。
 - `sf doctor`: 実行環境と接続先の診断。
-- `sf run`: Taskを作成しWorkflowを開始する。
-- `sf status`: Task / Runの状態を取得する。
+- `sf issue develop`: 外部Issue参照から承認済みWorkflowを開始する。
+- `sf status`: 外部Issue参照 / Runの状態を取得する。
 - `sf cancel`: 認可されたRunをキャンセルする。
 
 ### 3.2 MCP Server
@@ -46,9 +46,9 @@ MCP対応AIがFactoryの機能をToolとして呼び出す入口です。MCP Ser
 
 初期公開候補Tool:
 
-- `factory.create_task`
+- `factory.import_issue`（外部Adapterで取得したIssueのみ）
 - `factory.start_run`
-- `factory.get_task`
+- `factory.show_issue`
 - `factory.get_run_status`
 - `factory.get_run_events`
 - `factory.request_approval` またはPolicyに応じた承認操作
@@ -85,7 +85,7 @@ RuntimeごとのSDK型、CLI引数、JSONLイベント形式はAdapter内部に�
 
 ### 4.3 入力
 
-- Factory task / run IDとcorrelation ID。
+- 外部Issue参照 / Run IDとcorrelation ID。
 - Agent Roleと指示。
 - タスク説明、受け入れ条件、制約。
 - スコープを限定したcontext / artifact参照。
@@ -156,10 +156,12 @@ Requirements、Architecture、Project Profile、開発規約、Role instruction�
 
 ## 9. Observability
 
-構造化されたlifecycle event、metrics、traces、artifact referenceを受け取ります。Secretのmaskingは永続化・export前に行います。Task / Run / Runtime session / operation間のcorrelationを維持します。
+構造化されたlifecycle event、metrics、traces、artifact referenceを受け取ります。Secretのmaskingは永続化・export前に行います。外部Issue参照 / Run / Runtime session / operation間のcorrelationを維持します。
 
 ## 10. 互換性と適合性
 
 Adapterはsemanticなcontract versionとcapabilitiesを宣言します。Coreは互換性のないmajor versionを拒否し、起動時に必須capabilityを検証します。
 
 各Adapterには共通のcontract testを用意します。Adapter固有の挙動はintegration testで検証し、Mockだけで実サービスの制約を保証したとみなしてはいけません。
+
+独立Taskモデルは廃止済み。現行の参照・保存契約は[外部Issueモデル](external-issue-model.md)を参照。

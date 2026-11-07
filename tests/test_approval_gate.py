@@ -11,7 +11,7 @@ from sf_factory.approval_gate import (
 
 
 def test_requires_matching_explicit_approval():
-    action = ProposedAction("task-1", ActionKind.WRITE_FILE, "Update README")
+    action = ProposedAction("issue-1", ActionKind.WRITE_FILE, "Update README")
     with pytest.raises(PermissionError):
         require_approval(action, None)
     with pytest.raises(PermissionError):
@@ -20,7 +20,7 @@ def test_requires_matching_explicit_approval():
         require_approval(
             action,
             ApprovalDecision(
-                ProposedAction("task-2", ActionKind.WRITE_FILE, "Update README"),
+                ProposedAction("issue-2", ActionKind.WRITE_FILE, "Update README"),
                 True,
                 "reviewer",
             ),
@@ -32,8 +32,8 @@ def test_rejects_invalid_action_and_decision():
     with pytest.raises(ValueError):
         ProposedAction("", ActionKind.RELEASE, "Release")
     with pytest.raises(ValueError):
-        ProposedAction("task", ActionKind.RUN_COMMAND, "")
-    action = ProposedAction("task", ActionKind.RELEASE, "Release")
+        ProposedAction("issue", ActionKind.RUN_COMMAND, "")
+    action = ProposedAction("issue", ActionKind.RELEASE, "Release")
     with pytest.raises(ValueError):
         ApprovalDecision(action, True, "")
     with pytest.raises(ValueError):

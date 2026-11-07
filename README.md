@@ -33,7 +33,7 @@ Generic Software Factoryは、ソフトウェア開発の計画・実行・品�
 
 - Factory Core / Local CLI: Python 3.11+（初期開発はPython 3.13）
 - Dependency / quality tools: uv、pytest、Ruff、Pyright、pip-audit
-- Agent Runtime Adapter: Codex CLI、Grok Build CLI、GitHub Copilot SDK（Task/Runから選択可能。Copilotは空workspace・tools無効の現段階に限る）
+- Agent Runtime Adapter: Codex CLI、Grok Build CLI、GitHub Copilot SDK（IssueのRunから選択可能。Copilotは空workspace・tools無効の現段階に限る）
 - 追加予定: Claude Code、Gemini CLI
 - Model Provider: AWS Bedrock ConverseとツールなしCopilot SDK。xAI API等は将来の追加候補
 - ローカルWeb UI: React / TypeScript / Vite（Issue取り込み・閲覧。実装実行は明示的なローカルCLI）
@@ -89,7 +89,7 @@ copilot login
 uv run sf copilot-smoke
 ```
 
-`uv run sf task create "Explain this project"` でTaskを作成し、返されたIDを `uv run sf task run <task-id> --runtime copilot` に指定できます（Copilotの準備が必要）。初回は機密情報や業務コードを使わないでください。
+開発依頼はGitHub Issueで管理します。独立Taskの作成CLIは廃止しました。実行は[PCでのIssue開発](docs/local-issue-development.md)を参照してください。
 
 **対応状況:** Pythonベースのセットアップ手順を3 OS向けに記載していますが、Windows / Linuxでの全Runtime・全機能の実機動作保証ではありません。特にOS依存のCLI、サンドボックス機能、ファイル操作は環境ごとの検証が必要です。まず[オンボーディング](ONBOARDING.md)を確認してください。
 
@@ -103,16 +103,16 @@ Task SourceとSCMの初期標準はGitHubです。GitHub固有のAPI・型・認
 ## WebとDBなしのローカル保存
 
 通常の起動は `uv run sf web --rebuild` のままです。新しい保存先では、対応するPOSIX環境で
-File Adapterを自動選択し、Task・Project/Repository・read-only Runの結果をDBなしで保存します。
-既存SQLiteデータがある場合は、そのままSQLiteを使います。非POSIX環境の新規保存先もSQLiteです。
+File Adapterを自動選択し、Issue参照・Project/Repository・Runの結果をDBなしで保存します。
+新しいIssue形式のSQLiteがある場合はSQLiteを使います。旧Task形式は移行せず、新しい保存先を指定します。非POSIX環境の新規保存先もSQLiteです。
 
 [Webでの確認方法・保存先設定・制約](docs/local-web-storage.md)を参照してください。
-`sf state ...` は保存Adapter単体の確認用で、Web起動の追加手順ではありません。
+独立TaskのAPI・CLI・保存構造は削除済みです。[外部Issueモデルと旧形式の扱い](docs/external-issue-model.md)を参照してください。
 Harness承認・prepared RunもFile保存に対応。source snapshot・品質/レビュー証跡もFile対応です。ローカルCLIには実装・挙動テスト・独立レビュー・Draft PR配送を接続しています。実サービスでの最終通し試験はPCで未確認です。
 
 ## 現在のステータス
 
-**実験的MVP** — ローカルFile/SQLiteによるTask/Run/Audit記録、Codex/Grok/Copilot Runtime Adapter、read-only smoke test、Codexによるサンプル限定のコード編集と単体テストを実装しています。`uv run sf analyze /path/to/repository --confirm-send` は指定されたローカルGitリポジトリから制限付きのテキストsnapshotをCopilotへ渡して解析します。SDK toolsは無効で、リポジトリ本体をworkspaceとして渡さず、Task/RunやFactory DBにはソース内容を保存しません。ファイルの編集・任意コマンド実行・隔離保証はありません。詳細は[解析の範囲と制約](docs/local-repository-analysis.md)を参照してください。`uv run sf dev-smoke --runtime codex` は使い捨て一時ディレクトリ内の同梱サンプルだけを編集します。編集可能なRuntimeは明示指定が必要で、現時点ではCodexのみ検証済みです。Factory Coreおよび共通AgentRuntime契約はCodexに依存しません。明示的なローカルoperator設定を使う `sf issue develop` には、Issue取得・AI変更案・実隔離の挙動テスト・別session/requestのレビュー・Draft PR配送/復旧を接続しました。実Bedrock/実GitHubでの最終通し成功はPCで未確認です。Webからの実装実行、失敗の自動修正ループ、MCP Serverは未実装です。
+**実験的MVP** — ローカルFile/SQLiteによるIssue/Run/Audit記録、Codex/Grok/Copilot Runtime Adapter、read-only smoke test、Codexによるサンプル限定のコード編集と単体テストを実装しています。`uv run sf analyze /path/to/repository --confirm-send` は指定されたローカルGitリポジトリから制限付きのテキストsnapshotをCopilotへ渡して解析します。SDK toolsは無効で、リポジトリ本体をworkspaceとして渡さず、Task/RunやFactory DBにはソース内容を保存しません。ファイルの編集・任意コマンド実行・隔離保証はありません。詳細は[解析の範囲と制約](docs/local-repository-analysis.md)を参照してください。`uv run sf dev-smoke --runtime codex` は使い捨て一時ディレクトリ内の同梱サンプルだけを編集します。編集可能なRuntimeは明示指定が必要で、現時点ではCodexのみ検証済みです。Factory Coreおよび共通AgentRuntime契約はCodexに依存しません。明示的なローカルoperator設定を使う `sf issue develop` には、Issue取得・AI変更案・実隔離の挙動テスト・別session/requestのレビュー・Draft PR配送/復旧を接続しました。実Bedrock/実GitHubでの最終通し成功はPCで未確認です。Webからの実装実行、失敗の自動修正ループ、MCP Serverは未実装です。
 
 ## ローカルWeb UI（閲覧専用）
 
@@ -121,7 +121,7 @@ uv sync --extra web
 uv run sf web --rebuild
 ```
 
-ブラウザで `http://127.0.0.1:8000/` を開きます。画面にはタスク、実行履歴、登録済みRuntimeが表示され、`/guide` と `/onboarding` からHTML資料を読めます。初回またはフロントエンド再構築時はNode.js/npmも必要です。ローカルAPIは認証なしのため外部公開しないでください。詳細は[ローカルWeb API](docs/local-web-api.md)を参照してください。
+ブラウザで `http://127.0.0.1:8000/` を開きます。画面には外部Issue、実行履歴、登録済みRuntimeが表示され、`/guide` と `/onboarding` からHTML資料を読めます。初回またはフロントエンド再構築時はNode.js/npmも必要です。ローカルAPIは認証なしのため外部公開しないでください。詳細は[ローカルWeb API](docs/local-web-api.md)を参照してください。
 
 ## GitHub Issuesとローカル開発
 

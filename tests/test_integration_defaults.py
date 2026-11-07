@@ -54,12 +54,12 @@ def test_existing_authentication_priority_and_secret_repr(monkeypatch, primary, 
 def test_default_task_source_reuses_neutral_import_contract(tmp_path, monkeypatch):
     factory = open_factory(tmp_path)
     def fetch(self, external_id):
-        return ExternalIssue('github', self.repository, external_id, 'Default source task')
+        return ExternalIssue('github', self.repository, external_id, 'Default source issue')
     monkeypatch.setattr(GitHubIssuesSource, 'fetch_issue', fetch)
     first = import_issue(factory, task_source('example/repo'), '7')
     second = import_issue(factory, task_source('example/repo'), '7')
     assert first == second
-    assert factory.show_task(first)['task']['prompt'] == 'Default source task'
+    assert factory.show_issue(first)['issue']['prompt'] == 'Default source issue'
 
 
 def test_diagnostics_are_read_only_without_database_or_network(tmp_path, monkeypatch, capsys):

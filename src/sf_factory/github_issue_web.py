@@ -1,4 +1,4 @@
-"""Explicit local-only GitHub Issue preview and task import endpoints."""
+"""Explicit local-only GitHub Issue preview and issue import endpoints."""
 
 from __future__ import annotations
 
@@ -69,9 +69,9 @@ def install_github_issue_routes(app: FastAPI, data_dir: Path | None) -> None:
                 != "application/json"):
             raise HTTPException(status_code=403, detail="Same-origin JSON request required")
         issue = _fetch(selection.repository, selection.number)
-        task_id = open_factory(data_dir or Path(".sf-factory")).import_external_task(
+        issue_key = open_factory(data_dir or Path(".sf-factory")).import_issue(
             provider=issue.provider, instance=issue.instance,
             external_id=issue.external_id, prompt=issue.prompt,
             external_url=issue.external_url,
         )
-        return {"task_id": task_id, "external_url": issue.external_url}
+        return {"issue_key": issue_key, "external_url": issue.external_url}

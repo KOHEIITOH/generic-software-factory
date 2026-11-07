@@ -35,7 +35,7 @@ def test_fetch_and_import_issue(tmp_path: Path, monkeypatch) -> None:
     factory = Factory(tmp_path)
     first = import_issue(factory, source, "42")
     assert first == import_issue(factory, source, "42")
-    assert factory.list_tasks()[0]["prompt"] == "Fix tests\n\nRun CI"
+    assert factory.list_issues()[0]["prompt"] == "Fix tests\n\nRun CI"
 
 
 def test_pull_request_is_not_imported(monkeypatch) -> None:
@@ -66,7 +66,7 @@ def test_list_issues_pagination_and_pull_request_filter(monkeypatch) -> None:
     def fake_open(request, timeout):
         assert "state=closed&per_page=2&page=3" in request.full_url
         return FakeResponse([
-            {"number": 4, "title": "Closed task", "body": "Details",
+            {"number": 4, "title": "Closed issue", "body": "Details",
              "html_url": "https://github.com/org/repo/issues/4"},
             {"number": 5, "title": "Pull request", "pull_request": {},
              "html_url": "https://github.com/org/repo/issues/5"},
@@ -79,7 +79,7 @@ def test_list_issues_pagination_and_pull_request_filter(monkeypatch) -> None:
     assert has_more is True
     assert len(issues) == 1
     assert issues[0].external_id == "4"
-    assert issues[0].prompt == "Closed task\\n\\nDetails"
+    assert issues[0].prompt == "Closed issue\\n\\nDetails"
 
 
 @pytest.mark.parametrize("kwargs", [
