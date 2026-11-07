@@ -14,6 +14,8 @@ DBは不要。既存data rootがSQLiteなら保持し、新しいPOSIX rootはFi
 ## 前提
 
 - クリーンなローカルGit checkout。HEADをremote default branchと同じcommitにする。
+  SF自身を対象にする場合も、uv/npmの自動生成lockとegg-infoはこのrepositoryのignore対象。
+  target側の実ソースの変更や、未追跡の作業ファイルはcommit/stash等で整理してから実行する。
 - 正式なGitHub Issueと、repositoryへのbranch/PR書込権限。
 - local Docker socket、CPU/memory/PID制限が実際に有効なdaemon。
 - digestで固定した信頼するPython入りimageを、operatorが事前にpull済みであること。
