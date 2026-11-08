@@ -76,7 +76,7 @@ class GitHubIssuesSource:
             expected = f"https://github.com/{self.repository}/issues/{number}"
             if item.get("html_url") != expected:
                 continue
-            prompt = title.strip() + ("\\n\\n" + body.strip() if body and body.strip() else "")
+            prompt = title.strip() + ("\n\n" + body.strip() if body and body.strip() else "")
             issues.append(ExternalIssue(
                 provider="github", instance=self.repository, external_id=str(number),
                 prompt=prompt, external_url=expected,

@@ -7,6 +7,7 @@ import re
 import stat
 import subprocess
 import sys
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -57,7 +58,11 @@ class WebJobs:
                     or not re.fullmatch('[a-f0-9]{32}', job.get('profile_id', ''))
                     or not re.fullmatch('[a-f0-9]{32}', job.get('session_id', ''))
                     or not re.fullmatch('[a-f0-9]{64}', job.get('config_fingerprint', ''))
-                    or job.get('action') not in {'plan', 'advance', 'review', 'approve'}
+                    or job.get('action') not in {'plan', 'advance', 'review', 'approve', 'develop'}
+                    or ((job.get('action') == 'develop') != (job.get('issue_id') is not None))
+                    or (job.get('action') == 'develop' and
+                        (not isinstance(job.get('issue_id'), str) or
+                         not re.fullmatch('[1-9][0-9]{0,18}', job['issue_id'])))
                     or type(job.get('stop_requested')) is not bool
                     or (job.get('action') == 'approve' and
                         not re.fullmatch('[a-f0-9]{64}', job.get('approved_plan', '')))):
@@ -100,14 +105,18 @@ class WebJobs:
     def enqueue(self, *, profile_id: str, config_fingerprint: str, action: str,
                 request_id: str, confirm_bedrock: bool, run_id: str | None = None,
                 reviewers: tuple[str, ...] = (),
-                approved_plan: str | None = None) -> tuple[dict, bool]:
-        if (action not in {'plan', 'advance', 'review', 'approve'}
+                approved_plan: str | None = None,
+                issue_id: str | None = None) -> tuple[dict, bool]:
+        if (action not in {'plan', 'advance', 'review', 'approve', 'develop'}
                 or not re.fullmatch('[a-f0-9]{32}', request_id)
                 or (action == 'review') != (run_id is not None)
                 or (run_id is not None and not re.fullmatch('[a-f0-9]{32}', run_id))
                 or len(reviewers) > 16 or any(not re.fullmatch(r'[A-Za-z0-9_\[\]-]{1,128}', a)
                                             for a in reviewers)):
             raise ValueError('bounded registered workflow action required')
+        if ((action == 'develop') != (issue_id is not None)
+                or (issue_id is not None and not re.fullmatch('[1-9][0-9]{0,18}', issue_id))):
+            raise ValueError('exact selected Issue identity required')
         if ((action == 'approve') != (approved_plan is not None)
                 or (approved_plan is not None and not re.fullmatch('[a-f0-9]{64}', approved_plan))):
             raise ValueError('exact plan approval fingerprint required')
@@ -119,7 +128,12 @@ class WebJobs:
                    'confirm_bedrock': confirm_bedrock}
         if approved_plan is not None:
             command['approved_plan'] = approved_plan
+        if issue_id is not None:
+            config = replace(config, issue=issue_id)
+            command['issue_id'] = issue_id
         subject = ('review:' + config.repository + ':' + str(run_id) if action == 'review' else
+                   'issue-development:' + config.repository + ':' + config.issue
+                   if action == 'develop' else
                    'requirements:' + config.repository + ':' + config.issue)
         session_id = fingerprint({'subject': subject, 'config': fingerprint({
             'development': config.fingerprint, 'reviewers': reviewers})})[:32]
@@ -241,4 +255,6 @@ class WebJobs:
                 'expires_at': state['expires_at'], 'children': children,
                 'requirement_sources': source_summary,
                 'plan_preview': plan_preview(state),
+                'run_id': data.get('run_id'),
+                'pr_url': data.get('pull_request', {}).get('url'),
                 'decisions': [{'at': d['at'], 'code': d['code']} for d in state['decisions'][-20:]]}
