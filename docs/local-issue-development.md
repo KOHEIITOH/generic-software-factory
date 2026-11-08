@@ -131,5 +131,6 @@ journalを消す・別data rootに変える方法で再送を強制しない。
 
 初期経路は1つのcandidate、承認済みの挙動シナリオ、独立した1レビューを対象とする。
 同じPRの指摘修正と子Issueの直列実行は[有限ワークフロー](bounded-issue-workflow.md)から使う。
-品質失敗を無制限に修正するloop、Web operator認証・実行ボタン、分散Worker、S3永続化は未実装。
+[Web operator操作](local-web-execution.md)も同じcontrollerへ接続済み。
+品質失敗を無制限に修正するloop、分散Worker、S3永続化は未実装。
 成功したDraft PRも人間が変更全体と必要な回帰チェックをレビューしてから扱う。

@@ -194,3 +194,27 @@ def test_real_docker_web_worker_advances_existing_workflow(requirement_flow, mon
     assert run_job(root, 'a' * 32, executor=lambda **k: advance_requirements(**args, execute=True))
     assert store.get('a' * 32)['result']['reason'] == 'child_pr_submitted'
     assert store.progress('a' * 32)['children'][0]['pr_url']
+
+
+def test_stop_checkpoint_blocks_actual_external_and_container_start_boundaries(flow):
+    from sf_factory.automation_state import AutomationSession
+    from sf_factory.budgeted_model import BudgetedModel
+    from sf_factory.docker_execution import run_offline_command
+    from sf_factory.github_issues_source import GitHubIssuesSource
+    from sf_factory.github_source_control import GitHubSourceControl
+    from sf_factory.operation_control import OperationStopped, operation_control
+    session = AutomationSession(flow['factory'].root, subject='boundary-test',
+                                config_fingerprint='e' * 64)
+    def stop():
+        raise OperationStopped('fixture stopped')
+    with operation_control(stop):
+        for operation in (
+            lambda: GitHubSourceControl().describe_repository('fixture/repo'),
+            lambda: GitHubIssuesSource('fixture/repo').fetch_issue('1'),
+            lambda: run_offline_command(image=flow['config'].image, argv=('python', '-V')),
+            lambda: BudgetedModel(flow['implementer'], session, role='fixture').generate('test'),
+        ):
+            with pytest.raises(OperationStopped):
+                operation()
+    assert flow['implementer'].calls == 0
+    assert session.snapshot()['counts']['model'] == 0

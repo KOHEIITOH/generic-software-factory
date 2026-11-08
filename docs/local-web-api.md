@@ -2,7 +2,7 @@
 
 既定ではloopback専用のローカル管理画面です。開発依頼の入口はGitHub Issue、実行の記録はRunです。
 独立Taskの画面・API・CLI・保存構造は削除済みです。[外部Issueモデル](external-issue-model.md)を参照。
-**現在はIssue取込・関連付け・事前チェック・履歴表示までで、実装実行APIはまだ接続していません。**
+閲覧・Issue取込に加え、登録済み設定を使う[認証済みWeb実行](local-web-execution.md)を接続しています。
 
 ## 起動
 
@@ -27,10 +27,17 @@ URLは`http://127.0.0.1:8000/`です。Dockerは閲覧・取込には不要で�
 
 ## 既存の変更APIと境界
 
-Project/Repository登録、Issue取込、検証済みRepositoryとの関連付け、旧ローカルTask作成は既存APIで可能です。
+Project/Repository登録、Issue取込、検証済みRepositoryとの関連付けは既存APIで可能です。独自Task作成は削除済みです。
 ブラウザの変更要求はsame-originを要求します。GitHub Draft PRデモは明示boolean確認と権限検査後に
 markerだけを追加する機能であり、Issueの実装や自動配送ではありません。
 
-Webのoperator認証と安全な実行器への接続が整うまでは、読み取り専用CLI実行を実装実行APIへ転用しません。
+operator経路は既存の有限Workflowへ接続し、読み取り専用Runtimeを実装実行器へ転用しません。
 公開API認証は未実装なので、loopback以外へ公開する運用は対象外です。
 完成条件と未接続箇所は[縦断実装チェックリスト](issue-to-pr-vertical-slice.md)を参照してください。
+
+## 認証済みローカルoperator経路
+
+[Web実行操作](local-web-execution.md)はloopback launcherが発行する操作権限を要求する。
+`/api/operator/session`、`profiles`、`jobs`、`jobs/{id}/stop`、`logout` を使い、
+HTTPから設定ファイルpathや任意commandを受け取らない。通常のAPI起動は実行無効。
+既存の公開閲覧APIに実行権限は付与しない。operator応答はno-storeとする。

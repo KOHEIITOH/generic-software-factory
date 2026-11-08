@@ -1,0 +1,70 @@
+# Webから開発を実行・再開・停止する
+
+対象はPC上の単一利用者向けです。既存のCLIと同じWorkflow・Harness・品質チェック・
+GitHub Adapter・永続予算を使います。AWSリソース作成、デプロイ、mergeは行いません。
+
+## 初回の実行設定登録
+
+[Issue開発の設定](local-issue-development.md)を用意します。設定ファイルは対象repoの外、
+operator所有・他者書込不可にしてください。`data_root` とWebの `SF_DATA_DIR` は
+同じ絶対パスにします。設定の作成・変更・失効はPCのターミナルで行い、
+Webから任意pathやcommandを指定する入口は設けません。
+
+```sh
+export SF_DATA_DIR=/absolute/path/to/factory-data
+uv run sf operator register --config /absolute/path/operator.json --name 開発対象
+uv run sf web --rebuild
+```
+
+登録は初回だけです。次回からは従来どおり `uv run sf web --rebuild` で起動できます。
+設定が変わった場合はローカルで確認して登録し直します。失効するには
+`uv run sf operator revoke PROFILE_ID` を使います。登録結果にはPROFILE_IDを返します。
+登録自体ではAI、Docker、外部サービスを呼びません。
+
+起動時にブラウザが開き、ターミナルにも操作リンクを表示します。そのリンクは
+操作権限を含むため共有しないでください。能力はURLのfragmentから一度だけ交換し、
+すぐアドレスバーから除去します。HTTP queryやaccess log、localStorageへ保存しません。
+通常のURLから開いた閲覧用画面だけでは実行できません。操作cookieはHttpOnly / SameSite
+Strict、8時間で失効し、サーバー再起動または「操作権限を閉じる」でも無効になります。
+`uvicorn sf_factory.web_api:app` など直接起動したAPIには実行権限を付与しません。
+
+## 操作
+
+「開発を進める」で登録設定を選び、repo・親Issue・変更範囲・検証内容を確認します。
+AIへの送信・隔離テスト・Issue/PR操作に同意し、Bedrockなら料金発生にも同意します。
+信頼するレビュアーはカンマ区切りで指定でき、省略時はGitHub認証ユーザーです。
+同じ登録設定のレビュアー範囲は初回ジョブで固定します。
+
+- **計画・子Issueを作成**：既存source/Harnessに基づく分割と独立レビューを行い、GitHub子Issueを作ります。
+- **次の1ステップを実行・再開**：子Issueの実装・挙動検証・独立レビュー・Draft PR、または既存PRのレビュー修正・マージ確認を進めます。
+- **同じPRの指摘に対応**：元のFactory製Draft PRを作成したRun IDを指定し、既存の単独PRを修正します。
+- **停止を要求**：未開始ジョブは停止し、実行中は次の操作境界で停止します。処理中の推論・API・テストが終了して結果を記録する場合があります。
+
+同じdata rootではWebの実行は1つだけです。1ステップで必ず戻り、レビュー待ちから
+タイマーで勝手に次へ進めません。人間がPRを確認・mergeした後、明示的に次のステップを
+実行します。子Issueの依存はPRの正確なheadのmergeで解除します。
+
+画面には子Issue/PRリンク、Run ID、使用済み・残り予算、期限、判断・停止理由、
+操作履歴を表示します。実行中の自動更新はローカル保存状態を読むだけです。
+source、要件本文、モデル応答、SDK例外、秘密情報、設定ファイルのパスは返しません。
+
+## 復旧の扱い
+
+送信結果が不明な場合、「同じ送信を確認」は同じrequest IDを使います。二重ジョブを作りません。
+Webを再読み込みしても進捗・予算を維持します。サーバー再起動後は操作リンクを開き直します。
+workerは独立プロセスなので生存していれば継続し、POSIX lease消失なら「中断」と表示します。
+PID番号だけで生存と判断したり、再起動時に自動実行したりしません。
+
+中断後の「再開」は既存Workflowの証跡を照合します。結果不明の推論・commit準備は
+再送せず停止し、Issue/link/branch/PRの結果不明は既存のreadback規則を使います。
+停止が安全上terminalになった場合、画面操作で解除・予算リセットはしません。
+設定失効や変更も次の操作境界で反映します。ログアウトだけでは実行中workerを停止しません。
+
+workerは最大1時間、Workflowは既存の累積回数・token/API/write・7日期限を維持します。
+記録は `web-jobs-v1` / `automation-v1` / 既存Run・証跡に残します。
+ジョブ履歴は最大500件で、上限時に勝手に古い証拠を削除しません。
+DBは不要、現段階ではPOSIXローカル保存先を使います。複数利用者の公開サービス、
+分散Worker、ECS/S3保存は今回の対象外です。
+
+検証では実HTTP/保存とChromium、実Docker workerケースを使用し、AI/SCMは模擬します。
+Bedrock＋GitHubの実サービス最終通し確認は、引き続き利用者のPCで行います。
