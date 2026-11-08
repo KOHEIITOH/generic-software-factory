@@ -218,3 +218,13 @@ def test_stop_checkpoint_blocks_actual_external_and_container_start_boundaries(f
                 operation()
     assert flow['implementer'].calls == 0
     assert session.snapshot()['counts']['model'] == 0
+
+
+def test_history_is_chronological_even_when_random_job_ids_sort_oppositely(job_flow):
+    root, auth, payload, calls = job_flow
+    store = WebJobs(root)
+    command = {k: v for k, v in payload.items() if k != 'confirm_run'}
+    store.enqueue(**{**command, 'request_id': 'f' * 32})
+    store.stop('f' * 32)
+    store.enqueue(**{**command, 'request_id': '0' * 32})
+    assert [j['id'] for j in store.list()] == ['0' * 32, 'f' * 32]

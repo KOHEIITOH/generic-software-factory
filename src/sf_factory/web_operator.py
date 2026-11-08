@@ -149,6 +149,8 @@ class WebOperator:
                 self._failures.append(now)
                 raise HTTPException(403, 'Operator authentication required')
             self._sessions = {k: v for k, v in self._sessions.items() if v > now}
+            # Reopening the terminal link rotates this browser's capability.
+            self._sessions.pop(request.cookies.get(COOKIE, ''), None)
             if len(self._sessions) >= 16:
                 raise HTTPException(429, 'Operator session limit reached')
             session = secrets.token_urlsafe(32)
