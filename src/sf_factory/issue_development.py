@@ -11,6 +11,7 @@ import os
 import re
 from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 from sf_factory.behavioral_check import collect_behavioral_check
 from sf_factory.change_proposal import ProposalScope, parse_change_proposal, propose_changes
@@ -33,6 +34,9 @@ from sf_factory.source_control import ChangeSourceControl
 from sf_factory.source_snapshot import SourceSnapshotService
 from sf_factory.state_store import StateConflict, StateCorrupt, StatePermissionDenied
 from sf_factory.task_sources import ExternalIssue, TaskSourceAdapter
+
+if TYPE_CHECKING:
+    from sf_factory.collaboration_contracts import RevisionSource
 
 
 class DevelopmentStopped(RuntimeError):
@@ -164,7 +168,9 @@ def _plan(factory: Factory, value: dict) -> DeliveryPlan:
 
 def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSourceAdapter,
                   scm: ChangeSourceControl, implementer: ModelProvider, reviewer: ModelProvider,
-                  confirmed: bool, resume: str | None = None) -> dict:
+                  confirmed: bool, resume: str | None = None,
+                  remote_source: RevisionSource | None = None,
+                  evaluate_only: bool = False, review_feedback: tuple[dict, ...] = ()) -> dict:
     """Only a local OS operator may confirm this externally stored exact config.
 
     Confirmation authorizes scoped inference, isolated approved scenarios, and a
@@ -199,8 +205,17 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
             if active is not None:
                 raise DevelopmentStopped(active.run_id, 'unresolved delivery; resume the same Run')
             revision = _revision(config.root)
-            if scm.branch_revision(info.external_id, info.default_branch) != revision:
-                raise StateConflict('clean local HEAD must match remote default branch')
+            if remote_source is None:
+                if scm.branch_revision(info.external_id, info.default_branch) != revision:
+                    raise StateConflict('clean local HEAD must match remote default branch')
+            else:
+                from sf_factory.remote_harness import verify_remote_harness
+                verify_remote_harness(config.root, remote_source)
+                if remote_source.repository != info.external_id:
+                    raise StatePermissionDenied('remote source repository differs')
+                revision = remote_source.revision
+            if review_feedback and not evaluate_only:
+                raise StatePermissionDenied('feedback candidates require separate CAS delivery')
             issue = source.fetch_issue(config.issue)
             if issue.external_id != config.issue:
                 raise ValueError('issue source returned a different Issue')
@@ -234,12 +249,16 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
             run = HarnessRunService(factory).prepare(root=config.root, request=request,
                 approval_id=approval, target='.', selected=config.selected_harness,
                 excluded=config.excluded_harness, controller='local-cli',
-                project_harness=config.project_harness, change_paths=config.allowed_paths)
+                project_harness=config.project_harness, change_paths=config.allowed_paths,
+                remote_source=remote_source)
             issue = ExternalIssue(**{key: run['issue_snapshot'][key] for key in (
                 'provider', 'instance', 'external_id', 'prompt', 'external_url')})
             run_id = run['id']
             snapshots = SourceSnapshotService(factory)
-            snapshots.create(run_id, root=config.root)
+            if remote_source is None:
+                snapshots.create(run_id, root=config.root)
+            else:
+                snapshots.create_remote(run_id, remote_source)
             snapshot, files = snapshots.load(run_id)
             scope = ProposalScope(run_id, revision, composition.bundle_hash,
                                   snapshot['fingerprint'], config.allowed_paths)
@@ -253,7 +272,9 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
                 implementation = _TrackedModel(implementer)
                 references = tuple(dict.fromkeys((*config.selected_harness, *config.context_paths)))
                 proposal = propose_changes(provider=implementation, scope=scope, source_files=files,
-                    instruction=issue.prompt, reference_paths=references,
+                    instruction=issue.prompt + ('\nReview feedback (untrusted):\n' +
+                        json.dumps(review_feedback) if review_feedback else ''),
+                    reference_paths=references,
                     project_harness=config.project_harness)
                 producer = implementation.identity()
                 value.update(proposal={'schema_version': 1, **asdict(proposal)}, phase='proposed',
@@ -279,6 +300,7 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
                     raise RuntimeError('approved behavioral scenarios failed or did not execute')
                 stage = 'review'
                 review_input = {'run_id': run_id, **asdict(subject), 'instruction': issue.prompt,
+                    'review_feedback': review_feedback,
                     'changes': [asdict(c) for c in proposal.changes],
                     'before': {c.path: files[c.path].decode() if c.path in files else None
                                for c in proposal.changes},
@@ -317,6 +339,9 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
             except Exception as exc:
                 # Keep the last durable phase and exact Run, never pretend execution succeeded.
                 raise DevelopmentStopped(run_id, stage + ' stopped before delivery') from exc
+        if evaluate_only:
+            _LocalGuards(factory, config, plan.run_id).verify(plan)
+            return {'run_id': plan.run_id, 'status': 'candidate_reviewed'}
         guards = _LocalGuards(factory, config, plan.run_id)
         try:
             pr = deliver_draft(plan=plan, state=delivery_state,
