@@ -17,9 +17,13 @@ import tempfile
 import time
 import uuid
 from pathlib import Path, PurePosixPath
+from typing import TYPE_CHECKING
 
 from sf_factory.factory import Factory
 from sf_factory.harness_discovery import _sensitive
+
+if TYPE_CHECKING:
+    from sf_factory.collaboration_contracts import RevisionSource
 
 MAX_FILES = 1000
 MAX_FILE_BYTES = 1048576
@@ -111,6 +115,42 @@ class SourceSnapshotService:
         entries = tree.rstrip(b'\0').split(b'\0') if tree else []
         if not entries or len(entries) > MAX_FILES:
             raise ValueError('snapshot file count exceeded or empty source')
+        bodies: list[tuple[str, str, bytes]] = []
+        total = 0
+        for entry in entries:
+            header, encoded_path = entry.split(b'\t', 1)
+            mode, kind, object_id = header.decode('ascii').split(' ')
+            if (mode not in {'100644', '100755'} or kind != 'blob'
+                    or not re.fullmatch(r'(?:[a-f0-9]{40}|[a-f0-9]{64})', object_id)):
+                raise ValueError('symlinks, submodules or unsupported Git objects')
+            body = _git(root, ['cat-file', 'blob', object_id],
+                        min(MAX_FILE_BYTES, MAX_TOTAL_BYTES - total), deadline)
+            total += len(body)
+            bodies.append((encoded_path.decode('utf-8'), mode, body))
+        return self._publish(run_id, approved, bodies)
+
+    def create_remote(self, run_id: str, source: RevisionSource) -> dict:
+        """Publish previously verified exact remote blobs; no checkout or host execution."""
+        from sf_factory.remote_harness import verify_remote_harness
+        run = self.factory.show_run(run_id)
+        if run['status'] != 'prepared' or 'harness_manifest' not in run:
+            raise ValueError('prepared Harness Run required')
+        approved = run['harness_manifest']
+        request = approved['request']
+        repositories = self.factory.project_registry().list_repositories(request['project_id'])
+        repository = next((r for r in repositories if r.id == request['repository_id']), None)
+        if repository is None or repository.provider_id != 'local-git':
+            raise ValueError('registered repository required')
+        verify_remote_harness(Path(repository.external_id), source)
+        if source.revision != request['revision']:
+            raise ValueError('remote revision differs from approved Run')
+        return self._publish(run_id, approved,
+                             [(f.path, f.mode, f.content) for f in source.files])
+
+    def _publish(self, run_id: str, approved: dict,
+                 bodies: list[tuple[str, str, bytes]]) -> dict:
+        request = approved['request']
+        revision = request['revision']
         files: list[dict] = []
         seen: set[str] = set()
         total = 0
@@ -122,20 +162,17 @@ class SourceSnapshotService:
                 staging = Path(temporary)
                 payload = staging / 'payload'
                 payload.mkdir(mode=0o700)
-                for entry in entries:
-                    header, encoded_path = entry.split(b'\t', 1)
-                    mode, kind, object_id = header.decode('ascii').split(' ')
-                    if (mode not in {'100644', '100755'} or kind != 'blob'
-                            or not re.fullmatch(r'(?:[a-f0-9]{40}|[a-f0-9]{64})', object_id)):
-                        raise ValueError('symlinks, submodules or unsupported Git objects')
-                    relative = encoded_path.decode('utf-8')
+                if not 1 <= len(bodies) <= MAX_FILES:
+                    raise ValueError('snapshot file count exceeded or empty source')
+                for relative, mode, body in bodies:
                     path = _path(relative)
-                    if relative in seen:
-                        raise ValueError('duplicate Git path')
+                    if (relative in seen or mode not in {'100644', '100755'}
+                            or not isinstance(body, bytes) or len(body) > MAX_FILE_BYTES):
+                        raise ValueError('invalid snapshot file')
                     seen.add(relative)
-                    body = _git(root, ['cat-file', 'blob', object_id],
-                                min(MAX_FILE_BYTES, MAX_TOTAL_BYTES - total), deadline)
                     total += len(body)
+                    if total > MAX_TOTAL_BYTES:
+                        raise ValueError('snapshot bytes exceeded')
                     destination = payload.joinpath(*path.parts)
                     destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
                     with destination.open('xb') as stream:

@@ -6,12 +6,16 @@ import subprocess
 import uuid
 from dataclasses import asdict
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from sf_factory.factory import Factory, _now
 from sf_factory.harness_approval import HarnessApprovalRequest
 from sf_factory.harness_composition import compose_harness
 from sf_factory.harness_validation import validate_harness
 from sf_factory.project_harness import ProjectHarness
+
+if TYPE_CHECKING:
+    from sf_factory.collaboration_contracts import RevisionSource
 
 
 def _revision(root: Path) -> str:
@@ -60,13 +64,19 @@ class HarnessRunService:
         self, *, root: Path, request: HarnessApprovalRequest, approval_id: str,
         target: str, selected: tuple[str, ...], excluded: tuple[tuple[str, str], ...] = (),
         controller: str, project_harness: ProjectHarness | None = None,
-        change_paths: tuple[str, ...] = (),
+        change_paths: tuple[str, ...] = (), remote_source: RevisionSource | None = None,
     ) -> dict:
         """Recompose and atomically consume approval with Run/manifest/audit insertion."""
         self.state.check_registration(request, root)
         before = _revision(root)
-        if before != request.revision:
-            raise PermissionError('approved revision no longer matches repository HEAD')
+        if remote_source is None:
+            if before != request.revision:
+                raise PermissionError('approved revision no longer matches repository HEAD')
+        else:
+            from sf_factory.remote_harness import verify_remote_harness
+            verify_remote_harness(root, remote_source)
+            if remote_source.revision != request.revision:
+                raise PermissionError('remote source differs from approved revision')
         composition = compose_harness(validate_harness(root), target=target,
                                       selected=selected, excluded=excluded,
                                       project_harness=project_harness, change_paths=change_paths)
