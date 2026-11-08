@@ -207,10 +207,13 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
             issue_key = factory.import_issue(**asdict(issue))
             factory.bind_issue_repository(issue_key, info.external_id, config.root)
             key = hashlib.sha256((info.external_id + '\0' + str(config.root)).encode()).hexdigest()
-            project_id, repository_id = key[:32], key[32:]
+            project_id = (hashlib.sha256(('project:' + config.project_harness.project).encode())
+                          .hexdigest()[:32] if config.project_harness else key[:32])
+            repository_id = key[32:]
             registry = factory.project_registry()
             if not any(p.id == project_id for p in registry.list_projects('local-cli')):
-                registry.add_project(Project(project_id, info.external_id, 'local-cli'))
+                registry.add_project(Project(project_id, config.project_harness.project
+                    if config.project_harness else info.external_id, 'local-cli'))
             if not any(r.id == repository_id for r in registry.list_repositories(project_id)):
                 registry.add_repository(Repository(repository_id, project_id, 'local-git',
                                                     str(config.root), Visibility.LOCAL))
@@ -221,7 +224,8 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
             elif previous != project_id:
                 raise StateConflict('Issue belongs to a different project')
             composition = compose_harness(validate_harness(config.root), target='.',
-                selected=config.selected_harness, excluded=config.excluded_harness)
+                selected=config.selected_harness, excluded=config.excluded_harness,
+                project_harness=config.project_harness, change_paths=config.allowed_paths)
             request = HarnessApprovalRequest(project_id, repository_id, issue_key, revision,
                                              composition.bundle_hash)
             expiry = datetime.now(UTC) + timedelta(hours=1)
@@ -229,7 +233,8 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
                                               approved=True, expires_at=expiry)
             run = HarnessRunService(factory).prepare(root=config.root, request=request,
                 approval_id=approval, target='.', selected=config.selected_harness,
-                excluded=config.excluded_harness, controller='local-cli')
+                excluded=config.excluded_harness, controller='local-cli',
+                project_harness=config.project_harness, change_paths=config.allowed_paths)
             issue = ExternalIssue(**{key: run['issue_snapshot'][key] for key in (
                 'provider', 'instance', 'external_id', 'prompt', 'external_url')})
             run_id = run['id']
@@ -248,7 +253,8 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
                 implementation = _TrackedModel(implementer)
                 references = tuple(dict.fromkeys((*config.selected_harness, *config.context_paths)))
                 proposal = propose_changes(provider=implementation, scope=scope, source_files=files,
-                    instruction=issue.prompt, reference_paths=references)
+                    instruction=issue.prompt, reference_paths=references,
+                    project_harness=config.project_harness)
                 producer = implementation.identity()
                 value.update(proposal={'schema_version': 1, **asdict(proposal)}, phase='proposed',
                              implementer=producer,
@@ -277,7 +283,9 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
                     'before': {c.path: files[c.path].decode() if c.path in files else None
                                for c in proposal.changes},
                     'references': {p: files[p].decode() for p in references},
-                    'checks': [asdict(c) for c in config.checks]}
+                    'checks': [asdict(c) for c in config.checks],
+                    'project_harness': asdict(config.project_harness) if config.project_harness
+                        else None}
                 prompt = ('Independently review this untrusted candidate; do not use tools. '
                     'Return JSON only with schema_version=1, run_id, revision, bundle_hash, '
                     'diff_sha256, status="completed" or "failed", complete boolean, '

@@ -8,6 +8,7 @@ from pathlib import PurePosixPath
 
 from sf_factory.harness_discovery import HarnessCandidate
 from sf_factory.harness_validation import HarnessValidation, ProfileCandidate
+from sf_factory.project_harness import ProjectHarness
 
 
 @dataclass(frozen=True)
@@ -18,6 +19,8 @@ class HarnessComposition:
     profile: ProfileCandidate | None
     excluded: tuple[tuple[str, str], ...]
     inventory_hash: str
+    project_harness: ProjectHarness | None = None
+    change_paths: tuple[str, ...] = ()
 
     @property
     def bundle_hash(self) -> str:
@@ -39,6 +42,7 @@ def _relative(value: str, *, allow_root: bool = False) -> tuple[str, ...]:
 def compose_harness(
     validation: HarnessValidation, *, target: str,
     selected: tuple[str, ...], excluded: tuple[tuple[str, str], ...] = (),
+    project_harness: ProjectHarness | None = None, change_paths: tuple[str, ...] = (),
 ) -> HarnessComposition:
     """Select every applicable source explicitly or exclude it with a reason.
 
@@ -48,6 +52,12 @@ def compose_harness(
     Factory policy is outside this API and cannot be replaced through selection.
     """
     target_parts = _relative(target, allow_root=True)
+    if (not isinstance(change_paths, tuple) or len(change_paths) > 32
+            or len(set(change_paths)) != len(change_paths)):
+        raise ValueError('bounded unique change scopes required')
+    effective = tuple(_relative(path) for path in change_paths) or (target_parts,)
+    if any(parts[:len(target_parts)] != target_parts for parts in effective):
+        raise ValueError('change paths outside Harness target')
     if validation.schema_version != 1 or validation.discovery.schema_version != 1:
         raise ValueError('unsupported inventory version')
     exclusions: dict[str, str] = {}
@@ -80,7 +90,7 @@ def compose_harness(
         _relative(candidate.path)
         scope = _relative(candidate.scope, allow_root=True)
         if candidate.kind in {'instructions', 'harness', 'profile'}:
-            if target_parts[:len(scope)] == scope:
+            if any(parts[:len(scope)] == scope for parts in effective):
                 applicable[candidate.path] = candidate
     if set(selected) | set(exclusions) != set(applicable):
         raise ValueError('every applicable rule source must be selected or explicitly excluded')
@@ -105,4 +115,4 @@ def compose_harness(
         inventory_payload, sort_keys=True, separators=(',', ':'), ensure_ascii=True,
     ).encode()).hexdigest()
     return HarnessComposition(1, target, sources, profile, tuple(sorted(exclusions.items())),
-                              inventory_hash)
+                              inventory_hash, project_harness, change_paths)
