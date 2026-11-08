@@ -126,6 +126,8 @@ def _advance(factory, config, source, scm, tracker, implementer, reviewer,
         parent = source.fetch_issue(config.issue)
         if parent.external_id != config.issue:
             raise StateConflict('different parent Issue returned')
+        issue_key = factory.import_issue(**asdict(parent))
+        factory.bind_issue_repository(issue_key, config.repository, config.root)
         from sf_factory.remote_harness import verify_remote_harness
         info = scm.describe_repository(config.repository)
         revision = scm.branch_revision(config.repository, info.default_branch)
@@ -176,6 +178,9 @@ def _advance(factory, config, source, scm, tracker, implementer, reviewer,
                 found = tracker.create_issue(config.repository, title=title, body=body)
             except Exception:
                 return _save(session, data, 'child_create_unresolved', child=child.id)
+        if (action is not None and action['status'] == 'completed'
+                and action['receipt'] != asdict(found)):
+            raise StateConflict('child identity differs from durable creation receipt')
         if (found.prompt != title + '\n\n' + body or found.instance != parent.instance
                 or found.provider != parent.provider):
             raise StateConflict('existing child content/provider differs from reviewed plan')

@@ -341,3 +341,36 @@ def test_temporary_remote_read_failure_is_bounded_wait_not_reexecution(requireme
     args['scm'].read_revision = original
     assert advance_requirements(**args, execute=True)['reason'] == 'child_pr_submitted'
     assert args['tracker'].creates == 2
+
+
+def test_parent_origin_mismatch_stops_before_inference_and_child_creation(requirement_flow):
+    from sf_factory.state_store import StatePermissionDenied
+    args = requirement_flow
+    class WrongOrigin:
+        def verify(self, **kwargs):
+            raise StatePermissionDenied('fixture wrong origin')
+    args['factory'].repository_binding = WrongOrigin()
+    assert advance_requirements(**args)['status'] == 'stopped'
+    assert args['implementer'].calls == args['tracker'].creates == 0
+
+
+def test_completed_creation_receipt_cannot_adopt_a_different_issue_after_crash(requirement_flow):
+    from sf_factory.automation_state import AutomationSession, fingerprint
+    from sf_factory.requirement_workflow import PLAN_LIMITS
+    args = requirement_flow
+    result = advance_requirements(**args)
+    assert result['reason'] == 'plan_ready'
+    config = args['config']
+    session = AutomationSession(args['factory'].root,
+        subject='requirements:' + config.repository + ':' + config.issue,
+        config_fingerprint=fingerprint({'development': config.fingerprint, 'reviewers': ()}),
+        limits=PLAN_LIMITS)
+    state = session.snapshot()
+    data = state['data']
+    # Simulate durable receipt persisted before child mapping publication.
+    data['children'] = {}
+    session.save(data, expected_version=state['version'])
+    args['tracker'].items['2'] = replace(args['tracker'].items['2'], external_id='99',
+        external_url='https://fixture.invalid/issues/99')
+    assert advance_requirements(**args)['status'] == 'stopped'
+    assert args['tracker'].creates == 2 and args['scm'].prs == {}

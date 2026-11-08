@@ -2,6 +2,8 @@
 
 Accepted. Reuse existing DevelopmentConfig, TaskSourceAdapter, IssueTracker,
 CollaborationSourceControl, Run/snapshot/evidence and bounded automation journal.
+Local origin is verified through the existing repository binding before planning.
+Completed child creation receipts bind exact external identities during recovery.
 The parent remains the external requirement; 1..8 native children are execution
 units. This is not standalone Task CRUD. The independent planning review must
 confirm full coverage, concrete acceptance, completable units and valid scope/DAG.
