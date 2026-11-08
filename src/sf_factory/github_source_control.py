@@ -5,6 +5,8 @@ import base64
 import hashlib
 import json
 import re
+import time
+from collections.abc import Callable
 from pathlib import PurePosixPath
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
@@ -41,8 +43,15 @@ def _branch(branch: str) -> str:
 
 
 class GitHubSourceControl:
+    def __init__(self, *, request_guard: Callable[[str, str], None] | None = None):
+        self.request_guard = request_guard
+
     def _request(self, path: str, method: str = 'GET', payload: dict | None = None,
-                 *, collection: bool = False, optional: bool = False) -> dict:
+                 *, collection: bool = False, optional: bool = False,
+                 response_limit: int = 1048576) -> dict:
+        guard = getattr(self, 'request_guard', None)
+        if guard is not None:
+            guard(method, path)
         token = environment_token()
         if not token:
             raise SourceControlError('not_configured', 'GitHub credentials are not configured')
@@ -54,8 +63,8 @@ class GitHubSourceControl:
         try:
             with urlopen(Request('https://api.github.com' + path, data=data,
                                  headers=headers, method=method), timeout=15) as response:
-                raw = response.read(1048577)
-                if len(raw) > 1048576:
+                raw = response.read(response_limit + 1)
+                if len(raw) > response_limit:
                     raise SourceControlError('invalid_response', 'GitHub response exceeds limit')
                 result = json.loads(raw)
                 paginated = bool(response.headers.get('Link')) if collection else False
@@ -78,6 +87,12 @@ class GitHubSourceControl:
         if not isinstance(result, dict):
             raise SourceControlError('invalid_response', 'Unexpected GitHub response')
         return result
+
+    def _graphql(self, query: str, variables: dict) -> dict:
+        result = self._request('/graphql', 'POST', {'query': query, 'variables': variables})
+        if result.get('errors') or not isinstance(result.get('data'), dict):
+            raise SourceControlError('invalid_response', 'GraphQL operation not confirmed')
+        return result['data']
 
     def describe_repository(self, repository: str) -> RepositoryInfo:
         data = self._request(_base(repository))
@@ -288,3 +303,179 @@ class GitHubSourceControl:
                 or not isinstance(item.get('body'), str) or marker not in item['body']):
             raise SourceControlError('invalid_response', 'Existing PR differs from delivery intent')
         return PullRequestReference(str(number), item['html_url'])
+
+    def compare_update_branch(self, repository: str, branch: str, *, expected: str,
+                              revision: str) -> None:
+        """Atomic beforeOid/afterOid CAS; a pre-read plus REST PATCH is insufficient."""
+        prefix = _base(repository)
+        _branch(branch)
+        if any(not isinstance(v, str) or not re.fullmatch(r'[a-f0-9]{40}', v)
+               for v in (expected, revision)) or expected == revision:
+            raise ValueError('distinct exact ref revisions required')
+        info = self._request(prefix)
+        node = info.get('node_id')
+        if (not isinstance(node, str) or not node
+                or not isinstance(info.get('full_name'), str)
+                or info['full_name'].casefold() != repository.casefold()):
+            raise SourceControlError('invalid_response', 'Repository node identity missing')
+        data = self._graphql('''mutation($input:UpdateRefsInput!){
+            updateRefs(input:$input){clientMutationId}}''', {'input': {
+                'repositoryId': node, 'refUpdates': [{'name': 'refs/heads/' + branch,
+                    'beforeOid': expected, 'afterOid': revision, 'force': False}]}})
+        if not isinstance(data.get('updateRefs'), dict):
+            raise SourceControlError('invalid_response', 'Ref update outcome unknown')
+        if self.verified_branch_revision(repository, branch) != revision:
+            raise SourceControlError('invalid_response', 'Updated ref outcome unknown')
+
+    def read_revision(self, repository: str, revision: str):
+        from sf_factory.collaboration_contracts import RevisionFile, RevisionSource
+        if not isinstance(revision, str) or not re.fullmatch(r'[a-f0-9]{40}', revision):
+            raise ValueError('exact remote revision required')
+        prefix = _base(repository)
+        deadline = time.monotonic() + 120
+        commit = self._request(prefix + '/git/commits/' + revision)
+        if commit.get('sha') != revision or not isinstance(commit.get('tree'), dict):
+            raise SourceControlError('invalid_response', 'Remote commit identity mismatch')
+        tree_id = commit['tree'].get('sha')
+        if not isinstance(tree_id, str) or not re.fullmatch(r'[a-f0-9]{40}', tree_id):
+            raise SourceControlError('invalid_response', 'Invalid remote tree identity')
+        tree = self._request(prefix + '/git/trees/' + tree_id + '?recursive=1')
+        entries = tree.get('tree')
+        if (tree.get('sha') != tree_id or tree.get('truncated') is not False
+                or not isinstance(entries, list) or len(entries) > 2000):
+            raise SourceControlError('invalid_response', 'Complete bounded remote tree required')
+        blobs = []
+        paths = set()
+        from sf_factory.source_snapshot import _path
+        # Validate all paths/types/budgets BEFORE downloading any contents.
+        for entry in entries:
+            if not isinstance(entry, dict) or not isinstance(entry.get('path'), str):
+                raise SourceControlError('invalid_response', 'Invalid tree entry')
+            path = entry['path']
+            _path(path)
+            if path in paths:
+                raise SourceControlError('invalid_response', 'Duplicate tree entry')
+            paths.add(path)
+            if entry.get('type') == 'tree' and entry.get('mode') == '040000':
+                continue
+            if (entry.get('type') != 'blob' or entry.get('mode') not in {'100644', '100755'}
+                    or type(entry.get('size')) is not int or not 0 <= entry['size'] <= 1048576
+                    or not isinstance(entry.get('sha'), str)
+                    or not re.fullmatch(r'[a-f0-9]{40}', entry['sha'])):
+                raise SourceControlError('invalid_response', 'Unsupported remote source object')
+            blobs.append(entry)
+        if not 1 <= len(blobs) <= 1000 or sum(b['size'] for b in blobs) > 8 * 1024 * 1024:
+            raise SourceControlError('invalid_response', 'Remote source budget exceeded')
+        files = []
+        for entry in blobs:
+            if time.monotonic() >= deadline:
+                raise SourceControlError('unavailable', 'Remote source read deadline exceeded')
+            blob = self._request(prefix + '/git/blobs/' + entry['sha'], response_limit=2097152)
+            try:
+                if blob.get('encoding') != 'base64' or not isinstance(blob.get('content'), str):
+                    raise ValueError('blob encoding')
+                content = base64.b64decode(''.join(blob['content'].split()), validate=True)
+            except (ValueError, TypeError) as exc:
+                raise SourceControlError('invalid_response', 'Invalid remote blob') from exc
+            digest = hashlib.sha1(
+                b'blob ' + str(len(content)).encode() + b'\0' + content).hexdigest()
+            if (blob.get('sha') != entry['sha'] or digest != entry['sha']
+                    or len(content) != entry['size']):
+                raise SourceControlError('invalid_response', 'Remote blob content mismatch')
+            files.append(RevisionFile(entry['path'], entry['mode'], content))
+        result = RevisionSource(repository, revision, tuple(files))
+        result.validate()
+        return result
+
+    def pull_request_snapshot(self, repository: str, external_id: str):
+        from sf_factory.collaboration_contracts import (
+            PullRequestSnapshot,
+            ReviewDecision,
+            ReviewFeedback,
+        )
+        _base(repository)
+        if not isinstance(external_id, str) or not re.fullmatch(r'[1-9][0-9]*', external_id):
+            raise ValueError('exact PR number required')
+        owner, name = repository.split('/')
+        data = self._graphql('''query($owner:String!,$name:String!,$number:Int!){
+          repository(owner:$owner,name:$name){nameWithOwner pullRequest(number:$number){
+            number url body state isDraft merged headRefName headRefOid baseRefName baseRefOid
+            headRepository{nameWithOwner}
+            reviews(last:100){pageInfo{hasPreviousPage}nodes{
+              id author{login} body state commit{oid}}}
+            reviewThreads(first:100){pageInfo{hasNextPage}nodes{id isResolved isOutdated path
+              comments(last:20){pageInfo{hasPreviousPage}nodes{id author{login}body commit{oid}}}}
+          }}}''', {'owner': owner, 'name': name, 'number': int(external_id)})
+        try:
+            repo = data['repository']
+            pr = repo['pullRequest']
+            if (repo['nameWithOwner'].casefold() != repository.casefold()
+                    or pr['headRepository']['nameWithOwner'].casefold() != repository.casefold()
+                    or type(pr['number']) is not int or str(pr['number']) != external_id
+                    or pr['url'] != f'https://github.com/{repository}/pull/{external_id}'
+                    or type(pr['isDraft']) is not bool or type(pr['merged']) is not bool
+                    or pr['state'] not in {'OPEN', 'CLOSED', 'MERGED'}
+                    or pr['merged'] != (pr['state'] == 'MERGED')):
+                raise ValueError('PR identity/state')
+            for key in ('headRefOid', 'baseRefOid'):
+                if not isinstance(pr[key], str) or not re.fullmatch(r'[a-f0-9]{40}', pr[key]):
+                    raise ValueError('PR revision')
+            for key in ('headRefName', 'baseRefName'):
+                _branch(pr[key])
+            def connection(value, flag):
+                if (value['pageInfo'][flag] is not False or not isinstance(value['nodes'], list)
+                        or len(value['nodes']) > 100):
+                    raise ValueError('incomplete PR discussion')
+                return value['nodes']
+            def text(value, maximum):
+                if not isinstance(value, str) or len(value) > maximum:
+                    raise ValueError('unbounded PR text')
+                return value
+            feedback = []
+            latest = {}
+            for review in connection(pr['reviews'], 'hasPreviousPage'):
+                author = text(review['author']['login'], 128)
+                status = review['state']
+                if status not in {'APPROVED', 'CHANGES_REQUESTED', 'COMMENTED',
+                                  'DISMISSED', 'PENDING'}:
+                    raise ValueError('unknown review state')
+                revision = text(review['commit']['oid'], 40)
+                if not re.fullmatch(r'[a-f0-9]{40}', revision):
+                    raise ValueError('review revision')
+                if status != 'PENDING':
+                    latest[author] = review
+            for author, review in latest.items():
+                body = text(review['body'], 16384)
+                if review['state'] in {'CHANGES_REQUESTED', 'COMMENTED'} and body.strip():
+                    feedback.append(ReviewFeedback(text(review['id'], 256), author, body, None,
+                                                   review['state'].lower(),
+                                                   review['commit']['oid']))
+            for thread in connection(pr['reviewThreads'], 'hasNextPage'):
+                if type(thread['isResolved']) is not bool or type(thread['isOutdated']) is not bool:
+                    raise ValueError('thread flags')
+                comments = connection(thread['comments'], 'hasPreviousPage')
+                if thread['isResolved']:
+                    continue
+                path = text(thread['path'], 1024)
+                from sf_factory.source_snapshot import _path
+                _path(path)
+                for comment in comments:
+                    revision = comment['commit']['oid']
+                    if not isinstance(revision, str) or not re.fullmatch(r'[a-f0-9]{40}', revision):
+                        raise ValueError('comment revision')
+                    feedback.append(ReviewFeedback(text(comment['id'], 256),
+                        text(comment['author']['login'], 128), text(comment['body'], 16384), path,
+                        'outdated' if thread['isOutdated'] else 'unresolved', revision))
+            if len(feedback) > 100 or sum(len(f.body) for f in feedback) > 131072:
+                raise ValueError('feedback budget exceeded')
+            approved = any(r['state'] == 'APPROVED' and r['commit']['oid'] == pr['headRefOid']
+                           for r in latest.values())
+            return PullRequestSnapshot(PullRequestReference(external_id, pr['url']), repository,
+                pr['headRefName'], pr['headRefOid'], pr['baseRefName'], pr['baseRefOid'],
+                text(pr['body'], 65536), pr['state'].lower(), pr['isDraft'],
+                tuple(feedback), approved,
+                tuple(ReviewDecision(text(r['id'], 256), a, r['state'].lower(),
+                                     r['commit']['oid']) for a, r in latest.items()))
+        except (KeyError, TypeError, ValueError, AttributeError) as exc:
+            raise SourceControlError('invalid_response',
+                                     'Incomplete or inconsistent PR snapshot') from exc
