@@ -1,0 +1,19 @@
+# 0037: PRレビューを完全なsnapshotとして取得し、branchを原子的に比較更新する
+
+CollaborationSourceControlを既存ChangeSourceControlに追加する。CoreにはRevisionSource、
+PullRequestSnapshot、ReviewFeedback/Decisionだけを渡し、GitHub GraphQL/認証はAdapterに閉じる。
+
+PRのrepo/head repository、head/base ref/revision、状態、最新reviewと未解決threadを取得する。
+outdatedはresolvedではないため捨てない。pageInfo、本文/件数上限、author消失、未知stateは
+不完全として拒否する。承認は最新review/同一headに限定し、controllerはさらに信頼するreviewerを絞る。
+
+同じPRへの追加commitは、GitHub GraphQL updateRefsのbeforeOid/afterOidとforce=falseでCASする。
+単なるGET→REST PATCHでは原子的比較にならないため採用しない。公開APIのRefUpdate型を
+読取専用introspectionで確認した。APIエラー/応答不明は成功とせず、refのread-backも照合する。
+
+remote sourceは完全なtreeとblob SHAを照合し、正確なrevision、bytes、modeへ固定する。
+symlink/submodule/機密path/不完全tree/サイズ超過を拒否し、blobは書込やhost実行に渡さない。
+API呼出し前のguardを注入でき、後続controllerで永続API予算へ接続する。
+
+fixtureでCAS競合/強制更新なし、レビュー取りこぼしの拒否、outdated指摘、最新版承認、
+remote sourceのhashとmodeを検証する。実PRへの変更や実AI呼出しはまだ接続しない。
