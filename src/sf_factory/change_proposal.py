@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass
 from pathlib import PurePosixPath
 
 from sf_factory.model_provider import ModelProvider
+from sf_factory.project_harness import ProjectHarness
 from sf_factory.run_review import _unique
 from sf_factory.source_snapshot import _path
 
@@ -152,7 +153,8 @@ def candidate_files(proposal: ChangeProposal, *, scope: ProposalScope,
 
 def propose_changes(*, provider: ModelProvider, scope: ProposalScope,
                     source_files: Mapping[str, bytes], instruction: str,
-                    reference_paths: tuple[str, ...] = ()) -> ChangeProposal:
+                    reference_paths: tuple[str, ...] = (),
+                    project_harness: ProjectHarness | None = None) -> ChangeProposal:
     """Trusted controller only, after inference/context approval; may incur usage.
 
     ModelProvider is text-only, not a host AgentRuntime. This data scope does not
@@ -183,7 +185,8 @@ def propose_changes(*, provider: ModelProvider, scope: ProposalScope,
             raise ValueError('binary reference is unsupported')
         references.append({'path': path, 'content': body, 'read_only': True})
     data = json.dumps({'scope': asdict(scope), 'instruction': instruction, 'files': context,
-                      'read_only_references': references},
+                      'read_only_references': references,
+                      'project_harness': asdict(project_harness) if project_harness else None},
                       sort_keys=True, ensure_ascii=True)
     if len(data) > MAX_CONTEXT_CHARACTERS:
         raise ValueError('selected context exceeds budget')

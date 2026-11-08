@@ -17,7 +17,7 @@ class _NoInference:
         raise RuntimeError('resume never starts inference')
 
 
-def load_config(path: Path) -> DevelopmentConfig:
+def operator_document(path: Path) -> dict:
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     with os.fdopen(fd, 'rb') as stream:
         metadata = os.fstat(stream.fileno())
@@ -29,6 +29,22 @@ def load_config(path: Path) -> DevelopmentConfig:
     if len(raw) > 262144:
         raise ValueError('config exceeds budget')
     document = json.loads(raw, object_pairs_hook=_unique_object)
+    if not isinstance(document, dict):
+        raise ValueError('operator config object required')
+    return document
+
+
+def load_config(path: Path) -> DevelopmentConfig:
+    document = operator_document(path)
+    project_file = document.pop('project_harness_file', None)
+    if project_file is not None:
+        if 'project_harness' in document:
+            raise ValueError('choose inline Project Harness or a shared operator file')
+        project_path = Path(project_file)
+        if (not project_path.is_absolute() or
+                project_path.resolve(strict=True).is_relative_to(Path(document['root']))):
+            raise PermissionError('Project Harness file must be outside target repository')
+        document['project_harness'] = operator_document(project_path)
     config = DevelopmentConfig.from_document(document)
     if path.resolve(strict=True).is_relative_to(config.root):
         raise PermissionError('execution config must be outside the target repository')

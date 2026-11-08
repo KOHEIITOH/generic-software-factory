@@ -11,6 +11,7 @@ from sf_factory.factory import Factory, _now
 from sf_factory.harness_approval import HarnessApprovalRequest
 from sf_factory.harness_composition import compose_harness
 from sf_factory.harness_validation import validate_harness
+from sf_factory.project_harness import ProjectHarness
 
 
 def _revision(root: Path) -> str:
@@ -58,7 +59,8 @@ class HarnessRunService:
     def prepare(
         self, *, root: Path, request: HarnessApprovalRequest, approval_id: str,
         target: str, selected: tuple[str, ...], excluded: tuple[tuple[str, str], ...] = (),
-        controller: str,
+        controller: str, project_harness: ProjectHarness | None = None,
+        change_paths: tuple[str, ...] = (),
     ) -> dict:
         """Recompose and atomically consume approval with Run/manifest/audit insertion."""
         self.state.check_registration(request, root)
@@ -66,7 +68,8 @@ class HarnessRunService:
         if before != request.revision:
             raise PermissionError('approved revision no longer matches repository HEAD')
         composition = compose_harness(validate_harness(root), target=target,
-                                      selected=selected, excluded=excluded)
+                                      selected=selected, excluded=excluded,
+                                      project_harness=project_harness, change_paths=change_paths)
         if composition.bundle_hash != request.bundle_hash or _revision(root) != before:
             raise PermissionError('approved Harness no longer matches current composition')
         manifest = json.dumps({
