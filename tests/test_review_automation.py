@@ -193,3 +193,16 @@ def test_review_cli_parses_original_run_and_explicit_trust():
         '--run', 'a' * 32, '--reviewer', 'review-bot', '--confirm-run', '--confirm-bedrock'])
     assert args.issue_command == 'review' and args.run == 'a' * 32
     assert args.reviewer == ['review-bot'] and args.confirm_run and args.confirm_bedrock
+
+
+def test_temporary_snapshot_read_failure_waits_without_model_or_write(review_flow):
+    from sf_factory.source_control import SourceControlError
+    args, state = review_flow
+    snapshot = args['scm'].pull_request_snapshot
+    def unavailable(*args):
+        raise SourceControlError('unavailable', 'fixture network read')
+    args['scm'].pull_request_snapshot = unavailable
+    assert advance_review(**args)['reason'] == 'remote_read_unavailable'
+    assert args['implementer'].calls == state['cas_calls'] == 0
+    args['scm'].pull_request_snapshot = snapshot
+    assert advance_review(**args)['reason'] == 'repair_submitted'

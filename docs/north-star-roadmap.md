@@ -1,9 +1,28 @@
 # Software Factory — 最終ゴールと逆算ロードマップ
 
-- 更新日: 2026-11-06（日本時間）
+- 更新日: 2026-11-08（UTC）
 - 調査基準: `e2841cc6e2da8cb955eece15ba10b9d1ba8327ff`
-- 状態: **ユーザー確認済み。R01はPR #75でマージ済み。R02aはPR #76でマージ済み。R02bはPR #77でマージ済み。R03はPR #78でマージ済み。R04aはPR #79でマージ済み。現環境はcgroup不足で拒否。R05aはPR #80でマージ済み。R05bはPR #81でマージ済み。R06aはPR #82でマージ済み。R09aはPR #83でマージ済み。R10aはPR #84でマージ済み。R04bはPR #85でマージ済み。R04cの承認commit snapshotを実装。**
+- 状態: 最新の実装範囲は「2026-11-08の現在地」を参照。初回調査の表は履歴として保持。
 - 対象: 既存コード・テスト・設計資料のギャップ分析と、M1〜M5への実装順序。
+
+## 2026-11-08の現在地
+
+| 到達点 | 現在の接続 | 未完了の条件 |
+| --- | --- | --- |
+| M1 Harness | Discovery/Validation/選択/承認/Run固定、Project共通＋Repository＋変更directoryを接続 | 生成・継続評価・改善の全自動化 |
+| M2 安全な実行 | FileでDB不要、exact source snapshot、offline Docker、実check/review証跡、durable配送 | 分散Worker、全実行形態の復旧・クラウド実行 |
+| M3 Issue→Draft PR | Bedrock/Copilot text adapterとローカルCLI、有限の同一PR修正、子Issue DAGの直列実行・merge照合 | PCのBedrock＋GitHubで実サービス通し確認。Web実行operator認証/UI |
+| M4 開発基盤 | 既存Project/Web/Adapter境界を再利用 | 並列処理、複数利用者認可、監視・コスト可視化 |
+| M5 自律Factory | 要件分割・受入条件・外部子Issueの最小経路を接続 | 複数repo統合、承認付きrelease、継続的Harness改善 |
+
+[#114](https://github.com/KOHEIITOH/generic-software-factory/pull/114) は永続予算、
+[#115](https://github.com/KOHEIITOH/generic-software-factory/pull/115) はPR snapshot/CAS、
+[#116](https://github.com/KOHEIITOH/generic-software-factory/pull/116) はProject/Directory Harness、
+[#117](https://github.com/KOHEIITOH/generic-software-factory/pull/117) はremote source評価、
+[#118](https://github.com/KOHEIITOH/generic-software-factory/pull/118) は有限レビュー修正。
+子Issue Adapterと要件workflowの検証・判断はADR 0041/0042および
+[利用手順](bounded-issue-workflow.md)で管理する。実Docker CIではモデル/SCMを模擬し、
+実サービスE2Eと区別する。要件/品質失敗や予算切れは証跡を残して停止し、確認待ちの無限loopは作らない。
 
 ## 1. North Starと判断基準
 
@@ -17,7 +36,7 @@
 
 本書のM1〜M5はユーザー指定の新しい到達目標である。[旧MVP計画](mvp-plan.md)のM0〜M4とは番号の意味が異なる。本書を今後の逆算計画の基準案とし、旧資料は経緯・個別設計として参照する。既存のCore契約・Policyを本書だけで変更しない。契約・セキュリティ・Workflowの意味を変える実装PRには、既存方針に従いADRを付ける。
 
-## 2. 現在地と証拠
+## 2. 初回調査時点の記録と証拠
 
 判定は次の粒度を使う。
 

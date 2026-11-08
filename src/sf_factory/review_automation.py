@@ -19,6 +19,7 @@ from sf_factory.issue_development import (
     develop_issue,
 )
 from sf_factory.model_provider import ModelProvider
+from sf_factory.source_control import SourceControlError
 from sf_factory.state_store import StateConflict, StatePermissionDenied
 from sf_factory.task_sources import TaskSourceAdapter
 
@@ -59,11 +60,21 @@ def advance_review(*, factory: Factory, config: DevelopmentConfig,
         # Adapter transport guard covers every real HTTP request, including pagination.
         prior_guard = getattr(scm, 'request_guard', None)
         if hasattr(scm, 'request_guard'):
-            setattr(scm, 'request_guard', session.api_call)
+            def guard(method, path):
+                session.api_call(method, path)
+                if prior_guard is not None:
+                    prior_guard(method, path)
+            setattr(scm, 'request_guard', guard)
         try:
             return _advance(factory, config, source, scm, implementer, reviewer,
                             initial_run, trusted_reviewers, session)
         except Exception as exc:
+            current = session.snapshot()
+            if (isinstance(exc, SourceControlError) and exc.kind == 'unavailable'
+                    and current['status'] not in {'stopped', 'completed'}
+                    and current['data'].get('phase', 'observe') in
+                    {'observe', 'commit_ready', 'update_pending'}):
+                return _save(session, current['data'], 'remote_read_unavailable')
             if session.snapshot()['status'] not in {'stopped', 'completed'}:
                 data = session.snapshot()['data']
                 # Never record SDK exception text, prompts, credentials, or ask to reset limits.
@@ -113,6 +124,7 @@ def _advance(factory, config, source, scm, implementer, reviewer, initial_run,
             return _save(session, data, 'branch_update_unresolved', status='stopped')
         action = 'update:' + data['run_id']
         session.complete_action(action, {'revision': expected})
+        session.complete_action(data['round_key'], {'run_id': data['run_id']})
         data.update(head=expected, phase='observe')
         return _save(session, data, 'repair_reconciled')
     if snapshot.head_revision != data['head']:
@@ -143,18 +155,26 @@ def _advance(factory, config, source, scm, implementer, reviewer, initial_run,
     unit = data['pr']['external_id']
     event = fingerprint([asdict(f) for f in feedback])
     session.reserve('round', 'review:' + event, unit=unit)
-    data.update(phase='evaluating', feedback_ids=[f.id for f in feedback])
+    data.update(phase='evaluating', feedback_ids=[f.id for f in feedback],
+                round_key='review:' + event)
     _save(session, data, 'repair_started', status='ready', feedback_ids=data['feedback_ids'],
           ignored_feedback=ignored)
     remote = scm.read_revision(config.repository, data['head'])
+    session.api_call()
+    exact_issue = source.fetch_issue(config.issue)
+    if asdict(exact_issue) != _artifact(factory, initial_run)['issue']:
+        return _save(session, data, 'review_requirement_changed', status='stopped')
     class BudgetedSource:
         def fetch_issue(self, external_id):
-            session.api_call()
-            return source.fetch_issue(external_id)
+            if external_id != exact_issue.external_id:
+                raise StateConflict('different frozen review Issue requested')
+            return exact_issue
     try:
         result = develop_issue(factory=factory, config=config, source=BudgetedSource(), scm=scm,
-            implementer=BudgetedModel(implementer, session, role='implementation'),
-            reviewer=BudgetedModel(reviewer, session, role='review'), confirmed=True,
+            implementer=BudgetedModel(implementer, session, role='implementation',
+                                     max_output_tokens=32768),
+            reviewer=BudgetedModel(reviewer, session, role='review', max_output_tokens=32768),
+            confirmed=True,
             remote_source=remote, evaluate_only=True,
             review_feedback=tuple(asdict(f) for f in feedback))
     except DevelopmentStopped as exc:
@@ -203,5 +223,6 @@ def _update(factory, config, scm, session, data):
     if scm.verified_branch_revision(config.repository, data['branch']) != data['commit']:
         return _save(session, data, 'awaiting_branch_reconciliation')
     session.complete_action(key, {'revision': data['commit']})
+    session.complete_action(data['round_key'], {'run_id': data['run_id']})
     data.update(head=data['commit'], phase='observe')
     return _save(session, data, 'repair_submitted')

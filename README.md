@@ -109,6 +109,8 @@ File Adapterを自動選択し、Issue参照・Project/Repository・Runの結果
 [Webでの確認方法・保存先設定・制約](docs/local-web-storage.md)を参照してください。
 独立TaskのAPI・CLI・保存構造は削除済みです。[外部Issueモデルと旧形式の扱い](docs/external-issue-model.md)を参照してください。
 Harness承認・prepared RunもFile保存に対応。source snapshot・品質/レビュー証跡もFile対応です。ローカルCLIには実装・挙動テスト・独立レビュー・Draft PR配送を接続しています。実サービスでの最終通し試験はPCで未確認です。
+要件の子Issue分割・同じPRへの有限レビュー修正・Project/Repository/directory Harnessは
+[有限Issueワークフロー](docs/bounded-issue-workflow.md)を参照してください。
 
 ## 現在のステータス
 

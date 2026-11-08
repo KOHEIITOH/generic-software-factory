@@ -9,6 +9,9 @@ on:
       - "src/sf_factory/workspace_check.py"
       - "src/sf_factory/issue_development.py"
       - "src/sf_factory/review_automation.py"
+      - "src/sf_factory/requirement_workflow.py"
+      - "src/sf_factory/requirement_plan.py"
+      - "tests/test_requirement_workflow.py"
       - "tests/test_review_automation.py"
       - "src/sf_factory/behavioral_check.py"
       - "tests/test_issue_development.py"
@@ -23,6 +26,9 @@ on:
       - "src/sf_factory/workspace_check.py"
       - "src/sf_factory/issue_development.py"
       - "src/sf_factory/review_automation.py"
+      - "src/sf_factory/requirement_workflow.py"
+      - "src/sf_factory/requirement_plan.py"
+      - "tests/test_requirement_workflow.py"
       - "tests/test_review_automation.py"
       - "src/sf_factory/behavioral_check.py"
       - "tests/test_issue_development.py"
@@ -69,8 +75,8 @@ jobs:
             docker --host=unix:///var/run/docker.sock pull "$SF_TEST_DOCKER_IMAGE"
       - name: Exercise required isolation checks
         run: |
-          uv run pytest tests/test_docker_execution.py tests/test_workspace_check.py tests/test_issue_development.py tests/test_review_automation.py -q \
-            -k 'real_offline_filesystem_and_identity or real_timeout_cleans_child_processes or real_output_limit_is_enforced or real_command_failure_is_preserved or real_bounded_input_roundtrip or real_stdin_backpressure_cannot_bypass_timeout or real_input_command_failure_is_not_success or real_candidate_runs_approved_fixture_tests or real_candidate_failure_preserves_actual_test_failure or real_candidate_source_mutation_is_rejected or real_candidate_timeout_is_reaped or real_parent_process_provenance_is_private or real_local_issue_workflow_with_offline_docker or real_docker_same_pr_review_repair' \
+          uv run pytest tests/test_docker_execution.py tests/test_workspace_check.py tests/test_issue_development.py tests/test_review_automation.py tests/test_requirement_workflow.py -q \
+            -k 'real_offline_filesystem_and_identity or real_timeout_cleans_child_processes or real_output_limit_is_enforced or real_command_failure_is_preserved or real_bounded_input_roundtrip or real_stdin_backpressure_cannot_bypass_timeout or real_input_command_failure_is_not_success or real_candidate_runs_approved_fixture_tests or real_candidate_failure_preserves_actual_test_failure or real_candidate_source_mutation_is_rejected or real_candidate_timeout_is_reaped or real_parent_process_provenance_is_private or real_local_issue_workflow_with_offline_docker or real_docker_same_pr_review_repair or real_docker_requirement_plan_to_serial_prs' \
             --junitxml="$RUNNER_TEMP/offline-isolation.xml"
       - name: Reject missing or skipped isolation checks
         run: |
@@ -80,7 +86,7 @@ jobs:
           from xml.etree import ElementTree
           report = Path(os.environ["RUNNER_TEMP"]) / "offline-isolation.xml"
           cases = ElementTree.parse(report).findall(".//testcase")
-          assert len(cases) == 14, "Expected all fourteen required isolation checks"
+          assert len(cases) == 15, "Expected all fifteen required isolation checks"
           assert all(not any(case.findall(tag) for tag in ("failure", "error", "skipped"))
                      for case in cases), "Required isolation checks must execute and pass"
           PY
