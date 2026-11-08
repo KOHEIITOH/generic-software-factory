@@ -25,16 +25,22 @@ class OperatorProfiles:
     def __init__(self, root: Path):
         self.root = root.resolve()
         self.directory = self.root / 'web-operator-v1'
-        self.directory.mkdir(parents=True, mode=0o700, exist_ok=True)
+        self.root.mkdir(parents=True, mode=0o700, exist_ok=True)
+        try:
+            self.directory.mkdir(mode=0o700)
+            created = True
+        except FileExistsError:
+            created = False
         with lock_directory(self.directory) as fd:
-            if not (self.directory / 'state.json').exists():
+            if created:
                 write_document(fd, {'version': 1, 'profiles': {}})
             self._read(fd)
 
     @staticmethod
     def _read(fd):
         state = read_document(fd)
-        if (set(state) != {'version', 'profiles'} or state['version'] != 1
+        if (set(state) != {'version', 'profiles'} or type(state['version']) is not int
+                or state['version'] != 1
                 or not isinstance(state['profiles'], dict) or len(state['profiles']) > 32):
             raise StateConflict('invalid operator registry; do not reset')
         for key, p in state['profiles'].items():
@@ -122,7 +128,10 @@ class WebOperator:
     def browser(self, request: Request) -> None:
         if str(request.base_url).rstrip('/') != self.origin:
             raise HTTPException(403, 'Operator host rejected')
-        if (request.headers.get('origin') != self.origin
+        origin = request.headers.get('origin')
+        same_origin_read = (request.method == 'GET' and origin is None
+                            and request.headers.get('sec-fetch-site') == 'same-origin')
+        if ((origin != self.origin and not same_origin_read)
                 or request.headers.get('sec-fetch-site') not in {None, 'same-origin'}
                 or request.headers.get('x-sf-operator') != '1'):
             raise HTTPException(403, 'Same-origin operator request required')
@@ -135,7 +144,8 @@ class WebOperator:
             self._failures = [n for n in self._failures if n > now - 60]
             if len(self._failures) >= 10:
                 raise HTTPException(429, 'Operator authentication rate limited')
-            if not hmac.compare_digest(header, 'Bearer ' + self.token):
+            if len(header) > 512 or not hmac.compare_digest(
+                    header.encode(), ('Bearer ' + self.token).encode()):
                 self._failures.append(now)
                 raise HTTPException(403, 'Operator authentication required')
             self._sessions = {k: v for k, v in self._sessions.items() if v > now}

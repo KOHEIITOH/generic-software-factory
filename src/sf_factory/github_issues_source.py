@@ -84,6 +84,8 @@ class GitHubIssuesSource:
         return issues, len(payload) == limit
 
     def fetch_issue(self, external_id: str) -> ExternalIssue:
+        from sf_factory.operation_control import checkpoint
+        checkpoint()
         if not _NUMBER.fullmatch(external_id):
             raise ValueError("GitHub issue ID must be a positive integer")
         owner, repo = self.repository.split("/")

@@ -156,6 +156,8 @@ class AutomationSession:
         return None
 
     def reserve(self, kind: str, key: str, *, unit: str = '', tokens: int = 0) -> None:
+        from sf_factory.operation_control import checkpoint
+        checkpoint()
         if (kind not in {'round', 'model', 'write'} or not isinstance(key, str)
                 or not key.strip() or len(key) > 256 or len(unit) > 256
                 or type(tokens) is not int or tokens < 0 or (kind != 'model' and tokens)):

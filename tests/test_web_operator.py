@@ -107,3 +107,15 @@ def test_other_dashboard_root_cannot_use_profile_and_repo_cannot_supply_config(f
     inside.write_text(path.read_text())
     with pytest.raises(PermissionError):
         OperatorProfiles(flow['factory'].root).register(inside, 'Untrusted')
+
+
+def test_real_browser_same_origin_get_without_origin_header_uses_cookie():
+    auth = WebOperator(ORIGIN)
+    with TestClient(operator_app(auth), base_url=ORIGIN) as client:
+        client.post('/api/operator/session', headers={**HEADERS,
+                    'authorization': 'Bearer ' + auth.token})
+        response = client.get('/api/operator/profiles', headers={
+            'sec-fetch-site': 'same-origin', 'x-sf-operator': '1'})
+        assert response.status_code == 200
+        assert client.get('/api/operator/profiles', headers={
+            'sec-fetch-site': 'cross-site', 'x-sf-operator': '1'}).status_code == 403
