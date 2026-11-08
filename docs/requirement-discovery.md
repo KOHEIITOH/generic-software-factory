@@ -1,7 +1,7 @@
 # 要件ファイルを指定しても、省略しても計画する
 
 親Issueを指定した既存の `sf issue plan` / `sf issue advance` と、Webの
-「計画・子Issueを作成」「次の1ステップを実行・再開」で利用できます。
+「計画案を作成・確認」「次の1ステップを実行・再開」で利用できます。
 要件ファイルの検出に追加のAI Agentや設定サービスは不要です。
 
 ## 明示指定を優先
@@ -47,7 +47,8 @@ ADR/decisions・archive/history・test/fixtures・vendor・生成物は除外し
 Webでは実行前に「明示指定／自動検出」を表示し、実行後に「参照した要件資料・分割の根拠」で
 パス・選択理由・ハッシュ・版・判定カテゴリ・要件ID→出典→子Issueの対応を確認できます。
 詳細な解釈・指摘は `SF_DATA_DIR/automation-v1/<session_id>/state.json` の
-`requirement_sources` と `planning_review` に保存します。本文・解釈の生テキストはHTTPへ返しません。
+`requirement_sources` と `planning_review` に保存します。資料本文・生のSDKレスポンスはHTTPへ返しません。
+新規の承認必須計画では、判断に必要な派生した解釈・分割案を認証済み画面に表示します。
 
 子Issueの実装・独立レビュー・同じPRの修正にも同じ参照とハッシュを渡します。
 計画後に資料が変更・削除されれば、推論/配送を進めず理由を残して停止します。
