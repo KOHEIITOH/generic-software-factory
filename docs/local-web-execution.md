@@ -74,3 +74,10 @@ Bedrock＋GitHubの実サービス最終通し確認は、引き続き利用者�
 `context_paths` を指定すれば優先し、省略/空ならREADME・要件/仕様文書の候補を探します。
 不足・矛盾を検知した場合は子Issue作成前に停止し、出典・解釈・分割の根拠を保存します。
 上限と根拠の確認方法は[要件資料の検出](requirement-discovery.md)を参照してください。
+
+## 実行準備の診断
+
+登録設定を選び「実行準備を確認」で、設定・Git root/origin/Harness・AI設定・Docker資源制限・
+固定image・Git認証設定の不足と対処方法を表示します。AI推論やimage pullは行いません。
+「GitHub接続・権限を確認」は、明示操作で対象Repositoryの読み取りとAdapterのpush権限を確認します。
+AWS認証/モデル利用、Issue/親子関連/PRの書込権限は未確認として残し、診断成功を実通し成功とは扱いません。

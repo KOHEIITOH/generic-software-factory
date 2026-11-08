@@ -21,6 +21,12 @@ class SubmitStep(BaseModel):
     reviewers: list[str] = Field(default_factory=list, max_length=16)
 
 
+class DiagnoseProfile(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+    config_fingerprint: str = Field(pattern='^[a-f0-9]{64}$')
+    check_remote: bool = False
+
+
 def install_execution_routes(app: FastAPI, root: Path, operator: WebOperator | None) -> None:
     def auth(request: Request):
         if operator is None:
@@ -49,6 +55,15 @@ def install_execution_routes(app: FastAPI, root: Path, operator: WebOperator | N
     def profiles(request: Request):
         auth(request)
         return {'profiles': OperatorProfiles(root).list()}
+
+    @app.post('/api/operator/profiles/{key}/diagnostics')
+    def diagnostics(key: str, payload: DiagnoseProfile, request: Request):
+        auth(request)
+        if len(key) != 32 or any(c not in '0123456789abcdef' for c in key):
+            raise HTTPException(422, 'Exact profile ID required')
+        from sf_factory.operator_diagnostics import diagnose_profile
+        return diagnose_profile(root, key, payload.config_fingerprint,
+                                check_remote=payload.check_remote)
 
     @app.get('/api/operator/jobs')
     def jobs(request: Request):
