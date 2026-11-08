@@ -10,6 +10,7 @@ type Progress = { requirement_sources?: RequirementSources | null; status: strin
   decisions: { at: string; code: string }[] };
 type Job = { id: string; profile_id: string; config_fingerprint: string; action: string; reviewers: string[]; status: string;
   created_at: string; stop_requested: boolean; result: { status: string; reason?: string } | null; progress: Progress | null; events: { code: string }[] };
+type Diagnostic = { can_attempt: boolean; checked_at: string; checks: { id: string; status: string; detail: string; remedy: string }[] };
 type Submission = { profile_id: string; config_fingerprint: string; request_id: string; action: string; confirm_run: boolean;
   confirm_bedrock: boolean; run_id: string | null; reviewers: string[] };
 const active = (job: Job) => ["queued", "running", "stopping"].includes(job.status);
@@ -40,6 +41,8 @@ export default function OperatorPanel() {
   const [selected, setSelected] = useState("");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [reviewers, setReviewers] = useState("");
+  const [diagnostic, setDiagnostic] = useState<Diagnostic | null>(null);
+  const [diagnosticBusy, setDiagnosticBusy] = useState(false);
   const [runId, setRunId] = useState("");
   const [consent, setConsent] = useState(false);
   const [bedrock, setBedrock] = useState(false);
@@ -102,6 +105,17 @@ export default function OperatorPanel() {
       confirm_bedrock: bedrock, run_id: action === "review" ? runId : null,
       reviewers: frozen || reviewers.split(",").map(s => s.trim()).filter(Boolean) });
   }
+  async function diagnose(remote: boolean) {
+    if (!profile || diagnosticBusy) return;
+    setDiagnosticBusy(true); setError("");
+    try {
+      const response = await api("/profiles/" + profile.id + "/diagnostics", { method: "POST",
+        body: JSON.stringify({ config_fingerprint: profile.fingerprint, check_remote: remote }) });
+      if (!response.ok) throw new Error("診断を取得できませんでした。");
+      setDiagnostic(await response.json());
+    } catch (e) { setError(e instanceof Error ? e.message : "診断エラー"); }
+    finally { setDiagnosticBusy(false); }
+  }
   async function stop(job: Job) {
     setBusy(true); setError("");
     try {
@@ -125,12 +139,18 @@ export default function OperatorPanel() {
       {!profiles.length ? <p>実行設定が未登録です。同じ保存先を使うPCのターミナルで登録してください。<br />
         <code>uv run sf operator register --config /絶対パス/operator.json --name 開発対象</code></p> : <>
         <label className="project-selector">実行設定<select value={selected} disabled={busy || uncertain} onChange={e => {
-          setSelected(e.target.value); setConsent(false); setBedrock(false); setRunId(""); }}>
+          setSelected(e.target.value); setDiagnostic(null); setConsent(false); setBedrock(false); setRunId(""); }}>
           <option value="">選択してください</option>{profiles.map(p => <option key={p.id} value={p.id}>{p.name}{!p.available ? "（無効・再登録が必要）" : ""}</option>)}</select></label>
         {profile && <div className="operator-scope"><strong>{profile.repository} · 親Issue #{profile.issue}</strong>
           <p>AI: {profile.provider} / 変更範囲: {profile.allowed_paths?.join(", ")} / 検証: {profile.checks?.join(", ")}</p>
           <p>要件資料: {profile.context_paths?.length ? "明示指定（" + profile.context_paths.join(", ") + "）" : "自動検出（README・要件/仕様/設計の文書候補、最大12ファイル）"}</p>
           {!profile.available && <p role="alert">設定が変更・失効しています。ターミナルで確認し、登録し直してください。</p>}
+          <div className="operator-toolbar"><button type="button" disabled={diagnosticBusy || busy} onClick={() => void diagnose(false)}>実行準備を確認</button>
+            <button type="button" disabled={diagnosticBusy || busy} onClick={() => void diagnose(true)}>GitHub接続・権限を確認</button></div>
+          {diagnosticBusy && <p role="status">読み取り専用の診断中です。AI推論・変更処理は始めません。</p>}
+          {diagnostic && <div className="operator-diagnostics"><h3>{diagnostic.can_attempt ? "確認した開始条件に不足はありません（未確認項目を参照）" : "実行準備に不足があります"}</h3>
+            <ul>{diagnostic.checks.map(c => <li key={c.id}><strong>{c.status === "ok" ? "確認済み" : c.status === "blocked" ? "不足" : "未確認"}</strong>：{c.detail}
+              {c.status !== "ok" && c.remedy && <p>{c.remedy}</p>}</li>)}</ul></div>}
           <label>信頼するレビュアー（カンマ区切り、省略時はGitHub認証ユーザー）<input aria-label="信頼するレビュアー"
             value={frozen ? frozen.join(", ") : reviewers} disabled={!!frozen || busy || uncertain} onChange={e => setReviewers(e.target.value)} /></label>
           <label className="operator-consent"><input type="checkbox" checked={consent} disabled={busy || uncertain} onChange={e => setConsent(e.target.checked)} />表示した範囲のAI送信・隔離テスト・Issue/PR操作に同意する</label>

@@ -25,6 +25,13 @@ def main():
     path = directory / 'operator.json'
     path.write_text(json.dumps(asdict(config), default=str))
     OperatorProfiles(config.data_root).register(path, 'Browser fixture')
+    patch.setattr('sf_factory.operator_diagnostics.diagnose_profile', lambda *a, **k: {
+        'can_attempt': True, 'checked_at': '2026-11-08T00:00:00+00:00', 'checks': [
+            {'id': 'configuration', 'status': 'ok', 'detail': '登録設定を確認しました。',
+             'remedy': ''},
+            {'id': 'model_authorization', 'status': 'unknown',
+             'detail': 'AI認証は未確認です。推論しません。',
+             'remedy': 'PCの認証を確認してください。'}]})
     auth = WebOperator(f'http://127.0.0.1:{port}')
     (directory / 'operator-link').write_text(auth.origin + '/#operator=' + auth.token)
     leases = []

@@ -39,6 +39,8 @@ const net = require('node:net');
     assert.equal(await page.evaluate(() => localStorage.length), 0);
     const advance = panel.getByRole('button', { name: '次の1ステップを実行・再開', exact: true });
     assert.equal(await advance.isEnabled(), false);
+    await panel.getByRole('button', { name: '実行準備を確認', exact: true }).click();
+    await panel.getByText('AI認証は未確認です。推論しません。', { exact: true }).waitFor();
     await panel.getByLabel('表示した範囲のAI送信・隔離テスト・Issue/PR操作に同意する').check();
     assert.equal(await advance.isEnabled(), false, 'Bedrock consent must also be explicit');
     await panel.getByLabel('Bedrockの推論料金の発生に同意する').check();
