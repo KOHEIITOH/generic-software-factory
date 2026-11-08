@@ -102,3 +102,5 @@ h1{font-size:clamp(26px,3vw,38px);line-height:1.2}
 .operator-job small,.operator-children small{display:block;margin:6px 0;color:#b2c5df}.operator-panel details{margin-top:12px}.operator-panel summary{cursor:pointer}.operator-panel code{overflow-wrap:anywhere;white-space:normal}
 .operator-panel [role=alert]{color:#ffbac2}.operator-panel [role=status]{color:#b2ebcc}
 .operator-plan{border:1px solid #5474b0;border-radius:12px;padding:16px;margin:16px 0;overflow-wrap:anywhere}.operator-plan p{white-space:pre-wrap}.operator-plan small{display:block;color:#b2c5df}.operator-plan details{padding:10px;border:1px solid #304764;border-radius:8px}
+
+.operator-panel select{display:block;width:100%;max-width:100%;min-width:0;border:1px solid #385074;border-radius:8px;background:#0c1626;color:#edf3ff;padding:10px;font:inherit}.workspace-details>summary{cursor:pointer;padding:16px;margin-bottom:16px;border:1px solid #304764;border-radius:12px;color:#b7c8e2}

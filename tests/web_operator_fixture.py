@@ -3,7 +3,7 @@ import hashlib
 import json
 import os
 import sys
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 import pytest
@@ -32,6 +32,8 @@ def main():
             {'id': 'model_authorization', 'status': 'unknown',
              'detail': 'AI認証は未確認です。推論しません。',
              'remedy': 'PCの認証を確認してください。'}]})
+    patch.setattr('sf_factory.integration_defaults.list_open_issues',
+                  lambda repository, page: ([args['source'].fetch_issue('1')], False))
     auth = WebOperator(f'http://127.0.0.1:{port}')
     (directory / 'operator-link').write_text(auth.origin + '/#operator=' + auth.token)
     leases = {}
@@ -42,6 +44,21 @@ def main():
         from test_requirement_workflow import plan_document
 
         from sf_factory.plan_preview import approval_fingerprint
+        job = store.get(key)
+        if job['action'] == 'develop':
+            selected = replace(config, issue=job['issue_id'])
+            session = AutomationSession(config.data_root,
+                subject='issue-development:' + selected.repository + ':' + selected.issue,
+                config_fingerprint=fingerprint({'development': selected.fingerprint,
+                                                'reviewers': tuple(job['reviewers'])}))
+            if session.snapshot()['status'] != 'completed':
+                session.save({'run_id': 'e' * 32, 'pull_request': {
+                    'external_id': '99', 'url': 'https://github.com/fixture/repo/pull/99'}},
+                    expected_version=session.snapshot()['version'], status='completed',
+                    decision='draft_pr_created')
+            store.change(key, code='worker_step_finished', status='finished',
+                         result={'status': 'completed', 'reason': 'draft_pr_created'})
+            return
         store.change(key, code='worker_claimed', status='running')
         lease = store.lease(key)
         fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)

@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import stat
+from dataclasses import replace
 from pathlib import Path
 
 from sf_factory.development_config import DevelopmentConfig
@@ -61,13 +63,18 @@ def execute_local_development(*, config_path: Path, confirmed: bool, confirm_bed
                               workflow_action: str | None = None,
                               expected_fingerprint: str | None = None,
                               require_plan_approval: bool = False,
-                              approved_plan: str | None = None) -> dict:
+                              approved_plan: str | None = None,
+                              issue_id: str | None = None) -> dict:
     """Trusted local operator entry shared by CLI and the private Web worker."""
     if confirmed is not True:
         raise ConfirmationRequired('--confirm-run')
     config = load_config(config_path)
     if expected_fingerprint is not None and config.fingerprint != expected_fingerprint:
         raise PermissionError('approved execution configuration changed')
+    if issue_id is not None:
+        if workflow_action != 'develop' or not re.fullmatch('[1-9][0-9]{0,18}', issue_id):
+            raise ValueError('selected Issue requires the scoped development action')
+        config = replace(config, issue=issue_id)
     implementation: ModelProvider
     review: ModelProvider
     if resume is not None or workflow_action == 'approve':
@@ -93,7 +100,14 @@ def execute_local_development(*, config_path: Path, confirmed: bool, confirm_bed
     from sf_factory.factory_selection import open_factory
     from sf_factory.integration_defaults import source_control, task_source
 
-    if workflow_action is not None:
+    if workflow_action == 'develop':
+        from sf_factory.issue_execution import execute_issue
+
+        result = execute_issue(factory=open_factory(config.data_root), config=config,
+            source=task_source(config.repository), scm=source_control(),
+            implementer=implementation, reviewer=review, confirmed=True,
+            trusted_reviewers=trusted_reviewers)
+    elif workflow_action is not None:
         from sf_factory.github_issue_tracker import GitHubIssueTracker
         from sf_factory.requirement_workflow import advance_requirements
 

@@ -1,7 +1,7 @@
 """Operator-authenticated jobs; all public dashboard routes remain non-executing."""
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from sf_factory.state_store import StateConflict, StatePermissionDenied
@@ -14,7 +14,8 @@ class SubmitStep(BaseModel):
     profile_id: str = Field(pattern='^[a-f0-9]{32}$')
     config_fingerprint: str = Field(pattern='^[a-f0-9]{64}$')
     request_id: str = Field(pattern='^[a-f0-9]{32}$')
-    action: str = Field(pattern='^(plan|advance|review|approve)$')
+    action: str = Field(pattern='^(plan|advance|review|approve|develop)$')
+    issue_id: str | None = Field(default=None, pattern='^[1-9][0-9]{0,18}$')
     approved_plan: str | None = Field(default=None, pattern='^[a-f0-9]{64}$')
     confirm_run: bool
     confirm_bedrock: bool = False
@@ -66,6 +67,21 @@ def install_execution_routes(app: FastAPI, root: Path, operator: WebOperator | N
         return diagnose_profile(root, key, payload.config_fingerprint,
                                 check_remote=payload.check_remote)
 
+    @app.get('/api/operator/profiles/{key}/issues')
+    def issues(key: str, request: Request, page: int = Query(default=1, ge=1, le=10000)):
+        auth(request)
+        from sf_factory.integration_defaults import list_open_issues
+        try:
+            _, config = OperatorProfiles(root).get(key)
+            values, has_more = list_open_issues(config.repository, page)
+        except (ValueError, StatePermissionDenied, OSError) as exc:
+            raise HTTPException(403, 'Registered repository required') from exc
+        except RuntimeError as exc:
+            raise HTTPException(502, 'Issue list unavailable') from exc
+        return {'page': page, 'has_more': has_more, 'issues': [
+            {'id': issue.external_id, 'title': issue.prompt.splitlines()[0][:200],
+             'url': issue.external_url} for issue in values]}
+
     @app.get('/api/operator/jobs')
     def jobs(request: Request):
         auth(request)
@@ -83,7 +99,7 @@ def install_execution_routes(app: FastAPI, root: Path, operator: WebOperator | N
                 config_fingerprint=payload.config_fingerprint, request_id=payload.request_id,
                 action=payload.action, confirm_bedrock=payload.confirm_bedrock,
                 run_id=payload.run_id, reviewers=tuple(payload.reviewers),
-                approved_plan=payload.approved_plan)
+                approved_plan=payload.approved_plan, issue_id=payload.issue_id)
         except (StatePermissionDenied, ValueError, OSError) as exc:
             raise HTTPException(403, 'Registered scope or consent check failed') from exc
         if created:

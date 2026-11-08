@@ -35,6 +35,13 @@ def task_source(repository: str) -> TaskSourceAdapter:
     return GitHubIssuesSource.from_environment(repository)
 
 
+def list_open_issues(repository: str, page: int = 1):
+    """Read-only selector composition; provider pagination stays in the adapter."""
+    from sf_factory.github_issues_source import GitHubIssuesSource
+
+    return GitHubIssuesSource.from_environment(repository).list_issues(page=page)
+
+
 def describe_integrations() -> dict:
     """Local configuration only. Does not authenticate or call any provider."""
     from sf_factory.github_auth import credential_status

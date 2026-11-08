@@ -79,7 +79,7 @@ def test_list_issues_pagination_and_pull_request_filter(monkeypatch) -> None:
     assert has_more is True
     assert len(issues) == 1
     assert issues[0].external_id == "4"
-    assert issues[0].prompt == "Closed issue\\n\\nDetails"
+    assert issues[0].prompt == "Closed issue\n\nDetails"
 
 
 @pytest.mark.parametrize("kwargs", [

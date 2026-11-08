@@ -64,7 +64,8 @@ def run_job(root: Path, key: str, *, executor: Callable = execute_local_developm
                         expected_fingerprint=job['config_fingerprint'],
                         workflow_action=job['action'] if job['action'] != 'review' else None,
                         review_run=job['run_id'], trusted_reviewers=tuple(job['reviewers']),
-                        require_plan_approval=True, approved_plan=job.get('approved_plan'))
+                        require_plan_approval=True, approved_plan=job.get('approved_plan'),
+                        **({'issue_id': job['issue_id']} if job['action'] == 'develop' else {}))
                 result = public_result(result)
             except Exception:
                 # No SDK exceptions, source, config paths, stdout or secret-bearing logs in HTTP.

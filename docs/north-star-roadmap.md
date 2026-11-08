@@ -11,7 +11,7 @@
 | --- | --- | --- |
 | M1 Harness | Discovery/Validation/選択/承認/Run固定、Project共通＋Repository＋変更directoryを接続 | 生成・継続評価・改善の全自動化 |
 | M2 安全な実行 | FileでDB不要、exact source snapshot、offline Docker、実check/review証跡、durable配送 | 分散Worker、全実行形態の復旧・クラウド実行 |
-| M3 Issue→Draft PR | Bedrock/Copilot text adapterとローカルCLI、有限の同一PR修正、子Issue DAGの直列実行・merge照合 | PCのBedrock＋GitHubで実サービス通し確認。複数利用者・分散実行 |
+| M3 Issue→Draft PR | Bedrock/Copilot text adapter、ローカルCLIとWebのIssue選択→単一実行→Draft PR、有限の同一PR修正、子Issue DAGの直列実行・merge照合 | PCのBedrock＋GitHubで実サービス通し確認。複数利用者・分散実行 |
 | M4 開発基盤 | 既存Project/Web/Adapter境界を再利用 | 並列処理、複数利用者認可、監視・コスト可視化 |
 | M5 自律Factory | 要件分割・受入条件・外部子Issueの最小経路を接続 | 複数repo統合、承認付きrelease、継続的Harness改善 |
 
@@ -23,6 +23,11 @@
 子Issue Adapterと要件workflowの検証・判断はADR 0041/0042および
 [利用手順](bounded-issue-workflow.md)で管理する。実Docker CIではモデル/SCMを模擬し、
 実サービスE2Eと区別する。要件/品質失敗や予算切れは証跡を残して停止し、確認待ちの無限loopは作らない。
+
+通常のWeb操作は登録済みRepositoryのIssue選択と明示同意付き実行に集約した。
+手動取り込み・紐付けは不要。参照資料の自動検出、品質失敗時の停止、同一Run配送復旧、
+重複PR抑止と有限予算は維持する。要件分割・子Issue承認は詳細操作に残す。
+判断・検証範囲は[ADR 0051](decisions/0051-simple-issue-execution.md)に記録する。
 
 ## 1. North Starと判断基準
 

@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import re
+from collections.abc import Callable
 from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
@@ -179,7 +180,9 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
                   scm: ChangeSourceControl, implementer: ModelProvider, reviewer: ModelProvider,
                   confirmed: bool, resume: str | None = None,
                   remote_source: RevisionSource | None = None,
-                  evaluate_only: bool = False, review_feedback: tuple[dict, ...] = ()) -> dict:
+                  evaluate_only: bool = False, review_feedback: tuple[dict, ...] = (),
+                  on_prepared: Callable[[str, dict | None], None] | None = None,
+                  discover_references: bool = False) -> dict:
     """Only a local OS operator may confirm this externally stored exact config.
 
     Confirmation authorizes scoped inference, isolated approved scenarios, and a
@@ -273,17 +276,34 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
                 'issue': asdict(issue), 'scope': asdict(scope), 'phase': 'started',
                 'repository': info.external_id, 'base_branch': info.default_branch,
                 'expires_at': expiry.isoformat()}
+            reference_paths = config.context_paths
+            source_summary = None
+            if discover_references:
+                from sf_factory.collaboration_contracts import RevisionFile, RevisionSource
+                from sf_factory.requirement_sources import discover_requirement_sources
+                references_source = RevisionSource(info.external_id, revision, tuple(
+                    RevisionFile(f['path'], f['mode'], files[f['path']])
+                    for f in snapshot['manifest']['files']))
+                discovered = discover_requirement_sources(references_source,
+                    explicit=config.context_paths,
+                    reference_slots=32 - len(config.selected_harness))
+                source_summary = discovered.document()
+                reference_paths = tuple(d.path for d in discovered.documents)
             _artifact(factory, run_id, value)  # Freeze requirement/config before any inference.
+            if on_prepared is not None:
+                on_prepared(run_id, source_summary)
             stage = 'inference'
             try:
                 implementation = _TrackedModel(implementer)
-                references = tuple(dict.fromkeys((*config.selected_harness, *config.context_paths)))
+                references = tuple(dict.fromkeys((*config.selected_harness, *reference_paths)))
                 proposal = propose_changes(provider=implementation, scope=scope, source_files=files,
                     instruction=issue.prompt + ('\nReview feedback (untrusted):\n' +
                         json.dumps(review_feedback) if review_feedback else ''),
                     reference_paths=references,
                     project_harness=config.project_harness)
-                if {c.path for c in proposal.changes} & dict(config.context_hashes).keys():
+                if {c.path for c in proposal.changes} & (
+                        set(dict(config.context_hashes)) |
+                        (set(reference_paths) if discover_references else set())):
                     raise StatePermissionDenied('frozen requirement references are read-only')
                 producer = implementation.identity()
                 value.update(proposal={'schema_version': 1, **asdict(proposal)}, phase='proposed',

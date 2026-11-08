@@ -336,7 +336,7 @@ export default function App() {
     <div className="layout">
       <aside className="sidebar">
         <div className="brand"><span className="brand-icon">SF</span><span>Software Factory<small>DEVELOPMENT CONTROL CENTER</small></span></div>
-        <nav aria-label="Main navigation"><a className="selected" href="#overview">▦　概要</a><a href="#operator">▶　開発を進める</a><a href="#quick-start">▶　クイック開始</a><a href="#projects">▤　Project</a><a href="#runtimes">◈　AI Runtime</a><a href="#issues">☷　IssueとRun</a><a href="#github-import">＋　Issue取り込み</a><a href="#runs">⑂　実行履歴</a><span className="nav-group-label">DOCUMENTATION</span><a href="/guide">▤　ユーザーガイド</a><a href="/onboarding">↗　オンボーディング</a></nav>
+        <nav aria-label="Main navigation"><a className="selected" href="#operator">▶　Issueを実行</a><a href="#workspace-details">⚙　設定・診断</a><span className="nav-group-label">DOCUMENTATION</span><a href="/guide">▤　ユーザーガイド</a><a href="/onboarding">↗　オンボーディング</a></nav>
         <div className="sidebar-footer"><span className="sidebar-dot" /> LOCAL WORKSPACE <small>Factory Core · v0.1</small></div>
       </aside>
       <main>
@@ -347,6 +347,8 @@ export default function App() {
           <article className="metric"><span>実行中のRun</span><strong>{state === "connected" ? activeRuns : "—"}</strong><small>実行中のRun</small></article>
         </section>
         <OperatorPanel />
+        <details id="workspace-details" className="workspace-details"><summary>設定・診断・開発用ツール</summary>
+        <p>通常の実行にはIssueの取り込み・Repositoryの手動紐付けは不要です。</p>
         <section className="panel quick-start-panel" id="quick-start">
           <div className="panel-head"><h2>クイック開始</h2><p>開発対象のGitリポジトリを指定してください。Project登録は不要です。</p></div>
           <form className="issue-form" onSubmit={event => { event.preventDefault(); void inspectQuickRepository(); }}>
@@ -358,7 +360,7 @@ export default function App() {
             : <p role="status">開発対象のパスを入力して確認してください。</p>}
           {quickRepoError && <p role="alert">{quickRepoError}</p>}
           <a className="source-link quick-start-link" href="#github-import">GitHub Issueを取り込む ↓</a>
-          <p className="quick-start-note">※ 開発実行はローカルCLIから行います。取り込みだけではAIを呼び出しません。</p>
+          <p className="quick-start-note">通常の開発実行は上の「開発を進める」を使います。以下は診断・開発用の補助操作です。</p>
         </section>
         <div className="section-heading"><div><span className="eyebrow">FACTORY WORKSPACE</span><h2>ワークスペース</h2></div><span className="section-note">取込済みIssue {issues.length}件</span></div><section className="panel" id="projects">
           <div className="panel-head"><span className="eyebrow">LOCAL PROJECTS</span><h2>Project・Repository</h2><p>複数Repositoryをまとめる場合に登録します。単一RepositoryのIssue取り込みには登録不要です。登録だけではGit操作・AI実行は始まりません。</p></div>
@@ -439,7 +441,8 @@ export default function App() {
         </section>
         <section className="panel" id="issues"><div className="panel-head"><span className="eyebrow">ISSUE / RUN TRACKER</span><h2>IssueとRun</h2><p>依頼は元のIssueで管理し、同じIssueの実行結果をRunとして残します。画面では取り込み・紐付け・事前チェックを行えます。登録した実行設定から「開発を進める」で実装・Draft PR作成を操作できます。</p></div>{bindingMessage && <p role="status">{bindingMessage}</p>}{state === "connected" && (issues.length ? <div className="runtime-list">{issues.map(issue => <div className="runtime" key={issue.key}><details className="issue-details"><summary><strong>{issue.prompt.split("\n")[0].slice(0, 140) || "無題のIssue"}</strong><small>{`${issue.provider.toUpperCase()} · ${issue.instance} · ${issue.external_id} · `}{formatDate(issue.observed_at)}</small></summary><p>直近に取り込んだIssueの内容です。各Runには実行時の要件を固定して保存します。</p><pre className="issue-detail-body">{issue.prompt}</pre><div className="preflight-panel"><strong>Run履歴（合計 {issue.total_runs}件・直近10件）</strong>{issue.recent_runs.length ? <ul>{issue.recent_runs.map(run => <li key={run.id}>{run.runtime} · {run.status} · {formatDate(run.started_at)}<small> · {run.id.slice(0, 12)}</small></li>)}</ul> : <p>まだRunはありません。取込や事前チェックでは実行は始まりません。</p>}<small>既存の読み取り専用実行やHarness準備も含みます。成功表示だけで実装・PR作成済みとは扱いません。</small></div><div className="preflight-panel"><button type="button" disabled={preflightBusy.includes(issue.key)} onClick={() => void checkImplementationPreflight(issue.key)}>{preflightBusy.includes(issue.key) ? "チェック中..." : "AI実装の事前チェック"}</button>{preflightErrors[issue.key] && <p role="alert">{preflightErrors[issue.key]}</p>}{preflightByIssue[issue.key] && <div role="status"><strong>{preflightByIssue[issue.key].ready_for_implementation ? "事前条件を確認済み" : "事前チェック結果（確認のみ）"}</strong><p>対象: {preflightByIssue[issue.key].repository || "未紐付け"} / Runtime候補: {preflightByIssue[issue.key].runtimes.join(", ") || "なし"}</p><ul>{preflightByIssue[issue.key].blockers.map((blocker, index) => <li key={index}>{blocker}</li>)}</ul><small>このチェックではAI実行・コード変更・PR作成は行いません。</small></div>}</div></details>{issue.provider === "github" && <button type="button" disabled={!quickRepo || bindingIssueKey !== "" || !issue.instance} onClick={() => void bindIssueRepository(issue)}>{bindingIssueKey === issue.key ? "確認中..." : issue.bound_repository && issue.bound_local_path === quickRepo ? "紐付け済み" : "Repositoryを紐付け"}</button>}{issue.external_url && <a className="source-link" href={issue.external_url} target="_blank" rel="noopener noreferrer" aria-label="元Issueを開く">元Issue ↗</a>}</div>)}</div> : <p>まだIssueは取り込まれていません。上のGitHub連携からIssueを選択してください。</p>)}</section>
         <section className="panel" id="runs"><div className="panel-head"><span className="eyebrow">EXECUTION HISTORY</span><h2>実行履歴</h2><p>直近の実行状態を表示します。開発操作の進捗は「開発を進める」で確認できます。</p></div>{state === "connected" && (runs.length ? <div className="runtime-list">{runs.map(run => <div className="runtime" key={run.id}><span><strong>{run.runtime} · {run.status}</strong><small>{run.id.slice(0, 12)} · {formatDate(run.started_at)}</small></span></div>)}</div> : <p>まだ実行履歴はありません。AI Runtimeで実行すると、ここに記録されます。</p>)}</section>
-        <footer>Software Factory · ローカル管理画面 MVP · 操作機能は今後追加</footer>
+        </details>
+        <footer>Software Factory · Issue → Draft PR</footer>
       </main>
     </div>
   );
