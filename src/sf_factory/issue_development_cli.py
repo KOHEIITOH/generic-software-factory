@@ -51,73 +51,89 @@ def load_config(path: Path) -> DevelopmentConfig:
     return config
 
 
+class ConfirmationRequired(ValueError):
+    pass
+
+
+def execute_local_development(*, config_path: Path, confirmed: bool, confirm_bedrock: bool,
+                              resume: str | None = None, review_run: str | None = None,
+                              trusted_reviewers: tuple[str, ...] = (),
+                              workflow_action: str | None = None,
+                              expected_fingerprint: str | None = None) -> dict:
+    """Trusted local operator entry shared by CLI and the private Web worker."""
+    if confirmed is not True:
+        raise ConfirmationRequired('--confirm-run')
+    config = load_config(config_path)
+    if expected_fingerprint is not None and config.fingerprint != expected_fingerprint:
+        raise PermissionError('approved execution configuration changed')
+    implementation: ModelProvider
+    review: ModelProvider
+    if resume is not None:
+        implementation, review = _NoInference(), _NoInference()
+    elif config.provider == 'bedrock':
+        if confirm_bedrock is not True:
+            raise ConfirmationRequired('--confirm-bedrock')
+        from sf_factory.bedrock_provider import BedrockModelProvider
+        from sf_factory.model_provider_status import bedrock_configuration
+
+        settings = bedrock_configuration()
+        if not settings.configured or not settings.model_id or not settings.region_name:
+            raise ValueError('Bedrock SDK, model ID and region must be configured')
+        max_tokens = int(os.environ.get('SF_BEDROCK_MAX_TOKENS', '8192'))
+        implementation = BedrockModelProvider(settings.model_id, settings.region_name,
+                                              max_tokens=max_tokens)
+        review = BedrockModelProvider(settings.model_id, settings.region_name,
+                                       max_tokens=max_tokens)
+    else:
+        from sf_factory.copilot_model_provider import CopilotModelProvider
+
+        implementation, review = CopilotModelProvider(), CopilotModelProvider()
+    from sf_factory.factory_selection import open_factory
+    from sf_factory.integration_defaults import source_control, task_source
+
+    if workflow_action is not None:
+        from sf_factory.github_issue_tracker import GitHubIssueTracker
+        from sf_factory.requirement_workflow import advance_requirements
+
+        if workflow_action not in {'plan', 'advance'}:
+            raise ValueError('known workflow action required')
+        adapter = GitHubIssueTracker()
+        result = advance_requirements(factory=open_factory(config.data_root), config=config,
+            source=task_source(config.repository), scm=adapter, tracker=adapter,
+            implementer=implementation, reviewer=review, confirmed=True,
+            execute=workflow_action == 'advance', trusted_reviewers=trusted_reviewers)
+    elif review_run is not None:
+        from sf_factory.github_source_control import GitHubSourceControl
+        from sf_factory.review_automation import advance_review
+
+        result = advance_review(factory=open_factory(config.data_root), config=config,
+            source=task_source(config.repository), scm=GitHubSourceControl(),
+            implementer=implementation, reviewer=review, confirmed=True,
+            initial_run=review_run, trusted_reviewers=trusted_reviewers)
+    else:
+        result = develop_issue(factory=open_factory(config.data_root), config=config,
+            source=task_source(config.repository), scm=source_control(),
+            implementer=implementation, reviewer=review, confirmed=True, resume=resume)
+    return result
+
+
 def run_local_development(*, config_path: Path, confirmed: bool, confirm_bedrock: bool,
                           resume: str | None, review_run: str | None = None,
                           trusted_reviewers: tuple[str, ...] = (),
                           workflow_action: str | None = None) -> int:
-    # No provider/network/file state initialization before explicit operator consent.
-    if confirmed is not True:
-        print(json.dumps({'status': 'confirmation_required', 'required': '--confirm-run'}))
-        return 2
     try:
-        config = load_config(config_path)
-        implementation: ModelProvider
-        review: ModelProvider
-        if resume is not None:
-            implementation, review = _NoInference(), _NoInference()
-        elif config.provider == 'bedrock':
-            if confirm_bedrock is not True:
-                print(json.dumps({'status': 'confirmation_required',
-                                  'required': '--confirm-bedrock'}))
-                return 2
-            from sf_factory.bedrock_provider import BedrockModelProvider
-            from sf_factory.model_provider_status import bedrock_configuration
-
-            settings = bedrock_configuration()
-            if not settings.configured or not settings.model_id or not settings.region_name:
-                raise ValueError('Bedrock SDK, model ID and region must be configured')
-            max_tokens = int(os.environ.get('SF_BEDROCK_MAX_TOKENS', '8192'))
-            implementation = BedrockModelProvider(settings.model_id, settings.region_name,
-                                                  max_tokens=max_tokens)
-            review = BedrockModelProvider(settings.model_id, settings.region_name,
-                                           max_tokens=max_tokens)
-        else:
-            from sf_factory.copilot_model_provider import CopilotModelProvider
-
-            implementation, review = CopilotModelProvider(), CopilotModelProvider()
-        from sf_factory.factory_selection import open_factory
-        from sf_factory.integration_defaults import source_control, task_source
-
-        if workflow_action is not None:
-            from sf_factory.github_issue_tracker import GitHubIssueTracker
-            from sf_factory.requirement_workflow import advance_requirements
-
-            if workflow_action not in {'plan', 'advance'}:
-                raise ValueError('known workflow action required')
-            adapter = GitHubIssueTracker()
-            result = advance_requirements(factory=open_factory(config.data_root), config=config,
-                source=task_source(config.repository), scm=adapter, tracker=adapter,
-                implementer=implementation, reviewer=review, confirmed=True,
-                execute=workflow_action == 'advance', trusted_reviewers=trusted_reviewers)
-        elif review_run is not None:
-            from sf_factory.github_source_control import GitHubSourceControl
-            from sf_factory.review_automation import advance_review
-
-            result = advance_review(factory=open_factory(config.data_root), config=config,
-                source=task_source(config.repository), scm=GitHubSourceControl(),
-                implementer=implementation, reviewer=review, confirmed=True,
-                initial_run=review_run, trusted_reviewers=trusted_reviewers)
-        else:
-            result = develop_issue(factory=open_factory(config.data_root), config=config,
-                source=task_source(config.repository), scm=source_control(),
-                implementer=implementation, reviewer=review, confirmed=True, resume=resume)
+        result = execute_local_development(config_path=config_path, confirmed=confirmed,
+            confirm_bedrock=confirm_bedrock, resume=resume, review_run=review_run,
+            trusted_reviewers=trusted_reviewers, workflow_action=workflow_action)
         print(json.dumps(result))
         return 1 if result['status'] == 'stopped' else 0
+    except ConfirmationRequired as exc:
+        print(json.dumps({'status': 'confirmation_required', 'required': str(exc)}))
+        return 2
     except DevelopmentStopped as exc:
         print(json.dumps({'status': 'stopped', 'run_id': exc.run_id, 'reason': str(exc)}))
         return 1
     except Exception:
-        # SDK/network/config exceptions can include prompt, headers or local secrets.
         print(json.dumps({'status': 'blocked',
                           'reason': 'configuration or prerequisite check failed'}))
         return 2

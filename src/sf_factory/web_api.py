@@ -1,7 +1,7 @@
 """Opt-in localhost API for the Software Factory dashboard.
 
 Local dashboard endpoints. Mutations require same-origin browser requests.
-Agent execution and arbitrary filesystem browsing are not exposed over HTTP.
+Execution uses separately authenticated local operator routes and approved profiles.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from sf_factory.implementation_preflight_web import install_implementation_prefl
 from sf_factory.repo_discovery import discover_git_root
 from sf_factory.repository_contracts import Project, Repository, Visibility
 from sf_factory.state_store import StateConflict, StateUnavailable
+from sf_factory.web_operator import WebOperator
 
 
 class InspectRepositoryRequest(BaseModel):
@@ -54,7 +55,8 @@ def _check_local_origin(request: Request) -> None:
         raise HTTPException(status_code=403, detail="Cross-site request rejected")
 
 
-def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> FastAPI:
+def create_app(static_dir: Path | None = None, data_dir: Path | None = None,
+               operator: WebOperator | None = None) -> FastAPI:
     data_dir = data_directory(data_dir)
     app = FastAPI(
         title="Software Factory Local API",
@@ -194,6 +196,8 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None) -> 
             ]
         }
 
+    from sf_factory.web_execution import install_execution_routes
+    install_execution_routes(app, data_dir.resolve(), operator)
     install_github_issue_routes(app, data_dir)
     install_github_repository_routes(app)
     install_implementation_preflight_routes(app, data_dir or Path('.sf-factory'))

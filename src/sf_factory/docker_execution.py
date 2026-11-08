@@ -118,6 +118,8 @@ def run_offline_command(
     isolation approval for an AI runtime. Images must already be pulled by the
     controller through a trusted registry; this function never pulls an image.
     """
+    from sf_factory.operation_control import checkpoint
+    checkpoint()
     if not re.fullmatch(r'[a-z0-9./:_-]+@sha256:[a-f0-9]{64}', image):
         raise ValueError('a pinned image digest is required')
     if (not isinstance(argv, tuple) or not argv or len(argv) > 128

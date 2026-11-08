@@ -49,6 +49,8 @@ class GitHubSourceControl:
     def _request(self, path: str, method: str = 'GET', payload: dict | None = None,
                  *, collection: bool = False, optional: bool = False,
                  response_limit: int = 1048576) -> dict:
+        from sf_factory.operation_control import checkpoint
+        checkpoint()
         guard = getattr(self, 'request_guard', None)
         if guard is not None:
             guard(method, path)

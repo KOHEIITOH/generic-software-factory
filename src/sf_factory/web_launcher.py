@@ -48,12 +48,15 @@ def launch_web(*, rebuild: bool = False) -> int:
     backend = ("File (no DB)" if isinstance(factory, FileDashboardFactory)
                else "SQLite (existing/configured)")
     print(f"Storage: {backend}; {factory.root}")
-    app = create_app(static_dir=frontend / "dist", data_dir=factory.root)
-    url = "http://127.0.0.1:8000"
+    from sf_factory.web_operator import WebOperator
+    origin = "http://127.0.0.1:8000"
+    operator = WebOperator(origin)
+    app = create_app(static_dir=frontend / "dist", data_dir=factory.root, operator=operator)
+    url = origin + "/#operator=" + operator.token
     print(f"Software Factory dashboard: {url}")
     try:
         webbrowser.open(url)
-        uvicorn.run(app, host="127.0.0.1", port=8000)
+        uvicorn.run(app, host="127.0.0.1", port=8000, proxy_headers=False)
     except OSError as exc:
         print(f"Could not start dashboard: {exc}", file=sys.stderr)
         return 1
