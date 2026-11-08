@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 
-type Profile = { id: string; name: string; fingerprint: string; available: boolean; repository?: string; issue?: string; provider?: string; allowed_paths?: string[]; checks?: string[] };
-type Progress = { status: string; counts: Record<string, number>; limits: Record<string, number>; expires_at: string;
+type RequirementSources = { mode: string; revision: string; fingerprint: string; review_status?: string;
+  documents: { path: string; sha256: string; bytes: number; reason: string }[];
+  assessments: { source_id: string; status: string }[];
+  requirements: { id: string; sources: string[]; children: string[] }[] };
+type Profile = { id: string; name: string; fingerprint: string; available: boolean; repository?: string; issue?: string; provider?: string; allowed_paths?: string[]; checks?: string[]; context_paths?: string[]; requirement_mode?: string };
+type Progress = { requirement_sources?: RequirementSources | null; status: string; counts: Record<string, number>; limits: Record<string, number>; expires_at: string;
   children: { id: string; issue_id: string; issue_url?: string; status: string; run_id?: string; pr_url?: string }[];
   decisions: { at: string; code: string }[] };
 type Job = { id: string; profile_id: string; config_fingerprint: string; action: string; reviewers: string[]; status: string;
@@ -9,7 +13,7 @@ type Job = { id: string; profile_id: string; config_fingerprint: string; action:
 type Submission = { profile_id: string; config_fingerprint: string; request_id: string; action: string; confirm_run: boolean;
   confirm_bedrock: boolean; run_id: string | null; reviewers: string[] };
 const active = (job: Job) => ["queued", "running", "stopping"].includes(job.status);
-const labels: Record<string, string> = { queued: "実行待ち", running: "実行中", stopping: "停止処理中", stopped: "停止", interrupted: "中断・復旧確認が必要", finished: "ステップ終了", waiting: "次の操作・レビュー待ち", completed: "完了", ready: "次へ進めます", pending: "依存PRのマージ待ち", pr_open: "PRレビュー・マージ待ち", merged: "マージ確認済み", failed: "失敗", plan_ready: "計画と子Issueを作成しました", child_pr_submitted: "Draft PRを作成しました", awaiting_review: "レビュー待ち", awaiting_merge: "マージ待ち", repair_submitted: "同じPRへ修正を追記しました", child_awaiting_review_or_merge: "子PRのレビュー・マージ待ち", child_merge_verified: "子PRのマージを確認しました", all_child_prs_merged: "すべての子PRのマージを確認しました", remote_read_unavailable: "接続の再確認待ち", operator_or_execution_stopped: "停止または実行条件の確認が必要です", operator_step_approved: "実行を承認", worker_claimed: "workerが開始", operator_stop_requested: "停止を要求", worker_step_finished: "ステップ終了", worker_lease_lost: "workerの中断を検出", budget_exhausted: "試行・推論予算の上限に達しました", api_budget_exhausted: "API予算の上限に達しました", deadline_exhausted: "実行期限に達しました", candidate_repeated: "同じ変更案が繰り返されたため停止しました", base_changed_requires_new_candidate: "基準ブランチが変更されました", child_quality_failed: "子Issueの検証または独立レビューに失敗しました", parent_requirement_changed: "親Issueの要件が変更されました", child_requirement_changed: "子Issueの要件が変更されました", child_create_unresolved: "子Issue作成結果の照合待ち", child_link_unresolved: "親子関連の照合待ち", child_execution_outcome_unknown: "前の実行結果が不明なため停止しました", requirement_advance_stopped: "実行条件または権限を確認してください", advance_stopped: "実行条件または権限を確認してください" };
+const labels: Record<string, string> = { queued: "実行待ち", running: "実行中", stopping: "停止処理中", stopped: "停止", interrupted: "中断・復旧確認が必要", finished: "ステップ終了", waiting: "次の操作・レビュー待ち", completed: "完了", ready: "次へ進めます", pending: "依存PRのマージ待ち", pr_open: "PRレビュー・マージ待ち", merged: "マージ確認済み", failed: "失敗", plan_ready: "計画と子Issueを作成しました", child_pr_submitted: "Draft PRを作成しました", awaiting_review: "レビュー待ち", awaiting_merge: "マージ待ち", repair_submitted: "同じPRへ修正を追記しました", child_awaiting_review_or_merge: "子PRのレビュー・マージ待ち", child_merge_verified: "子PRのマージを確認しました", all_child_prs_merged: "すべての子PRのマージを確認しました", remote_read_unavailable: "接続の再確認待ち", operator_or_execution_stopped: "停止または実行条件の確認が必要です", operator_step_approved: "実行を承認", worker_claimed: "workerが開始", operator_stop_requested: "停止を要求", worker_step_finished: "ステップ終了", worker_lease_lost: "workerの中断を検出", budget_exhausted: "試行・推論予算の上限に達しました", api_budget_exhausted: "API予算の上限に達しました", deadline_exhausted: "実行期限に達しました", candidate_repeated: "同じ変更案が繰り返されたため停止しました", base_changed_requires_new_candidate: "基準ブランチが変更されました", child_quality_failed: "子Issueの検証または独立レビューに失敗しました", parent_requirement_changed: "親Issueの要件が変更されました", child_requirement_changed: "子Issueの要件が変更されました", child_create_unresolved: "子Issue作成結果の照合待ち", child_link_unresolved: "親子関連の照合待ち", child_execution_outcome_unknown: "前の実行結果が不明なため停止しました", requirement_advance_stopped: "実行条件または権限を確認してください", advance_stopped: "実行条件または権限を確認してください", requirements_insufficient: "要件が不足しているため停止しました", requirements_conflicting: "要件に矛盾があるため停止しました", requirements_discovery_limit: "要件資料の読取上限を超えました。参照資料を明示してください", requirements_context_limit: "要件とコードの文脈が上限を超えました", requirements_source_missing: "指定した要件資料が見つかりません", requirements_source_invalid: "要件資料の形式・内容を確認してください", requirements_source_changed: "計画時から要件資料が変更されました", requirements_plan_rejected: "要件分割の独立レビューを通過しませんでした", requirements_reference_write_conflict: "参照した要件資料への変更を含むため停止しました", requirements_interpreted: "要件の解釈を記録しました", repository_readme: "README", root_requirement_document: "ルートの要件文書", requirement_document_convention: "要件・仕様・設計の文書候補", operator_context_path: "明示指定", explicit: "明示指定", auto: "自動検出", issue_only: "親Issueのみ", insufficient: "要件不足", conflicting: "要件の矛盾", requirements: "要件", supporting: "参考資料", irrelevant: "要件として不採用" };
 const text = (code: string) => labels[code] || code;
 async function api(path: string, options: RequestInit = {}) {
   return fetch("/api/operator" + path, { ...options, credentials: "same-origin", headers: {
@@ -125,6 +129,7 @@ export default function OperatorPanel() {
           <option value="">選択してください</option>{profiles.map(p => <option key={p.id} value={p.id}>{p.name}{!p.available ? "（無効・再登録が必要）" : ""}</option>)}</select></label>
         {profile && <div className="operator-scope"><strong>{profile.repository} · 親Issue #{profile.issue}</strong>
           <p>AI: {profile.provider} / 変更範囲: {profile.allowed_paths?.join(", ")} / 検証: {profile.checks?.join(", ")}</p>
+          <p>要件資料: {profile.context_paths?.length ? "明示指定（" + profile.context_paths.join(", ") + "）" : "自動検出（README・要件/仕様/設計の文書候補、最大12ファイル）"}</p>
           {!profile.available && <p role="alert">設定が変更・失効しています。ターミナルで確認し、登録し直してください。</p>}
           <label>信頼するレビュアー（カンマ区切り、省略時はGitHub認証ユーザー）<input aria-label="信頼するレビュアー"
             value={frozen ? frozen.join(", ") : reviewers} disabled={!!frozen || busy || uncertain} onChange={e => setReviewers(e.target.value)} /></label>
@@ -138,6 +143,15 @@ export default function OperatorPanel() {
       {uncertain && <p>送信結果が不明です。新しい操作を作らず、同じ依頼の受付状態を確認します。 <button type="button" disabled={busy} onClick={() => { if (pending.current) void send(pending.current); }}>同じ送信を確認</button></p>}
       {progress && <div className="operator-progress"><h3>Workflowの進捗：{text(progress.status)}</h3><p>期限: {new Date(progress.expires_at).toLocaleString("ja-JP")}</p>
         <div className="operator-budgets">{[["model", "max_model_calls", "推論回数"], ["tokens", "max_tokens", "予約token"], ["api", "max_api_calls", "API回数"], ["write", "max_writes", "書込操作"]].map(([key, limit, label]) => <span key={key}>{label}: {progress.counts[key].toLocaleString()} / {progress.limits[limit].toLocaleString()}（残り {Math.max(0, progress.limits[limit] - progress.counts[key]).toLocaleString()}）</span>)}</div>
+        {progress.requirement_sources && <details className="requirement-sources"><summary>参照した要件資料・分割の根拠</summary>
+          <p>{text(progress.requirement_sources.mode)} / 確認結果: {progress.requirement_sources.review_status === "ready" ? "要件を確認済み" : progress.requirement_sources.review_status ? text(progress.requirement_sources.review_status) : "未判定"}</p>
+          <p>資料の版: <code>{progress.requirement_sources.revision}</code></p>
+          {!progress.requirement_sources.documents.length && <p>文書候補はありません。親Issueの要件を判定します。</p>}
+          <ul>{progress.requirement_sources.documents.map(d => <li key={d.path}><strong>{d.path}</strong> — {text(d.reason)}<small>SHA256: {d.sha256} · {d.bytes.toLocaleString()} bytes</small></li>)}</ul>
+          <ul>{progress.requirement_sources.assessments.map(a => <li key={a.source_id}>{a.source_id === "issue" ? "親Issue" : a.source_id}: {text(a.status)}</li>)}</ul>
+          <ul>{progress.requirement_sources.requirements.map(r => <li key={r.id}>{r.id}: {r.sources.join(", ")} → {r.children.join(", ")}</li>)}</ul>
+          <small>解釈の詳細と指摘内容は実行証跡に保存しています。要件不足・矛盾を検知した場合は停止します。</small>
+        </details>}
         <ul className="operator-children">{progress.children.map(c => <li key={c.id}><strong>{c.id} · Issue #{c.issue_id}</strong> — {text(c.status)} <Link url={c.issue_url} label="Issue" /> <Link url={c.pr_url} label="PR" />{c.run_id && <small>Run: {c.run_id}</small>}</li>)}</ul>
         <details><summary>判断・停止理由の履歴</summary><ol>{progress.decisions.map((d, i) => <li key={i}>{new Date(d.at).toLocaleString("ja-JP")} · {text(d.code)}</li>)}</ol></details>
         {progress.status === "stopped" && <p>同じ設定で再開しても、自動再送や予算のリセットは行いません。</p>}</div>}

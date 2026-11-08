@@ -1,4 +1,5 @@
 """Browser-only fixture. Operator API and persistence real; workflow effects simulated."""
+import hashlib
 import json
 import os
 import sys
@@ -41,7 +42,19 @@ def main():
         if not state['data']:
             session.reserve('model', 'fixture-plan', tokens=100)
             session.complete_action('fixture-plan', {'fixture': True})
-            session.save({'children': {'first': {'status': 'pr_open', 'run_id': 'd' * 32,
+            session.save({'requirement_sources': {
+                'mode': 'auto', 'revision': 'b' * 40, 'fingerprint': 'e' * 64,
+                'documents': [{'path': 'docs/requirements.md', 'sha256': hashlib.sha256(
+                    b'PRIVATE_REQUIREMENT_CONTENT').hexdigest(), 'bytes': 27,
+                    'reason': 'requirement_document_convention'}]},
+                'planning_review': {'report': {'requirements_status': 'ready',
+                    'interpretation': 'PRIVATE_INTERPRETATION', 'source_assessments': [
+                        {'source_id': 'issue', 'status': 'supporting', 'reason': 'PRIVATE_REASON'},
+                        {'source_id': 'docs/requirements.md', 'status': 'requirements',
+                         'reason': 'PRIVATE_REASON'}]}},
+                'plan': {'requirements': [{'id': 'addition', 'sources': ['docs/requirements.md']}],
+                         'children': [{'id': 'first', 'requirement_ids': ['addition']}]},
+                'children': {'first': {'status': 'pr_open', 'run_id': 'd' * 32,
                 'issue': {'external_id': '2', 'external_url': 'https://github.com/fixture/repo/issues/2'},
                 'pull_request': {'url': 'https://github.com/fixture/repo/pull/1'}},
                 'second': {'status': 'pending', 'issue': {'external_id': '3'}}}},
