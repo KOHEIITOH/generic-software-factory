@@ -101,3 +101,4 @@ h1{font-size:clamp(26px,3vw,38px);line-height:1.2}
 .operator-budgets{display:flex;flex-wrap:wrap;gap:12px}.operator-budgets span{padding:8px;border-radius:6px;background:#162b48;font-size:12px}.operator-children{padding-left:20px}.operator-children li{padding:8px 0}
 .operator-job small,.operator-children small{display:block;margin:6px 0;color:#b2c5df}.operator-panel details{margin-top:12px}.operator-panel summary{cursor:pointer}.operator-panel code{overflow-wrap:anywhere;white-space:normal}
 .operator-panel [role=alert]{color:#ffbac2}.operator-panel [role=status]{color:#b2ebcc}
+.operator-plan{border:1px solid #5474b0;border-radius:12px;padding:16px;margin:16px 0;overflow-wrap:anywhere}.operator-plan p{white-space:pre-wrap}.operator-plan small{display:block;color:#b2c5df}.operator-plan details{padding:10px;border:1px solid #304764;border-radius:8px}

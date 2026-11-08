@@ -112,6 +112,7 @@ Harness承認・prepared RunもFile保存に対応。source snapshot・品質/�
 要件の子Issue分割・同じPRへの有限レビュー修正・Project/Repository/directory Harnessは
 [有限Issueワークフロー](docs/bounded-issue-workflow.md)を参照してください。
 要件資料は[明示指定または自動検出](docs/requirement-discovery.md)でき、出典と分割の根拠を記録します。
+Webでは準備診断と、子Issue作成前の計画確認・承認も利用できます。
 Webからの実行・再開・停止は[ローカルWeb実行](docs/local-web-execution.md)で初回登録と操作を説明します。
 
 ## 現在のステータス

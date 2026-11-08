@@ -4,17 +4,20 @@ type RequirementSources = { mode: string; revision: string; fingerprint: string;
   documents: { path: string; sha256: string; bytes: number; reason: string }[];
   assessments: { source_id: string; status: string }[];
   requirements: { id: string; sources: string[]; children: string[] }[] };
+type PlanPreview = { plan: { requirements: { id: string; text: string; sources: string[] }[];
+  children: { id: string; title: string; goal: string; acceptance: string[]; depends_on: string[]; allowed_paths: string[]; check_ids: string[] }[] };
+  interpretation: string; approval_status: string; approval_fingerprint: string | null };
 type Profile = { id: string; name: string; fingerprint: string; available: boolean; repository?: string; issue?: string; provider?: string; allowed_paths?: string[]; checks?: string[]; context_paths?: string[]; requirement_mode?: string };
-type Progress = { requirement_sources?: RequirementSources | null; status: string; counts: Record<string, number>; limits: Record<string, number>; expires_at: string;
+type Progress = { plan_preview?: PlanPreview | null; requirement_sources?: RequirementSources | null; status: string; counts: Record<string, number>; limits: Record<string, number>; expires_at: string;
   children: { id: string; issue_id: string; issue_url?: string; status: string; run_id?: string; pr_url?: string }[];
   decisions: { at: string; code: string }[] };
 type Job = { id: string; profile_id: string; config_fingerprint: string; action: string; reviewers: string[]; status: string;
   created_at: string; stop_requested: boolean; result: { status: string; reason?: string } | null; progress: Progress | null; events: { code: string }[] };
 type Diagnostic = { can_attempt: boolean; checked_at: string; checks: { id: string; status: string; detail: string; remedy: string }[] };
 type Submission = { profile_id: string; config_fingerprint: string; request_id: string; action: string; confirm_run: boolean;
-  confirm_bedrock: boolean; run_id: string | null; reviewers: string[] };
+  confirm_bedrock: boolean; run_id: string | null; reviewers: string[]; approved_plan?: string | null };
 const active = (job: Job) => ["queued", "running", "stopping"].includes(job.status);
-const labels: Record<string, string> = { queued: "実行待ち", running: "実行中", stopping: "停止処理中", stopped: "停止", interrupted: "中断・復旧確認が必要", finished: "ステップ終了", waiting: "次の操作・レビュー待ち", completed: "完了", ready: "次へ進めます", pending: "依存PRのマージ待ち", pr_open: "PRレビュー・マージ待ち", merged: "マージ確認済み", failed: "失敗", plan_ready: "計画と子Issueを作成しました", child_pr_submitted: "Draft PRを作成しました", awaiting_review: "レビュー待ち", awaiting_merge: "マージ待ち", repair_submitted: "同じPRへ修正を追記しました", child_awaiting_review_or_merge: "子PRのレビュー・マージ待ち", child_merge_verified: "子PRのマージを確認しました", all_child_prs_merged: "すべての子PRのマージを確認しました", remote_read_unavailable: "接続の再確認待ち", operator_or_execution_stopped: "停止または実行条件の確認が必要です", operator_step_approved: "実行を承認", worker_claimed: "workerが開始", operator_stop_requested: "停止を要求", worker_step_finished: "ステップ終了", worker_lease_lost: "workerの中断を検出", budget_exhausted: "試行・推論予算の上限に達しました", api_budget_exhausted: "API予算の上限に達しました", deadline_exhausted: "実行期限に達しました", candidate_repeated: "同じ変更案が繰り返されたため停止しました", base_changed_requires_new_candidate: "基準ブランチが変更されました", child_quality_failed: "子Issueの検証または独立レビューに失敗しました", parent_requirement_changed: "親Issueの要件が変更されました", child_requirement_changed: "子Issueの要件が変更されました", child_create_unresolved: "子Issue作成結果の照合待ち", child_link_unresolved: "親子関連の照合待ち", child_execution_outcome_unknown: "前の実行結果が不明なため停止しました", requirement_advance_stopped: "実行条件または権限を確認してください", advance_stopped: "実行条件または権限を確認してください", requirements_insufficient: "要件が不足しているため停止しました", requirements_conflicting: "要件に矛盾があるため停止しました", requirements_discovery_limit: "要件資料の読取上限を超えました。参照資料を明示してください", requirements_context_limit: "要件とコードの文脈が上限を超えました", requirements_source_missing: "指定した要件資料が見つかりません", requirements_source_invalid: "要件資料の形式・内容を確認してください", requirements_source_changed: "計画時から要件資料が変更されました", requirements_plan_rejected: "要件分割の独立レビューを通過しませんでした", requirements_reference_write_conflict: "参照した要件資料への変更を含むため停止しました", requirements_interpreted: "要件の解釈を記録しました", repository_readme: "README", root_requirement_document: "ルートの要件文書", requirement_document_convention: "要件・仕様・設計の文書候補", operator_context_path: "明示指定", explicit: "明示指定", auto: "自動検出", issue_only: "親Issueのみ", insufficient: "要件不足", conflicting: "要件の矛盾", requirements: "要件", supporting: "参考資料", irrelevant: "要件として不採用" };
+const labels: Record<string, string> = { queued: "実行待ち", running: "実行中", stopping: "停止処理中", stopped: "停止", interrupted: "中断・復旧確認が必要", finished: "ステップ終了", waiting: "次の操作・レビュー待ち", completed: "完了", ready: "次へ進めます", awaiting_plan_approval: "計画の確認・承認待ち", plan_approval_requested: "計画の承認を依頼", human_plan_approved: "計画を承認済み", plan_approval_stale: "計画作成後に対象の版が変更されました", plan_approval_mismatch: "表示した計画と承認対象が一致しません", pending: "依存PRのマージ待ち", pr_open: "PRレビュー・マージ待ち", merged: "マージ確認済み", failed: "失敗", plan_ready: "計画と子Issueを作成しました", child_pr_submitted: "Draft PRを作成しました", awaiting_review: "レビュー待ち", awaiting_merge: "マージ待ち", repair_submitted: "同じPRへ修正を追記しました", child_awaiting_review_or_merge: "子PRのレビュー・マージ待ち", child_merge_verified: "子PRのマージを確認しました", all_child_prs_merged: "すべての子PRのマージを確認しました", remote_read_unavailable: "接続の再確認待ち", operator_or_execution_stopped: "停止または実行条件の確認が必要です", operator_step_approved: "実行を承認", worker_claimed: "workerが開始", operator_stop_requested: "停止を要求", worker_step_finished: "ステップ終了", worker_lease_lost: "workerの中断を検出", budget_exhausted: "試行・推論予算の上限に達しました", api_budget_exhausted: "API予算の上限に達しました", deadline_exhausted: "実行期限に達しました", candidate_repeated: "同じ変更案が繰り返されたため停止しました", base_changed_requires_new_candidate: "基準ブランチが変更されました", child_quality_failed: "子Issueの検証または独立レビューに失敗しました", parent_requirement_changed: "親Issueの要件が変更されました", child_requirement_changed: "子Issueの要件が変更されました", child_create_unresolved: "子Issue作成結果の照合待ち", child_link_unresolved: "親子関連の照合待ち", child_execution_outcome_unknown: "前の実行結果が不明なため停止しました", requirement_advance_stopped: "実行条件または権限を確認してください", advance_stopped: "実行条件または権限を確認してください", requirements_insufficient: "要件が不足しているため停止しました", requirements_conflicting: "要件に矛盾があるため停止しました", requirements_discovery_limit: "要件資料の読取上限を超えました。参照資料を明示してください", requirements_context_limit: "要件とコードの文脈が上限を超えました", requirements_source_missing: "指定した要件資料が見つかりません", requirements_source_invalid: "要件資料の形式・内容を確認してください", requirements_source_changed: "計画時から要件資料が変更されました", requirements_plan_rejected: "要件分割の独立レビューを通過しませんでした", requirements_reference_write_conflict: "参照した要件資料への変更を含むため停止しました", requirements_interpreted: "要件の解釈を記録しました", repository_readme: "README", root_requirement_document: "ルートの要件文書", requirement_document_convention: "要件・仕様・設計の文書候補", operator_context_path: "明示指定", explicit: "明示指定", auto: "自動検出", issue_only: "親Issueのみ", insufficient: "要件不足", conflicting: "要件の矛盾", requirements: "要件", supporting: "参考資料", irrelevant: "要件として不採用" };
 const text = (code: string) => labels[code] || code;
 async function api(path: string, options: RequestInit = {}) {
   return fetch("/api/operator" + path, { ...options, credentials: "same-origin", headers: {
@@ -44,6 +47,7 @@ export default function OperatorPanel() {
   const [diagnostic, setDiagnostic] = useState<Diagnostic | null>(null);
   const [diagnosticBusy, setDiagnosticBusy] = useState(false);
   const [runId, setRunId] = useState("");
+  const [approvalConsent, setApprovalConsent] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
   const [bedrock, setBedrock] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -55,9 +59,12 @@ export default function OperatorPanel() {
   const profile = profiles.find(p => p.id === selected);
   const history = jobs.filter(j => j.profile_id === selected && j.config_fingerprint === profile?.fingerprint);
   const progress = history.find(j => j.progress)?.progress;
+  const preview = progress?.plan_preview;
+  const approvalPending = preview?.approval_status === "pending";
+  const planTerminal = progress?.status === "stopped" || progress?.status === "completed";
   const frozen = history[0]?.reviewers;
   const working = jobs.some(active);
-  const enabled = profile?.available && !working && !busy && !uncertain && consent && (profile.provider !== "bedrock" || bedrock);
+  const enabled = profile?.available && !working && !busy && !diagnosticBusy && !uncertain && consent && (profile.provider !== "bedrock" || bedrock);
 
   async function refresh() {
     const [p, j] = await Promise.all([api("/profiles"), api("/jobs")]);
@@ -92,7 +99,7 @@ export default function OperatorPanel() {
         if (r.status < 500) { pending.current = null; setUncertain(false); }
         throw new Error("実行を受け付けられませんでした（" + r.status + "）。設定・同意・実行中の操作を確認してください。");
       }
-      pending.current = null; setUncertain(false); setConsent(false); setBedrock(false);
+      pending.current = null; setUncertain(false); setConsent(false); setBedrock(false); setApprovalConsent(null);
       setMessage("1ステップを受け付けました。レビュー待ちになったら、人間の確認後に次へ進めてください。");
       await refresh();
     } catch (e) { setError(e instanceof Error ? e.message : "送信状態を確認してください。"); }
@@ -104,6 +111,12 @@ export default function OperatorPanel() {
       request_id: crypto.randomUUID().replaceAll("-", ""), action, confirm_run: consent,
       confirm_bedrock: bedrock, run_id: action === "review" ? runId : null,
       reviewers: frozen || reviewers.split(",").map(s => s.trim()).filter(Boolean) });
+  }
+  function approve() {
+    if (!profile?.available || planTerminal || !preview?.approval_fingerprint || approvalConsent !== preview.approval_fingerprint || busy || working || uncertain) return;
+    void send({ profile_id: profile.id, config_fingerprint: profile.fingerprint,
+      request_id: crypto.randomUUID().replaceAll("-", ""), action: "approve", confirm_run: true,
+      confirm_bedrock: false, run_id: null, reviewers: frozen || [], approved_plan: preview.approval_fingerprint });
   }
   async function diagnose(remote: boolean) {
     if (!profile || diagnosticBusy) return;
@@ -138,8 +151,8 @@ export default function OperatorPanel() {
         <button type="button" disabled={busy} onClick={() => void api("/logout", { method: "POST" }).then(r => { if (r.ok) setAuth("locked"); })}>操作権限を閉じる</button></div>
       {!profiles.length ? <p>実行設定が未登録です。同じ保存先を使うPCのターミナルで登録してください。<br />
         <code>uv run sf operator register --config /絶対パス/operator.json --name 開発対象</code></p> : <>
-        <label className="project-selector">実行設定<select value={selected} disabled={busy || uncertain} onChange={e => {
-          setSelected(e.target.value); setDiagnostic(null); setConsent(false); setBedrock(false); setRunId(""); }}>
+        <label className="project-selector">実行設定<select value={selected} disabled={busy || uncertain || diagnosticBusy} onChange={e => {
+          setSelected(e.target.value); setDiagnostic(null); setApprovalConsent(null); setConsent(false); setBedrock(false); setRunId(""); }}>
           <option value="">選択してください</option>{profiles.map(p => <option key={p.id} value={p.id}>{p.name}{!p.available ? "（無効・再登録が必要）" : ""}</option>)}</select></label>
         {profile && <div className="operator-scope"><strong>{profile.repository} · 親Issue #{profile.issue}</strong>
           <p>AI: {profile.provider} / 変更範囲: {profile.allowed_paths?.join(", ")} / 検証: {profile.checks?.join(", ")}</p>
@@ -155,12 +168,23 @@ export default function OperatorPanel() {
             value={frozen ? frozen.join(", ") : reviewers} disabled={!!frozen || busy || uncertain} onChange={e => setReviewers(e.target.value)} /></label>
           <label className="operator-consent"><input type="checkbox" checked={consent} disabled={busy || uncertain} onChange={e => setConsent(e.target.checked)} />表示した範囲のAI送信・隔離テスト・Issue/PR操作に同意する</label>
           {profile.provider === "bedrock" && <label className="operator-consent"><input type="checkbox" checked={bedrock} disabled={busy || uncertain} onChange={e => setBedrock(e.target.checked)} />Bedrockの推論料金の発生に同意する</label>}
-          <div className="operator-toolbar"><button type="button" disabled={!enabled} onClick={() => submit("plan")}>計画・子Issueを作成</button>
-            <button type="button" disabled={!enabled} onClick={() => submit("advance")}>次の1ステップを実行・再開</button></div>
+          <div className="operator-toolbar"><button type="button" disabled={!enabled} onClick={() => submit("plan")}>計画案を作成・確認</button>
+            <button type="button" disabled={!enabled || approvalPending} onClick={() => submit("advance")}>次の1ステップを実行・再開</button></div>
           <details><summary>既存の単独PRをレビュー修正</summary><label>最初にDraft PRを作成したRun ID<input aria-label="元のRun ID" value={runId} disabled={busy || uncertain} onChange={e => setRunId(e.target.value)} /></label>
             <button type="button" disabled={!enabled || !/^[a-f0-9]{32}$/.test(runId)} onClick={() => submit("review")}>同じPRの指摘に対応</button></details>
         </div>}</>}
       {uncertain && <p>送信結果が不明です。新しい操作を作らず、同じ依頼の受付状態を確認します。 <button type="button" disabled={busy} onClick={() => { if (pending.current) void send(pending.current); }}>同じ送信を確認</button></p>}
+      {preview && <div className="operator-plan"><h3>子Issue作成前の計画確認</h3>
+        <p>{preview.interpretation}</p><h4>要件の解釈</h4><ul>{preview.plan.requirements.map(r => <li key={r.id}><strong>{r.id}</strong>：{r.text}<small>出典: {r.sources.join(", ")}</small></li>)}</ul>
+        <h4>分割案・受入条件・依存関係</h4>{preview.plan.children.map(c => <details key={c.id} open><summary>{c.id} · {c.title}</summary>
+          <p>{c.goal}</p><ul>{c.acceptance.map((criterion, i) => <li key={i}>{criterion}</li>)}</ul>
+          <p>依存: {c.depends_on.join(", ") || "なし"} / 変更範囲: {c.allowed_paths.join(", ")} / 検証: {c.check_ids.join(", ")}</p></details>)}
+        {approvalPending ? <><p>まだ子IssueやPRは作成していません。表示した計画を承認すると、子Issueを作成します。</p>
+          <label className="operator-consent"><input type="checkbox" checked={approvalConsent === preview.approval_fingerprint} disabled={busy || working || uncertain || planTerminal}
+            onChange={e => setApprovalConsent(e.target.checked ? preview.approval_fingerprint : null)} />この計画・参照資料・変更範囲を確認し、子Issue作成を承認する</label>
+          <button type="button" disabled={approvalConsent !== preview.approval_fingerprint || busy || working || uncertain || planTerminal || !profile?.available} onClick={approve}>この計画を承認して子Issueを作成</button></>
+          : <p>{planTerminal ? "このWorkflowは終了しています。判断・停止理由を確認してください。" : "計画は承認済みです。次のステップで実装を進められます。"}</p>}
+      </div>}
       {progress && <div className="operator-progress"><h3>Workflowの進捗：{text(progress.status)}</h3><p>期限: {new Date(progress.expires_at).toLocaleString("ja-JP")}</p>
         <div className="operator-budgets">{[["model", "max_model_calls", "推論回数"], ["tokens", "max_tokens", "予約token"], ["api", "max_api_calls", "API回数"], ["write", "max_writes", "書込操作"]].map(([key, limit, label]) => <span key={key}>{label}: {progress.counts[key].toLocaleString()} / {progress.limits[limit].toLocaleString()}（残り {Math.max(0, progress.limits[limit] - progress.counts[key]).toLocaleString()}）</span>)}</div>
         {progress.requirement_sources && <details className="requirement-sources"><summary>参照した要件資料・分割の根拠</summary>

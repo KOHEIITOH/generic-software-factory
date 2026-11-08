@@ -14,7 +14,8 @@ class SubmitStep(BaseModel):
     profile_id: str = Field(pattern='^[a-f0-9]{32}$')
     config_fingerprint: str = Field(pattern='^[a-f0-9]{64}$')
     request_id: str = Field(pattern='^[a-f0-9]{32}$')
-    action: str = Field(pattern='^(plan|advance|review)$')
+    action: str = Field(pattern='^(plan|advance|review|approve)$')
+    approved_plan: str | None = Field(default=None, pattern='^[a-f0-9]{64}$')
     confirm_run: bool
     confirm_bedrock: bool = False
     run_id: str | None = Field(default=None, pattern='^[a-f0-9]{32}$')
@@ -81,7 +82,8 @@ def install_execution_routes(app: FastAPI, root: Path, operator: WebOperator | N
             job, created = store.enqueue(profile_id=payload.profile_id,
                 config_fingerprint=payload.config_fingerprint, request_id=payload.request_id,
                 action=payload.action, confirm_bedrock=payload.confirm_bedrock,
-                run_id=payload.run_id, reviewers=tuple(payload.reviewers))
+                run_id=payload.run_id, reviewers=tuple(payload.reviewers),
+                approved_plan=payload.approved_plan)
         except (StatePermissionDenied, ValueError, OSError) as exc:
             raise HTTPException(403, 'Registered scope or consent check failed') from exc
         if created:

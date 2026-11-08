@@ -11,6 +11,7 @@ from sf_factory.collaboration_contracts import CollaborationSourceControl, Issue
 from sf_factory.development_config import DevelopmentConfig
 from sf_factory.factory import Factory
 from sf_factory.file_state import lock_directory
+from sf_factory.harness_runs import _revision
 from sf_factory.harness_validation import validate_harness
 from sf_factory.issue_development import (
     DevelopmentStopped,
@@ -19,6 +20,7 @@ from sf_factory.issue_development import (
     execution_readiness,
 )
 from sf_factory.model_provider import ModelProvider
+from sf_factory.plan_preview import approval_fingerprint
 from sf_factory.requirement_plan import (
     PlanChild,
     RequirementPlanningError,
@@ -92,7 +94,9 @@ def advance_requirements(*, factory: Factory, config: DevelopmentConfig,
                          tracker: IssueTracker, implementer: ModelProvider,
                          reviewer: ModelProvider, confirmed: bool, execute: bool = False,
                          trusted_reviewers: tuple[str, ...] = (),
-                         limits: AutomationLimits = PLAN_LIMITS) -> dict:
+                         limits: AutomationLimits = PLAN_LIMITS,
+                         require_plan_approval: bool = False,
+                         approved_plan: str | None = None) -> dict:
     if not confirmed or config.data_root != factory.root or implementer is reviewer:
         raise StatePermissionDenied(
             'explicit local requirement scope and independent models required')
@@ -123,7 +127,7 @@ def advance_requirements(*, factory: Factory, config: DevelopmentConfig,
                 BudgetedModel(implementer, session, role='workflow-implementation',
                               max_output_tokens=32768),
                 BudgetedModel(reviewer, session, role='workflow-review', max_output_tokens=32768),
-                session, execute, trusted_reviewers)
+                session, execute, trusted_reviewers, require_plan_approval, approved_plan)
         except (RequirementSourceError, RequirementPlanningError) as exc:
             return _save(session, session.snapshot()['data'], exc.code, status='stopped',
                          **getattr(exc, 'facts', {}))
@@ -149,11 +153,13 @@ def advance_requirements(*, factory: Factory, config: DevelopmentConfig,
 
 
 def _advance(factory, config, source, scm, tracker, implementer, reviewer,
-             session, execute, trusted_reviewers):
+             session, execute, trusted_reviewers, require_plan_approval, approved_plan):
     data = session.snapshot()['data']
     fresh = not data
+    if approved_plan is not None and 'plan' not in data:
+        return _save(session, data, 'plan_approval_not_ready')
     if not data:
-        if execute:
+        if execute and not require_plan_approval:
             execution_readiness(config)
         parent = source.fetch_issue(config.issue)
         if parent.external_id != config.issue:
@@ -182,6 +188,8 @@ def _advance(factory, config, source, scm, tracker, implementer, reviewer,
         data = {'parent': asdict(parent), 'phase': 'planning', 'children': {},
                 'source_revision': revision, 'source_fingerprint': remote.fingerprint,
                 'source_branch': info.default_branch,
+                'local_revision': _revision(config.root),
+                'require_plan_approval': require_plan_approval,
                 'repository_context': context,
                 'requirement_sources': selected_sources.document()}
         _save(session, data, 'planning_scope_frozen', status='ready',
@@ -219,6 +227,32 @@ def _advance(factory, config, source, scm, tracker, implementer, reviewer,
         max_children=session.snapshot()['limits']['max_children'], source_ids=source_ids)
     if plan.fingerprint != data['plan_fingerprint']:
         raise StateConflict('stored dependency plan changed')
+    if data.get('require_plan_approval'):
+        expected = approval_fingerprint(session.snapshot())
+        approval = data.get('plan_approval')
+        if approval is None:
+            data['plan_approval'] = {'status': 'pending', 'fingerprint': expected}
+            _save(session, data, 'plan_approval_requested', status='waiting')
+            approval = data['plan_approval']
+        if approval['fingerprint'] != expected:
+            return _save(session, data, 'plan_approval_scope_changed', status='stopped')
+        if approved_plan is not None and approved_plan != expected:
+            return _save(session, data, 'plan_approval_mismatch')
+        if (approval['status'] == 'approved' and len(data['children']) < len(plan.children)
+                and (_revision(config.root) != data['local_revision'] or
+                     scm.branch_revision(config.repository, data['source_branch']) !=
+                     data['source_revision'])):
+            return _save(session, data, 'plan_approval_stale', status='stopped')
+        if approval['status'] != 'approved':
+            if approved_plan is None:
+                return _save(session, data, 'awaiting_plan_approval')
+            if (_revision(config.root) != data['local_revision'] or
+                    scm.branch_revision(config.repository, data['source_branch']) !=
+                    data['source_revision']):
+                return _save(session, data, 'plan_approval_stale', status='stopped')
+            approval.update(status='approved', actor='local-operator')
+            _save(session, data, 'human_plan_approved', status='ready',
+                  approval_fingerprint=expected, plan_fingerprint=plan.fingerprint)
     # At most max_children iterations; topological order for external Issue links.
     for _ in range(len(plan.children)):
         remaining = [c for c in plan.children if c.id not in data['children']]

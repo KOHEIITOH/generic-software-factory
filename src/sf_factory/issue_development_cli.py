@@ -59,7 +59,9 @@ def execute_local_development(*, config_path: Path, confirmed: bool, confirm_bed
                               resume: str | None = None, review_run: str | None = None,
                               trusted_reviewers: tuple[str, ...] = (),
                               workflow_action: str | None = None,
-                              expected_fingerprint: str | None = None) -> dict:
+                              expected_fingerprint: str | None = None,
+                              require_plan_approval: bool = False,
+                              approved_plan: str | None = None) -> dict:
     """Trusted local operator entry shared by CLI and the private Web worker."""
     if confirmed is not True:
         raise ConfirmationRequired('--confirm-run')
@@ -68,7 +70,7 @@ def execute_local_development(*, config_path: Path, confirmed: bool, confirm_bed
         raise PermissionError('approved execution configuration changed')
     implementation: ModelProvider
     review: ModelProvider
-    if resume is not None:
+    if resume is not None or workflow_action == 'approve':
         implementation, review = _NoInference(), _NoInference()
     elif config.provider == 'bedrock':
         if confirm_bedrock is not True:
@@ -95,13 +97,14 @@ def execute_local_development(*, config_path: Path, confirmed: bool, confirm_bed
         from sf_factory.github_issue_tracker import GitHubIssueTracker
         from sf_factory.requirement_workflow import advance_requirements
 
-        if workflow_action not in {'plan', 'advance'}:
+        if workflow_action not in {'plan', 'advance', 'approve'}:
             raise ValueError('known workflow action required')
         adapter = GitHubIssueTracker()
         result = advance_requirements(factory=open_factory(config.data_root), config=config,
             source=task_source(config.repository), scm=adapter, tracker=adapter,
             implementer=implementation, reviewer=review, confirmed=True,
-            execute=workflow_action == 'advance', trusted_reviewers=trusted_reviewers)
+            execute=workflow_action == 'advance', trusted_reviewers=trusted_reviewers,
+            require_plan_approval=require_plan_approval, approved_plan=approved_plan)
     elif review_run is not None:
         from sf_factory.github_source_control import GitHubSourceControl
         from sf_factory.review_automation import advance_review

@@ -63,7 +63,8 @@ def run_job(root: Path, key: str, *, executor: Callable = execute_local_developm
                         confirm_bedrock=job['confirm_bedrock'],
                         expected_fingerprint=job['config_fingerprint'],
                         workflow_action=job['action'] if job['action'] != 'review' else None,
-                        review_run=job['run_id'], trusted_reviewers=tuple(job['reviewers']))
+                        review_run=job['run_id'], trusted_reviewers=tuple(job['reviewers']),
+                        require_plan_approval=True, approved_plan=job.get('approved_plan'))
                 result = public_result(result)
             except Exception:
                 # No SDK exceptions, source, config paths, stdout or secret-bearing logs in HTTP.

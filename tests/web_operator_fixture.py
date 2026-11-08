@@ -34,48 +34,74 @@ def main():
              'remedy': 'PCの認証を確認してください。'}]})
     auth = WebOperator(f'http://127.0.0.1:{port}')
     (directory / 'operator-link').write_text(auth.origin + '/#operator=' + auth.token)
-    leases = []
+    leases = {}
+    advances = []
     def spawn(store, key):
         import fcntl
+
+        from test_requirement_workflow import plan_document
+
+        from sf_factory.plan_preview import approval_fingerprint
         store.change(key, code='worker_claimed', status='running')
         lease = store.lease(key)
         fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        leases.append(lease)
+        leases[key] = lease
         session = AutomationSession(config.data_root,
             subject='requirements:' + config.repository + ':' + config.issue,
             config_fingerprint=fingerprint({'development': config.fingerprint, 'reviewers': ()}),
             limits=PLAN_LIMITS)
         state = session.snapshot()
         if not state['data']:
+            plan = plan_document()
+            plan['requirements'][0]['sources'] = ['docs/requirements.md']
             session.reserve('model', 'fixture-plan', tokens=100)
             session.complete_action('fixture-plan', {'fixture': True})
-            session.save({'requirement_sources': {
-                'mode': 'auto', 'revision': 'b' * 40, 'fingerprint': 'e' * 64,
-                'documents': [{'path': 'docs/requirements.md', 'sha256': hashlib.sha256(
-                    b'PRIVATE_REQUIREMENT_CONTENT').hexdigest(), 'bytes': 27,
-                    'reason': 'requirement_document_convention'}]},
+            data = {'require_plan_approval': True, 'source_revision': 'b' * 40,
+                'source_fingerprint': 'c' * 64, 'local_revision': 'd' * 40,
+                'parent': asdict(args['source'].fetch_issue('1')),
+                'requirement_sources': {'mode': 'auto', 'revision': 'b' * 40,
+                    'fingerprint': 'e' * 64, 'documents': [{'path': 'docs/requirements.md',
+                    'sha256': hashlib.sha256(b'PRIVATE_REQUIREMENT_CONTENT').hexdigest(),
+                    'bytes': 27, 'reason': 'requirement_document_convention'}]},
                 'planning_review': {'report': {'requirements_status': 'ready',
-                    'interpretation': 'PRIVATE_INTERPRETATION', 'source_assessments': [
-                        {'source_id': 'issue', 'status': 'supporting', 'reason': 'PRIVATE_REASON'},
-                        {'source_id': 'docs/requirements.md', 'status': 'requirements',
-                         'reason': 'PRIVATE_REASON'}]}},
-                'plan': {'requirements': [{'id': 'addition', 'sources': ['docs/requirements.md']}],
-                         'children': [{'id': 'first', 'requirement_ids': ['addition']}]},
-                'children': {'first': {'status': 'pr_open', 'run_id': 'd' * 32,
-                'issue': {'external_id': '2', 'external_url': 'https://github.com/fixture/repo/issues/2'},
-                'pull_request': {'url': 'https://github.com/fixture/repo/pull/1'}},
-                'second': {'status': 'pending', 'issue': {'external_id': '3'}}}},
-                expected_version=session.snapshot()['version'], status='waiting',
-                decision='child_pr_submitted')
-        if len(leases) > 1:
+                    'interpretation': '加算APIを維持し、受入条件を確認する2単位に分割します。',
+                    'source_assessments': [{'source_id': 'issue', 'status': 'supporting',
+                        'reason': 'PRIVATE_REASON'}, {'source_id': 'docs/requirements.md',
+                        'status': 'requirements', 'reason': 'PRIVATE_REASON'}]}},
+                'plan': plan, 'plan_fingerprint': fingerprint(plan), 'children': {}}
+            session.save(data, expected_version=session.snapshot()['version'])
+            data['plan_approval'] = {'status': 'pending',
+                                    'fingerprint': approval_fingerprint(session.snapshot())}
+            session.save(data, expected_version=session.snapshot()['version'], status='waiting',
+                         decision='plan_approval_requested')
+        data = session.snapshot()['data']
+        action = store.get(key)['action']
+        reason = 'awaiting_plan_approval'
+        if action == 'approve':
+            data['plan_approval']['status'] = 'approved'
+            data['children'] = {
+                'first': {'status': 'pending', 'issue': {'external_id': '2',
+                    'external_url': 'https://github.com/fixture/repo/issues/2'}},
+                'second': {'status': 'pending', 'issue': {'external_id': '3'}}}
+            reason = 'plan_ready'
+        elif data['plan_approval']['status'] == 'approved' and action == 'advance':
+            advances.append(key)
+            data['children']['first'].update(status='pr_open', run_id='d' * 32,
+                pull_request={'url': 'https://github.com/fixture/repo/pull/1'})
+            reason = ('child_pr_submitted' if len(advances) == 1 else
+                      'child_awaiting_review_or_merge')
+        session.save(data, expected_version=session.snapshot()['version'], status='waiting',
+                     decision=reason)
+        if action != 'advance' or not advances or len(advances) > 1:
             store.change(key, code='worker_step_finished', status='finished',
-                         result={'status': 'waiting', 'reason': 'child_awaiting_review_or_merge'})
-            os.close(lease)
+                         result={'status': 'waiting', 'reason': reason})
+            os.close(leases.pop(key))
     patch.setattr(WebJobs, 'spawn', spawn)
-    # Stop acknowledgement is simulated; no worker/model/SCM/container is started.
     original_stop = WebJobs.stop
     def stop(store, key):
         original_stop(store, key)
+        if key in leases:
+            os.close(leases.pop(key))
         return store.change(key, code='worker_step_finished', status='stopped',
                             result={'status': 'stopped', 'reason': 'operator_or_execution_stopped'})
     patch.setattr(WebJobs, 'stop', stop)
