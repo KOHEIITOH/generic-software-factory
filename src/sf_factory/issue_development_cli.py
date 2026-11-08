@@ -52,7 +52,8 @@ def load_config(path: Path) -> DevelopmentConfig:
 
 
 def run_local_development(*, config_path: Path, confirmed: bool, confirm_bedrock: bool,
-                          resume: str | None) -> int:
+                          resume: str | None, review_run: str | None = None,
+                          trusted_reviewers: tuple[str, ...] = ()) -> int:
     # No provider/network/file state initialization before explicit operator consent.
     if confirmed is not True:
         print(json.dumps({'status': 'confirmation_required', 'required': '--confirm-run'}))
@@ -86,11 +87,20 @@ def run_local_development(*, config_path: Path, confirmed: bool, confirm_bedrock
         from sf_factory.factory_selection import open_factory
         from sf_factory.integration_defaults import source_control, task_source
 
-        result = develop_issue(factory=open_factory(config.data_root), config=config,
-            source=task_source(config.repository), scm=source_control(),
-            implementer=implementation, reviewer=review, confirmed=True, resume=resume)
+        if review_run is not None:
+            from sf_factory.github_source_control import GitHubSourceControl
+            from sf_factory.review_automation import advance_review
+
+            result = advance_review(factory=open_factory(config.data_root), config=config,
+                source=task_source(config.repository), scm=GitHubSourceControl(),
+                implementer=implementation, reviewer=review, confirmed=True,
+                initial_run=review_run, trusted_reviewers=trusted_reviewers)
+        else:
+            result = develop_issue(factory=open_factory(config.data_root), config=config,
+                source=task_source(config.repository), scm=source_control(),
+                implementer=implementation, reviewer=review, confirmed=True, resume=resume)
         print(json.dumps(result))
-        return 0
+        return 1 if result['status'] == 'stopped' else 0
     except DevelopmentStopped as exc:
         print(json.dumps({'status': 'stopped', 'run_id': exc.run_id, 'reason': str(exc)}))
         return 1

@@ -387,6 +387,13 @@ class GitHubSourceControl:
         result.validate()
         return result
 
+    def authenticated_actor(self) -> str:
+        value = self._request('/user')
+        login = value.get('login') if isinstance(value, dict) else None
+        if not isinstance(login, str) or not re.fullmatch(r'[A-Za-z0-9_\[\]-]{1,128}', login):
+            raise SourceControlError('invalid_response', 'authenticated actor required')
+        return login
+
     def pull_request_snapshot(self, repository: str, external_id: str):
         from sf_factory.collaboration_contracts import (
             PullRequestSnapshot,
