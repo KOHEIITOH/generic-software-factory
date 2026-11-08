@@ -16,6 +16,13 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("doctor", help="check local prerequisites")
     web = sub.add_parser("web", help="start the local dashboard (builds UI if needed)")
     web.add_argument("--rebuild", action="store_true", help="rebuild frontend assets")
+    operator = sub.add_parser("operator", help="manage locally approved Web execution profiles")
+    op = operator.add_subparsers(dest="operator_command", required=True)
+    register = op.add_parser("register")
+    register.add_argument("--config", type=Path, required=True)
+    register.add_argument("--name", required=True)
+    revoke = op.add_parser("revoke")
+    revoke.add_argument("profile_id")
     issue = sub.add_parser("issue", help="explicit local Issue development controller")
     issue_sub = issue.add_subparsers(dest="issue_command", required=True)
     develop = issue_sub.add_parser("develop")
@@ -99,6 +106,21 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
+    if args.command == "operator":
+        from sf_factory.factory_selection import data_directory
+        from sf_factory.web_operator import OperatorProfiles
+
+        try:
+            profiles = OperatorProfiles(data_directory())
+            if args.operator_command == "register":
+                print(json.dumps(profiles.register(args.config, args.name)))
+            else:
+                profiles.revoke(args.profile_id)
+                print(json.dumps({"status": "revoked", "profile_id": args.profile_id}))
+            return 0
+        except Exception:
+            print(json.dumps({"status": "blocked", "reason": "operator profile validation failed"}))
+            return 2
     if args.command == "issue":
         from sf_factory.issue_development_cli import run_local_development
 
