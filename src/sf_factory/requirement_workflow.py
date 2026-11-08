@@ -19,7 +19,17 @@ from sf_factory.issue_development import (
     execution_readiness,
 )
 from sf_factory.model_provider import ModelProvider
-from sf_factory.requirement_plan import PlanChild, parse_plan, propose_plan
+from sf_factory.requirement_plan import (
+    PlanChild,
+    RequirementPlanningError,
+    parse_plan,
+    propose_plan,
+)
+from sf_factory.requirement_sources import (
+    RequirementSourceError,
+    discover_requirement_sources,
+    verify_requirement_sources,
+)
 from sf_factory.review_automation import _save, advance_review
 from sf_factory.source_control import SourceControlError
 from sf_factory.state_store import StateConflict, StatePermissionDenied
@@ -30,22 +40,34 @@ from sf_factory.task_sources import ExternalIssue, TaskSourceAdapter
 PLAN_LIMITS = AutomationLimits(max_model_calls=32, max_tokens=6000000)
 
 
-def child_scope(config: DevelopmentConfig, child: PlanChild, external_id: str) -> DevelopmentConfig:
+def child_scope(config: DevelopmentConfig, child: PlanChild, external_id: str,
+                requirement_sources: dict | None = None) -> DevelopmentConfig:
     validation = validate_harness(config.root)
     applicable = set()
     for candidate in validation.discovery.candidates:
         scope = PurePosixPath(candidate.scope).parts
         if any(PurePosixPath(path).parts[:len(scope)] == scope for path in child.allowed_paths):
             applicable.add(candidate.path)
+    paths = (tuple(d['path'] for d in requirement_sources['documents'])
+             if requirement_sources else ())
+    pins = dict(config.context_hashes)
+    if requirement_sources:
+        pins.update((d['path'], d['sha256']) for d in requirement_sources['documents'])
     return replace(config, issue=external_id, allowed_paths=child.allowed_paths,
+        context_paths=tuple(dict.fromkeys((*config.context_paths, *paths))),
+        context_hashes=tuple(pins.items()),
         checks=tuple(c for c in config.checks if c.id in child.check_ids),
         selected_harness=tuple(p for p in config.selected_harness if p in applicable),
         excluded_harness=tuple((p, r) for p, r in config.excluded_harness if p in applicable))
 
 
 def child_content(plan_hash: str, child: PlanChild, parent: ExternalIssue,
-                  children: dict) -> tuple[str, str, str]:
-    marker_scope = fingerprint({'plan': plan_hash, 'parent': asdict(parent)})
+                  children: dict, requirement_sources: dict | None = None,
+                  requirements: tuple = ()) -> tuple[str, str, str]:
+    marker_subject = {'plan': plan_hash, 'parent': asdict(parent)}
+    if requirement_sources is not None:
+        marker_subject['sources_fingerprint'] = requirement_sources['fingerprint']
+    marker_scope = fingerprint(marker_subject)
     marker = '<!-- sf-child:' + marker_scope + ':' + child.id + ' -->'
     dependencies = [children[key]['issue']['external_url'] for key in child.depends_on]
     body = marker + '\n\nParent: ' + (parent.external_url or parent.external_id)
@@ -54,6 +76,12 @@ def child_content(plan_hash: str, child: PlanChild, parent: ExternalIssue,
     body += '\n\nRequirement IDs: ' + ', '.join(child.requirement_ids)
     body += '\nApproved paths: ' + ', '.join(child.allowed_paths)
     body += '\nApproved checks: ' + ', '.join(child.check_ids)
+    if requirement_sources is not None:
+        cited = sorted({p for r in requirements if r.id in child.requirement_ids
+                        for p in r.sources})
+        body += '\nRequirement sources: ' + ', '.join(cited)
+        body += '\nSource revision: ' + requirement_sources['revision']
+        body += '\nSources fingerprint: ' + requirement_sources['fingerprint']
     if dependencies:
         body += '\nDepends on merged PRs for:\n' + '\n'.join('- ' + d for d in dependencies)
     return child.title, body, marker
@@ -96,6 +124,9 @@ def advance_requirements(*, factory: Factory, config: DevelopmentConfig,
                               max_output_tokens=32768),
                 BudgetedModel(reviewer, session, role='workflow-review', max_output_tokens=32768),
                 session, execute, trusted_reviewers)
+        except (RequirementSourceError, RequirementPlanningError) as exc:
+            return _save(session, session.snapshot()['data'], exc.code, status='stopped',
+                         **getattr(exc, 'facts', {}))
         except Exception as exc:
             current = session.snapshot()
             unknown_model = any(a['kind'] == 'model' and a['status'] == 'pending'
@@ -120,6 +151,7 @@ def advance_requirements(*, factory: Factory, config: DevelopmentConfig,
 def _advance(factory, config, source, scm, tracker, implementer, reviewer,
              session, execute, trusted_reviewers):
     data = session.snapshot()['data']
+    fresh = not data
     if not data:
         if execute:
             execution_readiness(config)
@@ -135,29 +167,56 @@ def _advance(factory, config, source, scm, tracker, implementer, reviewer,
         verify_remote_harness(config.root, remote)
         if remote.repository != config.repository or remote.revision != revision:
             raise StateConflict('planning source differs from repository revision')
-        paths = set((*config.selected_harness, *config.context_paths, *config.allowed_paths))
+        selected_sources = discover_requirement_sources(remote, explicit=config.context_paths,
+            reference_slots=32 - len(config.selected_harness))
+        discovered_hashes = {d.path: d.sha256 for d in selected_sources.documents}
+        if any(discovered_hashes.get(p) != digest for p, digest in config.context_hashes):
+            raise RequirementSourceError('requirements_source_changed', {})
+        paths = set((*config.selected_harness, *config.allowed_paths,
+                     *(d.path for d in selected_sources.documents)))
         context = {f.path: f.content.decode('utf-8') for f in remote.files if f.path in paths}
         if len(json.dumps(context, ensure_ascii=True)) > 65536:
-            raise ValueError('planning source context exceeds budget')
+            raise RequirementSourceError('requirements_context_limit', {
+                'source_count': len(selected_sources.documents),
+                'sources_fingerprint': selected_sources.fingerprint})
         data = {'parent': asdict(parent), 'phase': 'planning', 'children': {},
                 'source_revision': revision, 'source_fingerprint': remote.fingerprint,
-                'repository_context': context}
-        _save(session, data, 'planning_scope_frozen', status='ready')
+                'source_branch': info.default_branch,
+                'repository_context': context,
+                'requirement_sources': selected_sources.document()}
+        _save(session, data, 'planning_scope_frozen', status='ready',
+              requirement_mode=selected_sources.mode,
+              source_count=len(selected_sources.documents),
+              sources_fingerprint=selected_sources.fingerprint)
     parent = ExternalIssue(**data['parent'])
     # An edited requirement cannot silently change the frozen dependency plan.
     if asdict(source.fetch_issue(config.issue)) != data['parent']:
         return _save(session, data, 'parent_requirement_changed', status='stopped')
     if data['phase'] == 'planning':
+        sources = data.get('requirement_sources')
+        if not fresh and sources is not None:
+            revision = scm.branch_revision(config.repository, data['source_branch'])
+            if revision != data['source_revision']:
+                verify_requirement_sources(sources, scm.read_revision(config.repository, revision))
         # Prompts are deterministic and completed model receipts are reusable.
         # A pending unknown model reservation cannot be replayed by BudgetedModel.
+        def record_review(report):
+            data['planning_review'] = report
+            _save(session, data, 'requirements_interpreted', status='ready',
+                  requirement_status=report['report'].get('requirements_status',
+                                                         report['report'].get('status')))
         plan = propose_plan(parent.prompt, config, implementer, reviewer,
                             max_children=session.snapshot()['limits']['max_children'],
-                            repository_context=data['repository_context'])
+                            repository_context=data['repository_context'],
+                            requirement_sources=data.get('requirement_sources'),
+                            on_review=record_review)
         data.update(plan=asdict(plan), plan_fingerprint=plan.fingerprint, phase='children')
         _save(session, data, 'plan_independently_reviewed', status='ready',
               plan_fingerprint=plan.fingerprint, children=len(plan.children))
+    sources = data.get('requirement_sources')
+    source_ids = ('issue', *(d['path'] for d in sources['documents'])) if sources else None
     plan = parse_plan(json.dumps(data['plan']), config,
-                      max_children=session.snapshot()['limits']['max_children'])
+        max_children=session.snapshot()['limits']['max_children'], source_ids=source_ids)
     if plan.fingerprint != data['plan_fingerprint']:
         raise StateConflict('stored dependency plan changed')
     # At most max_children iterations; topological order for external Issue links.
@@ -166,7 +225,8 @@ def _advance(factory, config, source, scm, tracker, implementer, reviewer,
         if not remaining:
             break
         child = next(c for c in remaining if set(c.depends_on) <= set(data['children']))
-        title, body, marker = child_content(plan.fingerprint, child, parent, data['children'])
+        title, body, marker = child_content(plan.fingerprint, child, parent, data['children'],
+                                            sources, plan.requirements)
         key = 'issue:' + child.id
         action = session.snapshot()['actions'].get(key)
         found = tracker.find_issue(config.repository, marker)
@@ -221,7 +281,7 @@ def _advance(factory, config, source, scm, tracker, implementer, reviewer,
         if current_issue.external_id not in {i.external_id for i in
                 tracker.child_issues(config.repository, config.issue)}:
             return _save(session, data, 'child_parent_link_changed', status='stopped')
-        scoped = child_scope(config, active, item['issue']['external_id'])
+        scoped = child_scope(config, active, item['issue']['external_id'], sources)
         if item['status'] == 'executing':
             return _save(session, data, 'child_execution_outcome_unknown', status='stopped')
         if item['status'] == 'delivery_pending':
@@ -256,10 +316,12 @@ def _advance(factory, config, source, scm, tracker, implementer, reviewer,
     linked = tracker.child_issues(config.repository, config.issue)
     if exact.external_id not in {i.external_id for i in linked}:
         return _save(session, data, 'child_parent_link_changed', status='stopped')
-    scoped = child_scope(config, child, exact.external_id)
+    scoped = child_scope(config, child, exact.external_id, sources)
     info = scm.describe_repository(config.repository)
     revision = scm.branch_revision(config.repository, info.default_branch)
     remote = scm.read_revision(config.repository, revision)
+    if sources is not None:
+        verify_requirement_sources(sources, remote)
     session.reserve('round', 'develop:' + child.id, unit=child.id)
     session.reserve('write', 'delivery:' + child.id)
     item['status'] = 'executing'

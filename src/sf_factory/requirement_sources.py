@@ -15,7 +15,8 @@ MAX_DOCUMENT_BYTES = 24576
 MAX_TOTAL_BYTES = 49152
 _OMIT = _IGNORED | {'adr', 'decisions', 'archive', 'archives', 'history', 'historical',
                    'examples', 'generated', 'fixtures', 'test', 'tests'}
-_ROOTS = {'docs', 'doc', 'requirements', 'spec', 'specs', 'specifications', '要件', '仕様'}
+_GENERAL_ROOTS = {'docs', 'doc', 'documentation'}
+_ROOTS = _GENERAL_ROOTS | {'requirements', 'spec', 'specs', 'specifications', '要件', '仕様'}
 _TOPIC = re.compile(r'(?:^|[-_. ])(?:requirements?|specs?|specifications?|prd|design|'
                     r'architecture|overview)(?:$|[-_. ])', re.IGNORECASE)
 
@@ -60,7 +61,8 @@ def _candidate(path: str) -> str | None:
     if len(parts) > 4 or set(lower[:-1]) & _OMIT:
         return None
     file = PurePosixPath(lower[-1])
-    if file.suffix not in {'.md', '.rst', '.txt'}:
+    if file.suffix not in {'.md', '.markdown', '.rst', '.txt'} and not (
+            len(parts) == 1 and file.name == 'readme'):
         return None
     stem = file.stem
     if len(parts) == 1 and re.fullmatch(r'readme(?:[._-][a-z]{2}(?:[-_][a-z]{2})?)?', stem):
@@ -70,7 +72,7 @@ def _candidate(path: str) -> str | None:
     if len(parts) == 1 and topic and lower[-1] != 'requirements.txt':
         return 'root_requirement_document'
     if lower[0] in _ROOTS:
-        if (topic or stem == 'readme' or any(p in _ROOTS - {'docs', 'doc'} for p in lower[:-1])
+        if (topic or stem == 'readme' or any(p in _ROOTS - _GENERAL_ROOTS for p in lower[:-1])
                 or any(_TOPIC.search(p) for p in lower[1:-1])):
             return 'requirement_document_convention'
     return None

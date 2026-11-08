@@ -299,3 +299,13 @@ PR #97でCoreのorigin/source規則をAdapterへ、PR #98でDraft PRデモのRES
 利用・復旧と受入範囲は[Web実行](local-web-execution.md)およびADR 0043〜0045を参照。
 Chromiumの画面操作と必須Docker worker試験ではAI/SCMを模擬する。PCでの実Bedrock/GitHub
 E2E、複数利用者公開サービス、ECS/S3/分散workerは未完了として維持する。
+
+## 要件資料の任意指定・自動検出（2026-11-08）
+
+[#124](https://github.com/KOHEIITOH/generic-software-factory/pull/124) で検証済みsourceの
+候補検出と内容固定を追加。context_pathsを指定した場合は優先、省略/空では既知のREADME・
+要件/仕様/設計候補を読む。要件IDに出典を付け、独立レビューで十分さ・矛盾・資料の役割を判断し、
+子Issueと実装/レビューへ同じ参照を伝える。出典と判断は既存journal、Webはメタデータを表示する。
+不足/矛盾を検出した場合や資料変更/上限では停止する。既存の凍結済み計画は再適用しない。
+[仕様と上限](requirement-discovery.md)およびADR 0046/0047を参照。
+AI/SCMを模擬した実保存・Docker・ブラウザ検証と、PCでの実サービスE2E未確認は区別する。

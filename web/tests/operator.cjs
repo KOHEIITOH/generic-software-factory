@@ -58,6 +58,11 @@ const net = require('node:net');
     assert.equal(requests[0].request_id, requests[1].request_id, 'Unknown response must reuse nonce');
     assert.equal(await panel.getByRole('link', { name: 'PR ↗', exact: true }).count(), 1);
     assert((await panel.innerText()).includes('残り 31'));
+    await panel.getByText('参照した要件資料・分割の根拠', { exact: true }).click();
+    await panel.getByText('docs/requirements.md', { exact: true }).waitFor();
+    assert((await panel.innerText()).includes('addition: docs/requirements.md → first'));
+    assert(!(await panel.innerText()).includes('PRIVATE_'));
+    assert((await panel.innerText()).includes('SHA256:'));
     await page.reload();
     await panel.getByRole('button', { name: '停止を要求', exact: true }).waitFor();
     assert.equal(await advance.isEnabled(), false, 'Active job must prevent another submission');
@@ -84,7 +89,7 @@ const net = require('node:net');
     await panel.getByRole('button', { name: '操作権限を閉じる' }).click();
     await panel.getByText('操作権限がありません。', { exact: false }).waitFor();
     assert.deepEqual(pageErrors, []);
-    console.log('Operator browser checks passed: consent, fragment, idempotent retry, progress, stop, reload/resume, budgets, mobile, unauthorized access, logout.');
+    console.log('Operator browser checks passed: consent, fragment, idempotent retry, progress, requirement source metadata/citations, stop, reload/resume, budgets, mobile, unauthorized access, logout.');
   } finally {
     if (browser) await browser.close();
     if (server.exitCode === null) {

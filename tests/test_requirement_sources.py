@@ -111,3 +111,10 @@ def test_content_hash_cannot_grant_a_new_path_or_accept_changed_source(flow):
     correct = replace(wrong, context_hashes=(('AGENTS.md', hashlib.sha256(
         (config.root / 'AGENTS.md').read_bytes()).hexdigest()),))
     assert develop_issue(**{**flow, 'config': correct})['status'] == 'draft_pr_created'
+
+
+def test_extensionless_readme_and_documentation_conventions_are_supported():
+    selected = discover_requirement_sources(source({'README': b'project overview',
+        'documentation/specification.markdown': b'approved requirements',
+        'documentation/install.md': b'not automatically selected'}))
+    assert selected.source_ids == ('issue', 'README', 'documentation/specification.markdown')

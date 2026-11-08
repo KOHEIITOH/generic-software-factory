@@ -79,3 +79,9 @@ Issue作成・関連付け・branch更新の結果不明はreadbackだけで照�
 判断の証跡は `SF_DATA_DIR/automation-v1/<session_id>/state.json` の `decisions`、
 実装根拠は既存Run・source snapshot・check/review evidenceに保存します。
 CLI出力のreasonとsession_idから確認できます。通常の設計判断で追加質問はしません。
+
+## 要件資料の自動検出
+
+`context_paths` を指定すれば優先し、省略/空ならREADME・要件/仕様文書の候補を探します。
+不足・矛盾を検知した場合は子Issue作成前に停止し、出典・解釈・分割の根拠を保存します。
+上限と根拠の確認方法は[要件資料の検出](requirement-discovery.md)を参照してください。

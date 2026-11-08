@@ -100,7 +100,8 @@ class OperatorProfiles:
                 _, config = self.get(p['id'])
                 row.update(available=True, repository=config.repository, issue=config.issue,
                     provider=config.provider, allowed_paths=list(config.allowed_paths),
-                    checks=[c.id for c in config.checks],
+                    checks=[c.id for c in config.checks], context_paths=list(config.context_paths),
+                    requirement_mode='explicit' if config.context_paths else 'auto',
                     project=config.project_harness.project if config.project_harness else None)
             except (OSError, ValueError, StateConflict):
                 row.update(available=False)

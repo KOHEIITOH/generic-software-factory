@@ -111,6 +111,7 @@ File Adapterを自動選択し、Issue参照・Project/Repository・Runの結果
 Harness承認・prepared RunもFile保存に対応。source snapshot・品質/レビュー証跡もFile対応です。ローカルCLIには実装・挙動テスト・独立レビュー・Draft PR配送を接続しています。実サービスでの最終通し試験はPCで未確認です。
 要件の子Issue分割・同じPRへの有限レビュー修正・Project/Repository/directory Harnessは
 [有限Issueワークフロー](docs/bounded-issue-workflow.md)を参照してください。
+要件資料は[明示指定または自動検出](docs/requirement-discovery.md)でき、出典と分割の根拠を記録します。
 Webからの実行・再開・停止は[ローカルWeb実行](docs/local-web-execution.md)で初回登録と操作を説明します。
 
 ## 現在のステータス

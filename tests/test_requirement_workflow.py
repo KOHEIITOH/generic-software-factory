@@ -18,7 +18,8 @@ from sf_factory.task_sources import ExternalIssue
 
 
 def plan_document():
-    return {'schema_version': 1, 'requirements': [{'id': 'addition', 'text': 'Add two numbers'}],
+    return {'schema_version': 1, 'requirements': [{'id': 'addition', 'text': 'Add two numbers',
+        'sources': ['issue']}],
         'children': [{'id': key, 'title': 'Implement ' + key, 'goal': 'Preserve addition API',
             'requirement_ids': ['addition'], 'acceptance': ['add(2,3) returns 5'],
             'allowed_paths': ['app.py'], 'check_ids': ['addition'], 'depends_on': deps}
@@ -34,6 +35,15 @@ class WorkflowModel(Model):
                 result = {'schema_version': 1, 'plan_fingerprint': data['plan_fingerprint'],
                     'complete': True, 'completable': True, 'scope_valid': True,
                     'dependencies_valid': True, 'findings': []}
+                if 'requirement_sources' in data:
+                    sources = data['requirement_sources']
+                    cited = {p for r in data['plan']['requirements'] for p in r.get('sources', [])}
+                    result.update(sources_fingerprint=sources['fingerprint'],
+                        requirements_status='ready', concerns=[],
+                        interpretation='Implement the addition requirement within approved scope.',
+                        source_assessments=[{'source_id': p, 'status': 'requirements'
+                            if p in cited else 'supporting', 'reason': 'Fixture assessed source'}
+                            for p in ['issue', *(d['path'] for d in sources['documents'])]])
             else:
                 result = plan_document()
         elif 'scope' in data:

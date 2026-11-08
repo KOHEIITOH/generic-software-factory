@@ -134,3 +134,6 @@ journalを消す・別data rootに変える方法で再送を強制しない。
 [Web operator操作](local-web-execution.md)も同じcontrollerへ接続済み。
 品質失敗を無制限に修正するloop、分散Worker、S3永続化は未実装。
 成功したDraft PRも人間が変更全体と必要な回帰チェックをレビューしてから扱う。
+
+要件分割の `issue plan` / `issue advance` は[要件資料の自動検出](requirement-discovery.md)に対応します。
+単独の `issue develop` は従来の明示contextを使うため、分割と自動検出はplan/advanceから始めてください。

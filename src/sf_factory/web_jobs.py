@@ -200,7 +200,23 @@ class WebJobs:
                 'issue_url': value['issue'].get('external_url'), 'status': value['status'],
                 'run_id': value.get('run_id'),
                 'pr_url': value.get('pull_request', {}).get('url')})
+        sources = data.get('requirement_sources')
+        source_summary = None
+        if sources is not None:
+            report = data.get('planning_review', {}).get('report', {})
+            source_summary = {k: sources[k] for k in
+                ('mode', 'revision', 'fingerprint', 'documents')}
+            source_summary['review_status'] = report.get(
+                'requirements_status', report.get('status'))
+            source_summary['assessments'] = [{'source_id': a['source_id'], 'status': a['status']}
+                for a in report.get('source_assessments', [])]
+            source_summary['requirements'] = [
+                {'id': r['id'], 'sources': r.get('sources', []), 'children': [c['id']
+                    for c in data.get('plan', {}).get('children', [])
+                    if r['id'] in c['requirement_ids']]}
+                for r in data.get('plan', {}).get('requirements', [])]
         return {'id': self.get(key)['session_id'], 'status': state['status'],
                 'counts': state['counts'], 'limits': state['limits'], 'rounds': state['rounds'],
                 'expires_at': state['expires_at'], 'children': children,
+                'requirement_sources': source_summary,
                 'decisions': [{'at': d['at'], 'code': d['code']} for d in state['decisions'][-20:]]}

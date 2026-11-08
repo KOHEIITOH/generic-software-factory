@@ -68,3 +68,9 @@ DBは不要、現段階ではPOSIXローカル保存先を使います。複数�
 
 検証では実HTTP/保存とChromium、実Docker workerケースを使用し、AI/SCMは模擬します。
 Bedrock＋GitHubの実サービス最終通し確認は、引き続き利用者のPCで行います。
+
+## 要件資料の自動検出
+
+`context_paths` を指定すれば優先し、省略/空ならREADME・要件/仕様文書の候補を探します。
+不足・矛盾を検知した場合は子Issue作成前に停止し、出典・解釈・分割の根拠を保存します。
+上限と根拠の確認方法は[要件資料の検出](requirement-discovery.md)を参照してください。
