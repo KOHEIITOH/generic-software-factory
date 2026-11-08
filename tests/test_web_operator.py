@@ -119,3 +119,13 @@ def test_real_browser_same_origin_get_without_origin_header_uses_cookie():
         assert response.status_code == 200
         assert client.get('/api/operator/profiles', headers={
             'sec-fetch-site': 'cross-site', 'x-sf-operator': '1'}).status_code == 403
+
+
+def test_reopening_operator_link_rotates_same_browser_without_leaking_session_slots():
+    auth = WebOperator(ORIGIN)
+    with TestClient(operator_app(auth), base_url=ORIGIN) as client:
+        for _ in range(20):
+            assert client.post('/api/operator/session', headers={**HEADERS,
+                'authorization': 'Bearer ' + auth.token}).status_code == 200
+        assert len(auth._sessions) == 1
+        assert client.get('/api/operator/profiles', headers=HEADERS).status_code == 200

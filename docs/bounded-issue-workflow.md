@@ -1,8 +1,8 @@
 # 要件分割・レビュー修正・Harnessの利用
 
 PCのDockerとBedrock認証を使うローカルCLIの経路です。Webは従来どおり
-`uv run sf web --rebuild` で起動できますが、以下の実行をWebから起動する
-operator認証・ボタンは未実装です。実サービスの最終通し確認はPCで行います。
+`uv run sf web --rebuild` で起動し、[Web実行操作](local-web-execution.md)からも
+同じWorkflowを進められます。実サービスの最終通し確認はPCで行います。
 
 ## 準備
 

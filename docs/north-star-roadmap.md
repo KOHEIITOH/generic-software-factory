@@ -11,7 +11,7 @@
 | --- | --- | --- |
 | M1 Harness | Discovery/Validation/選択/承認/Run固定、Project共通＋Repository＋変更directoryを接続 | 生成・継続評価・改善の全自動化 |
 | M2 安全な実行 | FileでDB不要、exact source snapshot、offline Docker、実check/review証跡、durable配送 | 分散Worker、全実行形態の復旧・クラウド実行 |
-| M3 Issue→Draft PR | Bedrock/Copilot text adapterとローカルCLI、有限の同一PR修正、子Issue DAGの直列実行・merge照合 | PCのBedrock＋GitHubで実サービス通し確認。Web実行operator認証/UI |
+| M3 Issue→Draft PR | Bedrock/Copilot text adapterとローカルCLI、有限の同一PR修正、子Issue DAGの直列実行・merge照合 | PCのBedrock＋GitHubで実サービス通し確認。複数利用者・分散実行 |
 | M4 開発基盤 | 既存Project/Web/Adapter境界を再利用 | 並列処理、複数利用者認可、監視・コスト可視化 |
 | M5 自律Factory | 要件分割・受入条件・外部子Issueの最小経路を接続 | 複数repo統合、承認付きrelease、継続的Harness改善 |
 
@@ -289,3 +289,13 @@ PR #97でCoreのorigin/source規則をAdapterへ、PR #98でDraft PRデモのRES
 独立Taskの管理・保存・旧API/CLIは削除済み。外部Issue参照へRun・承認・証跡を直接関連付け、
 各Runに要件snapshotを固定する。旧形式の移行は行わず、新しい保存先で開始する。
 詳細は[外部Issueモデル](external-issue-model.md)を参照。M3の実サービス最終通し試験は引き続きPCで未確認。
+
+## ローカルWebの実行操作（2026-11-08）
+
+ローカルoperator認証と登録設定、専用workerによる有限実行、停止要求、leaseによる中断検出、
+既存journalへ接続する再開、子Issue/PR/予算/判断理由の表示を接続した。
+[#121](https://github.com/KOHEIITOH/generic-software-factory/pull/121) は操作権限、
+[#122](https://github.com/KOHEIITOH/generic-software-factory/pull/122) は永続worker/API。
+利用・復旧と受入範囲は[Web実行](local-web-execution.md)およびADR 0043〜0045を参照。
+Chromiumの画面操作と必須Docker worker試験ではAI/SCMを模擬する。PCでの実Bedrock/GitHub
+E2E、複数利用者公開サービス、ECS/S3/分散workerは未完了として維持する。

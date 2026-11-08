@@ -142,7 +142,8 @@ class WebJobs:
             state = self._read(fd)
             self._reconcile(state)
             write_document(fd, state)
-            return list(reversed(list(state['jobs'].values())))
+            return sorted(state['jobs'].values(),
+                          key=lambda job: (job['created_at'], job['id']), reverse=True)
 
     def get(self, key: str) -> dict:
         if not re.fullmatch('[a-f0-9]{32}', key):

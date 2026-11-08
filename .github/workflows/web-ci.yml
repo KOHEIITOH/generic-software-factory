@@ -5,10 +5,14 @@ on:
     branches: [main, "feat/**"]
     paths:
       - "web/**"
+      - "src/sf_factory/web_*.py"
+      - "tests/web_operator_fixture.py"
       - ".github/workflows/web-ci.yml"
   pull_request:
     paths:
       - "web/**"
+      - "src/sf_factory/web_*.py"
+      - "tests/web_operator_fixture.py"
       - ".github/workflows/web-ci.yml"
 
 permissions:
@@ -17,6 +21,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: web
@@ -29,3 +34,14 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Type check and build
         run: npm run build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@v6
+      - name: Install browser fixture dependencies
+        run: uv sync --extra dev --extra web
+        working-directory: .
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Exercise operator browser controls
+        run: npm run test:operator
