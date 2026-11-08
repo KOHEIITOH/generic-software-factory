@@ -104,6 +104,8 @@ def parse_plan(text: str, config: DevelopmentConfig, *, max_children: int,
         if (not set(refs) <= ids or not set(paths) <= set(config.allowed_paths)
                 or not set(checks) <= {c.id for c in config.checks}):
             raise ValueError('child expands requirement/check/path scope')
+        if source_ids is not None and set(paths) & (set(source_ids) - {'issue'}):
+            raise RequirementPlanningError('requirements_reference_write_conflict')
         for criterion in acceptance:
             _text(criterion, 1000)
         deps = row['depends_on']

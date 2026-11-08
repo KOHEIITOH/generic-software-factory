@@ -118,3 +118,15 @@ def test_extensionless_readme_and_documentation_conventions_are_supported():
         'documentation/specification.markdown': b'approved requirements',
         'documentation/install.md': b'not automatically selected'}))
     assert selected.source_ids == ('issue', 'README', 'documentation/specification.markdown')
+
+
+def test_implementation_cannot_rewrite_a_hash_frozen_reference(flow):
+    from sf_factory.issue_development import DevelopmentStopped
+    config = flow['config']
+    before = (config.root / 'app.py').read_bytes()
+    config = replace(config, context_paths=('app.py',),
+                     context_hashes=(('app.py', hashlib.sha256(before).hexdigest()),))
+    with pytest.raises(DevelopmentStopped):
+        develop_issue(**{**flow, 'config': config})
+    assert flow['implementer'].calls == 1
+    assert flow['reviewer'].calls == flow['scm'].writes == 0

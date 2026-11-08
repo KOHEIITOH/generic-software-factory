@@ -283,6 +283,8 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
                         json.dumps(review_feedback) if review_feedback else ''),
                     reference_paths=references,
                     project_harness=config.project_harness)
+                if {c.path for c in proposal.changes} & dict(config.context_hashes).keys():
+                    raise StatePermissionDenied('frozen requirement references are read-only')
                 producer = implementation.identity()
                 value.update(proposal={'schema_version': 1, **asdict(proposal)}, phase='proposed',
                              implementer=producer,

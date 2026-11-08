@@ -258,3 +258,22 @@ def test_changed_documents_are_rechecked_before_resuming_unpublished_planning(
     calls = args['implementer'].calls
     assert advance_requirements(**args)['reason'] == 'requirements_source_changed'
     assert args['implementer'].calls == calls and args['tracker'].creates == 0
+
+
+def test_requirement_references_cannot_become_child_write_targets(requirement_flow):
+    args = requirement_flow
+    install_documents(args, {'docs/requirements.md': b'Fixed requirement source'})
+    args['config'] = replace(args['config'], allowed_paths=('app.py', 'docs/requirements.md'))
+    class WritesRequirement(ObservedModel):
+        def generate(self, prompt):
+            response = super().generate(prompt)
+            data = json.loads(prompt.split('\n', 1)[1])
+            if 'max_children' in data and 'plan' not in data:
+                report = json.loads(response.text)
+                report['children'][0]['allowed_paths'] = ['docs/requirements.md']
+                return replace(response, text=json.dumps(report))
+            return response
+    args['implementer'] = WritesRequirement('implementation')
+    result = advance_requirements(**args)
+    assert result['reason'] == 'requirements_reference_write_conflict'
+    assert args['reviewer'].calls == args['tracker'].creates == 0
