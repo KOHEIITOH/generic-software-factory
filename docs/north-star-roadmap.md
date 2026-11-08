@@ -309,3 +309,10 @@ E2E、複数利用者公開サービス、ECS/S3/分散workerは未完了とし�
 不足/矛盾を検出した場合や資料変更/上限では停止する。既存の凍結済み計画は再適用しない。
 [仕様と上限](requirement-discovery.md)およびADR 0046/0047を参照。
 AI/SCMを模擬した実保存・Docker・ブラウザ検証と、PCでの実サービスE2E未確認は区別する。
+
+## PC実確認に向けた運用整備（2026-11-08）
+
+[#126](https://github.com/KOHEIITOH/generic-software-factory/pull/126): Web準備診断と未確認項目/対処の明示。
+[#127](https://github.com/KOHEIITOH/generic-software-factory/pull/127): 実SIGKILL・保存途中・通信切断の復旧検証。
+新規Web計画は派生した解釈/受入条件/依存関係を確認し、正確な計画と対象版への承認後に子Issueを公開する。
+判断と制約はADR 0048〜0050に記録。PCでの実Bedrock/GitHub E2Eは引き続き未確認。

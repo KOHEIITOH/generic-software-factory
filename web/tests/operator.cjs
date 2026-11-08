@@ -52,11 +52,26 @@ const net = require('node:net');
       if (!discarded) { discarded = true; await route.fetch(); await route.abort(); }
       else await route.continue();
     });
-    await advance.click();
+    await panel.getByRole('button', { name: '計画案を作成・確認', exact: true }).click();
     await panel.getByRole('button', { name: '同じ送信を確認' }).waitFor();
     await panel.getByRole('button', { name: '同じ送信を確認' }).click();
+    const approve = panel.getByRole('button', { name: 'この計画を承認して子Issueを作成', exact: true });
+    await approve.waitFor();
+    assert.equal(await approve.isEnabled(), false);
+    assert.equal(await panel.getByRole('link', { name: 'PR ↗', exact: true }).count(), 0);
+    assert((await panel.innerText()).includes('add(2,3) returns 5'));
+    assert((await panel.innerText()).includes('依存: first'));
+    await panel.getByLabel('この計画・参照資料・変更範囲を確認し、子Issue作成を承認する').check();
+    await approve.click();
+    await panel.getByText('計画は承認済みです。次のステップで実装を進められます。', { exact: true }).waitFor();
+    assert.equal(requests[2].action, 'approve');
+    assert.equal(requests[2].confirm_bedrock, false);
+    assert.match(requests[2].approved_plan, /^[a-f0-9]{64}$/);
+    await panel.getByLabel('表示した範囲のAI送信・隔離テスト・Issue/PR操作に同意する').check();
+    await panel.getByLabel('Bedrockの推論料金の発生に同意する').check();
+    await advance.click();
     await panel.getByRole('button', { name: '停止を要求', exact: true }).waitFor();
-    assert.equal(requests.length, 2);
+    assert.equal(requests.length, 4);
     assert.equal(requests[0].request_id, requests[1].request_id, 'Unknown response must reuse nonce');
     assert.equal(await panel.getByRole('link', { name: 'PR ↗', exact: true }).count(), 1);
     assert((await panel.innerText()).includes('残り 31'));
@@ -74,7 +89,7 @@ const net = require('node:net');
     await panel.getByLabel('Bedrockの推論料金の発生に同意する').check();
     await advance.click();
     await panel.getByText('子PRのレビュー・マージ待ち', { exact: true }).waitFor();
-    assert.notEqual(requests[1].request_id, requests[2].request_id);
+    assert.notEqual(requests[3].request_id, requests[4].request_id);
     assert((await panel.innerText()).includes('残り 31'), 'Resume must not reset workflow budget');
     if (process.env.SF_BROWSER_DESKTOP_SCREENSHOT) {
       await page.setViewportSize({ width: 1280, height: 2400 });
@@ -91,7 +106,7 @@ const net = require('node:net');
     await panel.getByRole('button', { name: '操作権限を閉じる' }).click();
     await panel.getByText('操作権限がありません。', { exact: false }).waitFor();
     assert.deepEqual(pageErrors, []);
-    console.log('Operator browser checks passed: consent, fragment, idempotent retry, progress, requirement source metadata/citations, stop, reload/resume, budgets, mobile, unauthorized access, logout.');
+    console.log('Operator browser checks passed: consent, fragment, idempotent retry, reviewed plan approval, progress, requirement source metadata/citations, stop, reload/resume, budgets, mobile, unauthorized access, logout.');
   } finally {
     if (browser) await browser.close();
     if (server.exitCode === null) {

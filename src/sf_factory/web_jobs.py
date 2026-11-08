@@ -13,6 +13,7 @@ from pathlib import Path
 from sf_factory.automation_state import AutomationSession, fingerprint
 from sf_factory.file_document import read_document, write_document
 from sf_factory.file_state import lock_directory
+from sf_factory.plan_preview import plan_preview
 from sf_factory.source_snapshot import _sync_directory
 from sf_factory.state_store import StateConflict, StatePermissionDenied
 from sf_factory.web_operator import OperatorProfiles
@@ -56,8 +57,10 @@ class WebJobs:
                     or not re.fullmatch('[a-f0-9]{32}', job.get('profile_id', ''))
                     or not re.fullmatch('[a-f0-9]{32}', job.get('session_id', ''))
                     or not re.fullmatch('[a-f0-9]{64}', job.get('config_fingerprint', ''))
-                    or job.get('action') not in {'plan', 'advance', 'review'}
-                    or type(job.get('stop_requested')) is not bool):
+                    or job.get('action') not in {'plan', 'advance', 'review', 'approve'}
+                    or type(job.get('stop_requested')) is not bool
+                    or (job.get('action') == 'approve' and
+                        not re.fullmatch('[a-f0-9]{64}', job.get('approved_plan', '')))):
                 raise StateConflict('invalid Web job')
         return state
 
@@ -96,20 +99,26 @@ class WebJobs:
 
     def enqueue(self, *, profile_id: str, config_fingerprint: str, action: str,
                 request_id: str, confirm_bedrock: bool, run_id: str | None = None,
-                reviewers: tuple[str, ...] = ()) -> tuple[dict, bool]:
-        if (action not in {'plan', 'advance', 'review'}
+                reviewers: tuple[str, ...] = (),
+                approved_plan: str | None = None) -> tuple[dict, bool]:
+        if (action not in {'plan', 'advance', 'review', 'approve'}
                 or not re.fullmatch('[a-f0-9]{32}', request_id)
                 or (action == 'review') != (run_id is not None)
                 or (run_id is not None and not re.fullmatch('[a-f0-9]{32}', run_id))
                 or len(reviewers) > 16 or any(not re.fullmatch(r'[A-Za-z0-9_\[\]-]{1,128}', a)
                                             for a in reviewers)):
             raise ValueError('bounded registered workflow action required')
+        if ((action == 'approve') != (approved_plan is not None)
+                or (approved_plan is not None and not re.fullmatch('[a-f0-9]{64}', approved_plan))):
+            raise ValueError('exact plan approval fingerprint required')
         _, config = OperatorProfiles(self.root).get(profile_id, config_fingerprint)
-        if config.provider == 'bedrock' and confirm_bedrock is not True:
+        if config.provider == 'bedrock' and action != 'approve' and confirm_bedrock is not True:
             raise StatePermissionDenied('explicit Bedrock inference consent required')
         command = {'profile_id': profile_id, 'config_fingerprint': config_fingerprint,
                    'action': action, 'run_id': run_id, 'reviewers': list(reviewers),
                    'confirm_bedrock': confirm_bedrock}
+        if approved_plan is not None:
+            command['approved_plan'] = approved_plan
         subject = ('review:' + config.repository + ':' + str(run_id) if action == 'review' else
                    'requirements:' + config.repository + ':' + config.issue)
         session_id = fingerprint({'subject': subject, 'config': fingerprint({
@@ -122,6 +131,18 @@ class WebJobs:
                 if any(prior[k] != v for k, v in command.items()):
                     raise StateConflict('request identity already used for another scope')
                 return prior, False
+            if approved_plan is not None:
+                from sf_factory.plan_preview import approval_fingerprint
+                path = self.root / 'automation-v1' / session_id
+                if not path.is_dir():
+                    raise StateConflict('no plan is awaiting approval')
+                with lock_directory(path) as document:
+                    workflow = AutomationSession._read(document)
+                approval = workflow['data'].get('plan_approval')
+                if (workflow['status'] in {'completed', 'stopped'} or approval is None
+                        or approved_plan != approval['fingerprint']
+                        or approved_plan != approval_fingerprint(workflow)):
+                    raise StateConflict('plan approval scope changed')
             if any(j['profile_id'] == profile_id and
                    j['config_fingerprint'] == config_fingerprint and
                    j['reviewers'] != list(reviewers) for j in state['jobs'].values()):
@@ -219,4 +240,5 @@ class WebJobs:
                 'counts': state['counts'], 'limits': state['limits'], 'rounds': state['rounds'],
                 'expires_at': state['expires_at'], 'children': children,
                 'requirement_sources': source_summary,
+                'plan_preview': plan_preview(state),
                 'decisions': [{'at': d['at'], 'code': d['code']} for d in state['decisions'][-20:]]}
