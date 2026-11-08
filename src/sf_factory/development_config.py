@@ -27,6 +27,7 @@ class DevelopmentConfig:
     checks: tuple[BehavioralCheck, ...]
     excluded_harness: tuple[tuple[str, str], ...] = ()
     project_harness: ProjectHarness | None = None
+    context_hashes: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
         for value in (self.repository, self.issue):
@@ -53,6 +54,14 @@ class DevelopmentConfig:
             raise ValueError('explicit bounded Harness/reference scope required')
         for path in (*self.selected_harness, *self.context_paths):
             _path(path)
+        if (not isinstance(self.context_hashes, tuple) or len(self.context_hashes) > 32
+                or any(not isinstance(pair, tuple) or len(pair) != 2
+                       for pair in self.context_hashes)):
+            raise ValueError('bounded reference hash pairs required')
+        if (len({p for p, _ in self.context_hashes}) != len(self.context_hashes)
+                or any(p not in self.context_paths or not isinstance(h, str)
+                       or not re.fullmatch('[a-f0-9]{64}', h) for p, h in self.context_hashes)):
+            raise ValueError('unique hashes within approved context paths required')
         if (not isinstance(self.checks, tuple) or not 1 <= len(self.checks) <= 16
                 or not all(isinstance(c, BehavioralCheck) for c in self.checks)
                 or len({c.id for c in self.checks}) != len(self.checks)):
@@ -65,6 +74,8 @@ class DevelopmentConfig:
     @property
     def fingerprint(self) -> str:
         data = asdict(self)
+        if not self.context_hashes:
+            data.pop('context_hashes')
         if self.project_harness is None:
             data.pop('project_harness')
         return hashlib.sha256(json.dumps(data, default=str, sort_keys=True,
@@ -73,16 +84,18 @@ class DevelopmentConfig:
     @classmethod
     def from_document(cls, value: dict) -> DevelopmentConfig:
         required = {'repository', 'issue', 'root', 'data_root', 'provider', 'image',
-                    'allowed_paths', 'selected_harness', 'context_paths', 'checks'}
+                    'allowed_paths', 'selected_harness', 'checks'}
         if (not isinstance(value, dict) or not required <= set(value)
-                or not set(value) <= required | {'excluded_harness', 'project_harness'}
-                or any(not isinstance(value[k], list) for k in (
+                or not set(value) <= required | {'excluded_harness', 'project_harness',
+                                                'context_paths', 'context_hashes'}
+                or any(not isinstance(value.get(k, []), list) for k in (
                     'allowed_paths', 'selected_harness', 'context_paths', 'checks'))):
             raise ValueError('exact development config schema required')
         return cls(**{**value, 'root': Path(value['root']), 'data_root': Path(value['data_root']),
             'allowed_paths': tuple(value['allowed_paths']),
             'selected_harness': tuple(value['selected_harness']),
-            'context_paths': tuple(value['context_paths']),
+            'context_paths': tuple(value.get('context_paths', [])),
+            'context_hashes': tuple(tuple(pair) for pair in value.get('context_hashes', [])),
             'excluded_harness': tuple(tuple(pair) for pair in value.get('excluded_harness', [])),
             'project_harness': ProjectHarness.from_document(value['project_harness'])
                 if value.get('project_harness') is not None else None,

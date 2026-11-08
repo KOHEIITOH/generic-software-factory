@@ -264,6 +264,9 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
             else:
                 snapshots.create_remote(run_id, remote_source)
             snapshot, files = snapshots.load(run_id)
+            for path, expected in config.context_hashes:
+                if path not in files or hashlib.sha256(files[path]).hexdigest() != expected:
+                    raise StatePermissionDenied('frozen requirement/reference content changed')
             scope = ProposalScope(run_id, revision, composition.bundle_hash,
                                   snapshot['fingerprint'], config.allowed_paths)
             value = {'schema_version': 1, 'config_fingerprint': config.fingerprint,
