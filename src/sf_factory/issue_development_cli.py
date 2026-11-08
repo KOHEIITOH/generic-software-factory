@@ -53,7 +53,8 @@ def load_config(path: Path) -> DevelopmentConfig:
 
 def run_local_development(*, config_path: Path, confirmed: bool, confirm_bedrock: bool,
                           resume: str | None, review_run: str | None = None,
-                          trusted_reviewers: tuple[str, ...] = ()) -> int:
+                          trusted_reviewers: tuple[str, ...] = (),
+                          workflow_action: str | None = None) -> int:
     # No provider/network/file state initialization before explicit operator consent.
     if confirmed is not True:
         print(json.dumps({'status': 'confirmation_required', 'required': '--confirm-run'}))
@@ -87,7 +88,18 @@ def run_local_development(*, config_path: Path, confirmed: bool, confirm_bedrock
         from sf_factory.factory_selection import open_factory
         from sf_factory.integration_defaults import source_control, task_source
 
-        if review_run is not None:
+        if workflow_action is not None:
+            from sf_factory.github_issue_tracker import GitHubIssueTracker
+            from sf_factory.requirement_workflow import advance_requirements
+
+            if workflow_action not in {'plan', 'advance'}:
+                raise ValueError('known workflow action required')
+            adapter = GitHubIssueTracker()
+            result = advance_requirements(factory=open_factory(config.data_root), config=config,
+                source=task_source(config.repository), scm=adapter, tracker=adapter,
+                implementer=implementation, reviewer=review, confirmed=True,
+                execute=workflow_action == 'advance', trusted_reviewers=trusted_reviewers)
+        elif review_run is not None:
             from sf_factory.github_source_control import GitHubSourceControl
             from sf_factory.review_automation import advance_review
 

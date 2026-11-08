@@ -166,6 +166,15 @@ def _plan(factory: Factory, value: dict) -> DeliveryPlan:
                                issue_url=value['issue']['external_url'])
 
 
+def execution_readiness(config: DevelopmentConfig) -> None:
+    readiness = run_offline_command(image=config.image,
+        argv=('python', '-I', '-c', 'print("SF_EXECUTION_READY")'), timeout_seconds=10)
+    if (readiness.status != 'succeeded' or readiness.exit_code != 0
+            or not readiness.cleaned_up
+            or readiness.output.strip() != 'SF_EXECUTION_READY'):
+        raise RuntimeError('verified Docker/image unavailable; no inference started')
+
+
 def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSourceAdapter,
                   scm: ChangeSourceControl, implementer: ModelProvider, reviewer: ModelProvider,
                   confirmed: bool, resume: str | None = None,
@@ -192,12 +201,7 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
             _artifact(factory, resume, value)
             plan = _plan(factory, value)
         else:
-            readiness = run_offline_command(image=config.image,
-                argv=('python', '-I', '-c', 'print("SF_EXECUTION_READY")'), timeout_seconds=10)
-            if (readiness.status != 'succeeded' or readiness.exit_code != 0
-                    or not readiness.cleaned_up
-                    or readiness.output.strip() != 'SF_EXECUTION_READY'):
-                raise RuntimeError('verified Docker/image unavailable; no inference started')
+            execution_readiness(config)
             info = scm.describe_repository(config.repository)
             if not info.capabilities.write or not info.capabilities.pull_request:
                 raise StatePermissionDenied('repository write/PR capability required')

@@ -33,6 +33,13 @@ def build_parser() -> argparse.ArgumentParser:
                         help="trusted reviewer login; defaults to authenticated operator")
     repair.add_argument("--confirm-run", action="store_true")
     repair.add_argument("--confirm-bedrock", action="store_true")
+    for action in ("plan", "advance"):
+        workflow = issue_sub.add_parser(action, help="bounded requirement-to-child-Issue workflow")
+        workflow.add_argument("--config", required=True, type=Path)
+        workflow.add_argument("--confirm-run", action="store_true",
+                              help="authorize scoped inference and external child Issue/PR writes")
+        workflow.add_argument("--confirm-bedrock", action="store_true")
+        workflow.add_argument("--reviewer", action="append", default=[])
     integration = sub.add_parser("integration", help="inspect default integration configuration")
     integration.add_subparsers(dest="integration_command", required=True).add_parser("show")
     runtime = sub.add_parser("runtime", help="inspect registered runtimes")
@@ -95,6 +102,10 @@ def main() -> int:
     if args.command == "issue":
         from sf_factory.issue_development_cli import run_local_development
 
+        if args.issue_command in {"plan", "advance"}:
+            return run_local_development(config_path=args.config, confirmed=args.confirm_run,
+                confirm_bedrock=args.confirm_bedrock, resume=None,
+                trusted_reviewers=tuple(args.reviewer), workflow_action=args.issue_command)
         if args.issue_command == "review":
             return run_local_development(config_path=args.config, confirmed=args.confirm_run,
                 confirm_bedrock=args.confirm_bedrock, resume=None, review_run=args.run,
