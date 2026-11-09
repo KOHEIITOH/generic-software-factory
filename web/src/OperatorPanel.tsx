@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import SetupPanel from "./SetupPanel";
 
 type RequirementSources = { mode: string; revision: string; fingerprint: string; review_status?: string;
   documents: { path: string; sha256: string; bytes: number; reason: string }[];
@@ -41,6 +42,7 @@ function Link({ url, label }: { url?: string; label: string }) {
 }
 
 export default function OperatorPanel() {
+  const [setupOpen, setSetupOpen] = useState(false);
   const [auth, setAuth] = useState("loading");
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selected, setSelected] = useState("");
@@ -180,9 +182,10 @@ export default function OperatorPanel() {
     {auth === "ready" && <>
       <div className="operator-toolbar"><button type="button" disabled={busy} onClick={() => void refresh().catch(e => setError(e.message))}>状態を更新</button>
         <button type="button" disabled={busy} onClick={() => void api("/logout", { method: "POST" }).then(r => { if (r.ok) setAuth("locked"); })}>操作権限を閉じる</button></div>
-      {!profiles.length ? <p>実行設定が未登録です。同じ保存先を使うPCのターミナルで登録してください。<br />
+      <details open={!profiles.length || setupOpen} onToggle={e => setSetupOpen(e.currentTarget.open)}><summary>初回設定・Harness生成と改善</summary>{(!profiles.length || setupOpen) && <SetupPanel refreshKey={jobs.map(j => j.id + j.status).join(",")} onApplied={async id => { await refresh(); setSelected(id); setSetupOpen(false); setMessage("実行設定とHarnessを登録しました。Issueを選択して実行できます。"); }} />}</details>
+      {!profiles.length ? <p>Webの初回設定、またはCLIから登録できます。CLIを使う場合は、同じ保存先を指定して登録してください。<br />
         <code>uv run sf operator register --config /絶対パス/operator.json --name 開発対象</code></p> : <>
-        <label className="project-selector">実行設定<select value={selected} disabled={busy || uncertain || working || diagnosticBusy} onChange={e => {
+        <label className="project-selector">実行設定<select aria-label="実行設定" value={selected} disabled={busy || uncertain || working || diagnosticBusy} onChange={e => {
           setSelected(e.target.value); setDiagnostic(null); setApprovalConsent(null); setConsent(false); setBedrock(false); setRunId(""); }}>
           <option value="">選択してください</option>{profiles.map(p => <option key={p.id} value={p.id}>{p.name}{!p.available ? "（無効・再登録が必要）" : ""}</option>)}</select></label>
         {profile && <div className="operator-scope"><strong>{profile.repository}</strong>

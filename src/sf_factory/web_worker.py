@@ -66,6 +66,19 @@ def run_job(root: Path, key: str, *, executor: Callable = execute_local_developm
                         review_run=job['run_id'], trusted_reviewers=tuple(job['reviewers']),
                         require_plan_approval=True, approved_plan=job.get('approved_plan'),
                         **({'issue_id': job['issue_id']} if job['action'] == 'develop' else {}))
+                    if (job['action'] == 'develop'
+                            and result.get('reason') == 'issue_quality_failed'
+                            and result.get('run_id') and result.get('session_id')):
+                        # Bounded, deterministic text proposals from durable outcome metadata.
+                        # No extra AI call, new permissions, check changes or automatic adoption.
+                        try:
+                            checkpoint()
+                            from sf_factory.operator_setup import SetupProposals
+                            SetupProposals(root).feedback(job['profile_id'],
+                                job['config_fingerprint'], job['issue_id'], result['run_id'],
+                                result['session_id'])
+                        except Exception:
+                            jobs.change(key, code='harness_feedback_unavailable')
                 result = public_result(result)
             except Exception:
                 # No SDK exceptions, source, config paths, stdout or secret-bearing logs in HTTP.

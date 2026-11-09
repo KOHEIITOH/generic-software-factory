@@ -14,6 +14,23 @@ _SSH = re.compile(r"^git@github\.com:([^/]+)/([^/]+?)(?:\.git)?/?$")
 _SSH_URL = re.compile(r"^ssh://git@github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$")
 
 
+def repository_from_origin(root: Path) -> str:
+    """Bounded local read for the authenticated setup wizard; never contacts GitHub."""
+    import time
+
+    from sf_factory.source_snapshot import _git
+    remote = _git(root, ['remote', 'get-url', 'origin'], 4096, time.monotonic() + 10)
+    value = remote.decode('utf-8').strip()
+    match = next((m for pattern in (_HTTPS, _SSH, _SSH_URL)
+                  if (m := pattern.fullmatch(value)) is not None), None)
+    if match is None:
+        raise ValueError('supported GitHub origin required')
+    repository = f'{match.group(1)}/{match.group(2)}'
+    if not _REPO.fullmatch(repository) or '..' in repository:
+        raise ValueError('valid repository identity required')
+    return repository
+
+
 def verify_github_origin(directory: Path, repository: str) -> Path:
     """Verify identity without network access, authentication, or mutation."""
     if not _REPO.fullmatch(repository) or ".." in repository:

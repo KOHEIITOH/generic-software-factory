@@ -4,8 +4,15 @@ Text context only: no commands, permissions, secret paths or tool grants.
 """
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
+from pathlib import Path
+
+
+def repository_project_name(repository: str, root: Path) -> str:
+    """Reserved name for generated rules on the existing repository-local Project."""
+    return 'repository-' + hashlib.sha256((repository + '\0' + str(root)).encode()).hexdigest()
 
 
 @dataclass(frozen=True)

@@ -3,12 +3,30 @@
 対象はPC上の単一利用者向けです。既存のCLIと同じWorkflow・Harness・品質チェック・
 GitHub Adapter・永続予算を使います。AWSリソース作成、デプロイ、mergeは行いません。
 
-## 初回の実行設定登録
+## Webでの初回設定・Harness生成
 
-[Issue開発の設定](local-issue-development.md)を用意します。設定ファイルは対象repoの外、
-operator所有・他者書込不可にしてください。`data_root` とWebの `SF_DATA_DIR` は
-同じ絶対パスにします。設定の作成・変更・失効はPCのターミナルで行い、
-Webから任意pathやcommandを指定する入口は設けません。
+`uv run sf web --rebuild` で起動し、ターミナルの操作リンクを開きます。
+実行設定が未登録なら「初回設定・Harness生成と改善」が開きます。
+
+1. 対象のクリーンなGit Repositoryの絶対パスを指定し「リポジトリとHarnessを確認」。GitHub名はoriginから検出します。
+2. AI、変更可能ファイル、検証内容と固定Dockerイメージを確認します。既存Harnessは検出・検証して再利用し、ない場合は最小の共通ルールを生成します。
+3. 「設定とHarnessの案を作成」で表示された内容と除外Profileを確認し、承認して登録します。
+4. 登録した設定でIssueを選択し「同意して実行・Draft PR作成」を押します。
+
+設定JSONの手作業や `sf operator register` は不要です。設定はFactoryのprivate保存先に作成し、
+Repositoryへファイルを書き込みません。案作成・登録ではAI推論・Docker実行・GitHubへの変更は行いません。
+GitHub/AIの認証、Docker、固定イメージは利用PCで事前に準備します。秘密情報はWebへ入力しません。
+Factoryの保存先と開発対象は分離します。Factory自身のRepositoryを対象にする場合は、起動前に`SF_DATA_DIR`をそのRepositoryの外へ指定してください。
+Python unittest/pytestを静的に検出できれば検証案を用意します。0件・skip・失敗・expected failureは不合格です。
+pytest等の依存は実行イメージに含めてください。未検出の方式は詳細欄で検証argv・期待出力を指定します。
+要件分割・CLI用の親Issue番号は詳細欄で指定できます（初期値1）。通常の実行は画面で選んだIssueを使います。
+このwizardではアプリsourceの変更範囲を最大32ファイルに限定し、テスト・依存設定・Harnessは変更対象にしません。
+既存のProject Profileは自動でコマンド権限へ変換せず、適用除外を明示して独立の検証設定を承認します。
+
+### 既存CLIで登録する場合
+
+[Issue開発の設定](local-issue-development.md)を対象repo外のoperator所有ファイルに用意し、
+`data_root` とWebの `SF_DATA_DIR` を同じ絶対パスにします。
 
 ```sh
 export SF_DATA_DIR=/absolute/path/to/factory-data
@@ -16,10 +34,9 @@ uv run sf operator register --config /absolute/path/operator.json --name 開発�
 uv run sf web --rebuild
 ```
 
-登録は初回だけです。次回からは従来どおり `uv run sf web --rebuild` で起動できます。
-設定が変わった場合はローカルで確認して登録し直します。失効するには
-`uv run sf operator revoke PROFILE_ID` を使います。登録結果にはPROFILE_IDを返します。
-登録自体ではAI、Docker、外部サービスを呼びません。
+どちらも登録は初回だけです。次回からは `uv run sf web --rebuild` で起動できます。
+設定変更は新しい案の内容を確認して登録するか、CLIで再登録します。
+失効するには `uv run sf operator revoke PROFILE_ID` を使います。失効済み設定は再送で復活させません。
 
 起動時にブラウザが開き、ターミナルにも操作リンクを表示します。そのリンクは
 操作権限を含むため共有しないでください。能力はURLのfragmentから一度だけ交換し、
@@ -120,3 +137,15 @@ Bedrock課金同意は不要です。Issueへの書込同意は必要です。�
 
 この確認のため、新規の承認必須計画だけ、認証済み画面に限定して派生した解釈・計画を表示します。
 元のsource/要件全文、SDK例外、秘密情報、詳細なreview concernは返しません。
+
+## 失敗RunからのHarness改善案
+
+Webの開発実行が品質条件で停止した場合、受信済みのモデル出力・検証・レビューの記録を根拠に、
+定型の改善案を自動作成します。AIによる自由生成ではなく、追加の推論料金は発生しません。
+認証/通信/Dockerの失敗を品質改善とは扱わず、応答や検証証拠がない場合は案を作りません。
+「初回設定・Harness生成と改善」の保存済み案から、根拠Run・追加ルール・変更範囲・検証を確認し承認します。
+
+承認後は新しい設定を選択し、同じIssueを実行すると、改善したHarnessで再度テスト・独立レビューを行います。
+元設定・失敗Runの予算・証跡は保持します。テストを弱めたり権限を広げたりして成功扱いにしません。
+改善効果は次回の実行で検証し、ルールの追加だけで品質向上を断定しません。
+同じRunにつき1案、同じRepositoryで最大5改善案、保存先全体で100案までです。自動適用・無限再試行はしません。

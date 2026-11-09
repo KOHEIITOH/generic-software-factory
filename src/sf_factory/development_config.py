@@ -48,7 +48,8 @@ class DevelopmentConfig:
                 and not isinstance(self.project_harness, ProjectHarness)):
             raise ValueError('typed Project Harness required')
         ProposalScope('a' * 32, 'b' * 40, 'c' * 64, 'd' * 64, self.allowed_paths)
-        if (not isinstance(self.selected_harness, tuple) or not self.selected_harness
+        if (not isinstance(self.selected_harness, tuple)
+                or (not self.selected_harness and self.project_harness is None)
                 or not isinstance(self.context_paths, tuple)
                 or len(self.selected_harness) + len(self.context_paths) > 32):
             raise ValueError('explicit bounded Harness/reference scope required')

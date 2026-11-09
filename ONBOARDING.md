@@ -11,7 +11,7 @@ FactoryはAI開発作業の工程・権限・品質判定を共通化する基�
 
 ## 現在のWeb UIでできること（2026年11月時点）
 
-初回に[実行設定と認証](docs/local-web-execution.md)を登録し、`uv run sf web --rebuild`で起動します。
+`uv run sf web --rebuild`で起動し、[Web初回設定](docs/local-web-execution.md)からRepository・変更範囲・検証・Harnessの案を確認して登録します。設定JSONの手作業は不要です。GitHub/AI認証とDockerは利用PCで準備します。
 ターミナルの操作リンクから開き、Issueを選んで「同意して実行・Draft PR作成」を押します。
 手動取り込み・Repositoryの手動紐付け・デモPR作成は不要です。
 
@@ -20,7 +20,7 @@ FactoryはAI開発作業の工程・権限・品質判定を共通化する基�
 - Project管理: 任意。画面を開いたときだけ読み込みます
 - `/guide`、`/onboarding`: ブラウザで利用手順を確認
 
-初期設定にはCLI操作が必要です。loopback専用で、実行にはoperator認証が必要です。
+起動・AI認証・Dockerの準備はPCで行い、実行設定・Harness登録はWebで進められます。loopback専用で、実行にはoperator認証が必要です。
 WebのビルドにはNode.js/npm、コードの検証には資源制限を強制できるDockerが必要です。
 
 ## 1. 最初に用意する

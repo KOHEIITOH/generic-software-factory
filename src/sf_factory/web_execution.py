@@ -29,6 +29,34 @@ class DiagnoseProfile(BaseModel):
     check_remote: bool = False
 
 
+class InspectSetup(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+    root: str = Field(min_length=1, max_length=1000)
+    repository: str = Field(default='', max_length=200)
+
+
+class SetupCheck(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+    id: str = Field(min_length=1, max_length=64)
+    argv: list[str] = Field(min_length=1, max_length=128)
+    stdout: str = Field(max_length=16384)
+
+
+class CreateSetup(InspectSetup):
+    name: str = Field(min_length=1, max_length=100)
+    provider: str = Field(pattern='^(bedrock|copilot)$')
+    image: str = Field(min_length=70, max_length=300)
+    allowed_paths: list[str] = Field(min_length=1, max_length=32)
+    checks: list[SetupCheck] = Field(min_length=1, max_length=16)
+    issue: str = Field(default='1', pattern='^[1-9][0-9]{0,18}$')
+
+
+class ApproveSetup(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+    fingerprint: str = Field(pattern='^[a-f0-9]{64}$')
+    confirmed: bool
+
+
 def install_execution_routes(app: FastAPI, root: Path, operator: WebOperator | None) -> None:
     def auth(request: Request):
         if operator is None:
@@ -57,6 +85,46 @@ def install_execution_routes(app: FastAPI, root: Path, operator: WebOperator | N
     def profiles(request: Request):
         auth(request)
         return {'profiles': OperatorProfiles(root).list()}
+
+    @app.post('/api/operator/setup/inspect')
+    def inspect_setup(payload: InspectSetup, request: Request):
+        auth(request)
+        from sf_factory.operator_setup import inspect_repository
+        try:
+            return inspect_repository(Path(payload.root), payload.repository, root)
+        except (ValueError, OSError) as exc:
+            raise HTTPException(422, 'Clean Git root, origin and safe files required') from exc
+
+    @app.post('/api/operator/setup/proposals', status_code=201)
+    def create_setup(payload: CreateSetup, request: Request):
+        auth(request)
+        from sf_factory.behavioral_check import BehavioralCheck
+        from sf_factory.operator_setup import SetupProposals
+        try:
+            return SetupProposals(root).initial(root=Path(payload.root),
+                repository=payload.repository, name=payload.name, provider=payload.provider,
+                image=payload.image, allowed_paths=tuple(payload.allowed_paths),
+                checks=tuple(BehavioralCheck(c.id, tuple(c.argv), c.stdout)
+                             for c in payload.checks), issue=payload.issue)
+        except (ValueError, OSError) as exc:
+            raise HTTPException(422, 'Invalid setup scope, Harness or checks') from exc
+
+    @app.get('/api/operator/setup/proposals')
+    def setup_proposals(request: Request):
+        auth(request)
+        from sf_factory.operator_setup import SetupProposals
+        return {'proposals': SetupProposals(root).list()}
+
+    @app.post('/api/operator/setup/proposals/{key}/approve')
+    def approve_setup(key: str, payload: ApproveSetup, request: Request):
+        auth(request)
+        if payload.confirmed is not True:
+            raise HTTPException(403, 'Explicit configuration and Harness approval required')
+        from sf_factory.operator_setup import SetupProposals
+        try:
+            return SetupProposals(root).approve(key, payload.fingerprint)
+        except (ValueError, OSError) as exc:
+            raise HTTPException(422, 'Proposal cannot be installed; inspect again') from exc
 
     @app.post('/api/operator/profiles/{key}/diagnostics')
     def diagnostics(key: str, payload: DiagnoseProfile, request: Request):

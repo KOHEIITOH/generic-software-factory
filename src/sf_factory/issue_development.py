@@ -29,6 +29,7 @@ from sf_factory.harness_composition import compose_harness
 from sf_factory.harness_runs import HarnessRunService, _revision
 from sf_factory.harness_validation import validate_harness
 from sf_factory.model_provider import ModelProvider, ModelResponse
+from sf_factory.project_harness import repository_project_name
 from sf_factory.repository_contracts import Project, Repository, Visibility
 from sf_factory.run_evidence import CheckRequirement, EvidenceSubject, RunEvidenceService
 from sf_factory.source_control import ChangeSourceControl
@@ -229,13 +230,18 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
             issue_key = factory.import_issue(**asdict(issue))
             factory.bind_issue_repository(issue_key, info.external_id, config.root)
             key = hashlib.sha256((info.external_id + '\0' + str(config.root)).encode()).hexdigest()
+            shared_project = (config.project_harness is not None and
+                config.project_harness.project != repository_project_name(config.repository,
+                                                                          config.root))
             project_id = (hashlib.sha256(('project:' + config.project_harness.project).encode())
-                          .hexdigest()[:32] if config.project_harness else key[:32])
+                          .hexdigest()[:32] if shared_project and config.project_harness
+                          else key[:32])
             repository_id = key[32:]
             registry = factory.project_registry()
             if not any(p.id == project_id for p in registry.list_projects('local-cli')):
                 registry.add_project(Project(project_id, config.project_harness.project
-                    if config.project_harness else info.external_id, 'local-cli'))
+                    if shared_project and config.project_harness else info.external_id,
+                    'local-cli'))
             if not any(r.id == repository_id for r in registry.list_repositories(project_id)):
                 registry.add_repository(Repository(repository_id, project_id, 'local-git',
                                                     str(config.root), Visibility.LOCAL))
