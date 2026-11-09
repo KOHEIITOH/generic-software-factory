@@ -1,4 +1,4 @@
-"""Minimal provider-neutral SCM operations used by the existing Draft PR demo."""
+"""Provider-neutral SCM identities and operations used by Draft PR delivery."""
 from __future__ import annotations
 
 from dataclasses import dataclass

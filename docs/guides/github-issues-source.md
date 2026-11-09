@@ -14,7 +14,7 @@ issue_key = import_issue(factory, source, "42")
 print(factory.show_issue(issue_key))
 ```
 
-プライベートリポジトリでは、最小権限のトークン（Issues: read）を環境変数等から取得して `token=` に渡す。トークンをソースコードへ埋め込まない。WebのIssue取り込みとローカル開発CLIからも利用する。
+プライベートリポジトリでは、最小権限のトークン（Issues: read）を環境変数等から取得して `token=` に渡す。トークンをソースコードへ埋め込まない。認証済みWebとローカル開発CLIが実行時に利用する。手動取り込みのWeb入口は削除済み。通常の利用者による上記Python APIの操作は不要。
 
 - Issue番号は正の整数に限定し、Pull Requestは拒否する。
 - GitHubのタイトル・本文は**信頼できない外部入力**。Factoryに保存しても、AIへの自動実行や権限昇格を意味しない。

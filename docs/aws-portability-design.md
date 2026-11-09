@@ -6,6 +6,8 @@
 - 確認済み: ユーザーは「まず直列実行で確実な復旧を優先」を選択。同じRunは1 Worker、同じRepositoryの変更も直列。
 - 最重要方針: AWS専用化せず、ローカル/AWS、保存先、Agent Runtime、Model Provider、Executionを独立に選ぶ。
 
+> 本書は上記調査基準の設計履歴です。2026-11-09時点ではFileによるDB不要運用・認証済みWeb実行・実装成果物のDraft配送が追加済みで、旧preflight・手動取り込み・デモPRのWeb入口は削除しました。最新の実装状況は[ロードマップ](north-star-roadmap.md)と[Web実行](local-web-execution.md)を参照してください。
+
 ## 1. 結論と今回の範囲
 
 **専用DBを必須にしない構成は可能。ただし現在のSFはSQLite必須で、そのままではDBなしでは動かない。**

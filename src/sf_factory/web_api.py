@@ -17,23 +17,9 @@ from pydantic import BaseModel, Field
 
 from sf_factory.agent_registry import default_runtime_registry
 from sf_factory.factory_selection import data_directory, open_factory
-from sf_factory.github_issue_web import install_github_issue_routes
-from sf_factory.github_pr_demo_web import install_github_pr_demo_routes
-from sf_factory.github_repository_web import install_github_repository_routes
-from sf_factory.implementation_preflight_web import install_implementation_preflight_routes
-from sf_factory.repo_discovery import discover_git_root
 from sf_factory.repository_contracts import Project, Repository, Visibility
 from sf_factory.state_store import StateConflict, StateUnavailable
 from sf_factory.web_operator import WebOperator
-
-
-class InspectRepositoryRequest(BaseModel):
-    path: str = Field(min_length=1, max_length=1000)
-
-
-class BindIssueRepositoryRequest(BaseModel):
-    repository: str = Field(min_length=3, max_length=200)
-    local_path: str = Field(min_length=1, max_length=1000)
 
 
 class CreateProjectRequest(BaseModel):
@@ -85,27 +71,6 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None,
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    @app.get("/api/quick/repository")
-    def quick_repository() -> dict[str, str | bool | None]:
-        # Only the directory where the server was launched is considered.
-        # No user-supplied filesystem path or repository content is accepted.
-        try:
-            root = discover_git_root(Path.cwd())
-        except (OSError, ValueError):
-            return {"detected": False, "repository_root": None, "provider": None}
-        return {"detected": True, "repository_root": str(root), "provider": "local-git"}
-
-    @app.post("/api/quick/repository/inspect")
-    def inspect_quick_repository(
-        payload: InspectRepositoryRequest, request: Request
-    ) -> dict[str, str]:
-        _check_local_origin(request)
-        try:
-            root = discover_git_root(Path(payload.path))
-        except (OSError, ValueError) as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-        return {"repository_root": str(root), "provider": "local-git"}
-
     @app.get("/api/runtimes")
     def runtimes() -> dict[str, list[str]]:
         return {"runtimes": list(default_runtime_registry().names())}
@@ -117,18 +82,6 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None,
     @app.get('/api/runs')
     def runs() -> dict[str, list[dict]]:
         return {'runs': open_factory(data_dir or Path('.sf-factory')).list_runs()}
-
-    @app.post("/api/issues/{issue_key}/repository")
-    def bind_issue_repository(
-        issue_key: str, payload: BindIssueRepositoryRequest, request: Request
-    ) -> dict[str, str]:
-        _check_local_origin(request)
-        try:
-            return open_factory(data_dir or Path(".sf-factory")).bind_issue_repository(
-                issue_key, payload.repository, Path(payload.local_path)
-            )
-        except (OSError, ValueError) as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.get("/api/projects")
     def projects() -> dict[str, list[dict[str, str]]]:
@@ -198,10 +151,6 @@ def create_app(static_dir: Path | None = None, data_dir: Path | None = None,
 
     from sf_factory.web_execution import install_execution_routes
     install_execution_routes(app, data_dir.resolve(), operator)
-    install_github_issue_routes(app, data_dir)
-    install_github_repository_routes(app)
-    install_implementation_preflight_routes(app, data_dir or Path('.sf-factory'))
-    install_github_pr_demo_routes(app)
 
     if static_dir is not None:
         project_root = Path(__file__).resolve().parents[2]

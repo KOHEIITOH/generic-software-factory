@@ -1,129 +1,20 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Software Factoryを初めて使う人向けのセットアップと安全な使い方"><title>はじめてのセットアップ | Software Factory</title><style>:root{font-family:system-ui,-apple-system,"Noto Sans JP",sans-serif;color:#e9f1ff;background:#09111e}*{box-sizing:border-box}body{margin:0;line-height:1.85}a{color:#a9caff}header{padding:30px max(20px,calc((100vw - 920px)/2));background:linear-gradient(125deg,#182e58,#11213a);border-bottom:1px solid #304665}header a{text-decoration:none;font-weight:700}header h1{font-size:clamp(26px,4vw,42px);line-height:1.25;margin:25px 0 10px}header p{color:#b6c7df}main{max-width:960px;margin:auto;padding:24px 20px 80px}h2{font-size:24px;margin-top:44px;padding-bottom:12px;border-bottom:1px solid #334663}h3{margin-top:32px}p,li{color:#d1dcef}ul{padding-left:24px}li{margin:10px 0}pre{background:#101e32;padding:20px;border:1px solid #344765;border-radius:13px;overflow-x:auto;line-height:1.6}code{font-family:ui-monospace,monospace;background:#21344f;border-radius:4px;padding:2px 5px}pre code{padding:0;background:none}aside{border-left:3px solid #73a2ff;padding:12px 16px;background:#162841;border-radius:5px;margin:12px 0;color:#d8e7ff}.table-scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}td{padding:12px;border-bottom:1px solid #31445e;vertical-align:top}tr:first-child{background:#1d3353;font-weight:700}td:first-child{min-width:155px}a:focus-visible{outline:3px solid #f3c767;outline-offset:3px}@media(max-width:650px){header{padding:22px}td{min-width:130px}}</style></head><body><header><a href="/">← ダッシュボードに戻る</a><h1>はじめてのセットアップ</h1><p>AI開発工場を安全に試すためのオンボーディングガイド</p><a href="/guide">ユーザーガイドを見る →</a></header><main><section><h2>現在のWeb UIでできること（2026年11月時点）</h2><p>現在のWeb UIは<strong>閲覧専用</strong>です。初回セットアップには開発者によるCLI操作が必要です。</p><pre><code>uv sync --extra web
-uv run sf web --rebuild</code></pre><p>起動後は <a href="/">ダッシュボード</a>で登録済みAI Runtime、Task一覧、Run履歴を確認できます。ユーザーガイドは<a href="/guide">こちら</a>。初回ビルドにはNode.js/npmが必要です。</p><ul><li>GitHub Issuesの読み取り専用Adapterと重複防止付きTask取り込みはPython APIとして実装済みです。</li><li>Web UIからのTask作成・Issue取り込み・AI実行はまだできません。</li><li>任意リポジトリへの自律編集、PR自動作成、安全な隔離実行も未実装です。</li><li>APIは認証なしのローカル専用です。外部公開しないでください。</li></ul></section><h1>初回オンボーディング — Generic Software Factory</h1>
-<aside>対象: 初めてFactoryを触る人。所要目安15〜30分（AI Runtimeのインストール時間を除く）。</aside>
-<aside>本書は実験的MVP向けです。業務・機密リポジトリでの運用手順ではありません。</aside>
-<h2>0. 何ができる？</h2>
-<p>FactoryはAI開発作業の工程・権限・品質判定を共通化するための基盤です。現状はローカルCLIでTask / Runを記録し、Codex・Grok・Copilotへの限定的な接続確認ができます。Workflow、Policy、Quality Gate、Improvement LoopのPython部品も実装されていますが、これらを統合した完全自律開発CLIやPR自動作成は未実装です。</p>
-<h2>1. 最初に用意する</h2>
-<ul>
-<li>Git と uv（<span title="技術資料: README.md#quickstart--macos--windows--linux">READMEのOS別手順</span>）</li>
-<li>macOS / Linux のターミナル、または Windows PowerShell</li>
-<li>Python 3.13 は <code>uv python install 3.13</code> で導入</li>
-<li>最初のローカルテストにAIアカウントは不要</li>
-</ul>
-<h2>2. 最初の5コマンド</h2>
-<p>以下を上から順に実行します。PowerShell / macOS / Linux共通です。</p>
-<pre><code>
-git clone https://github.com/KOHEIITOH/generic-software-factory.git
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Software Factory 初回オンボーディング</title><style>body{margin:0;background:#0b1019;color:#e7edf6;font:16px/1.8 system-ui,sans-serif}main{max-width:850px;margin:auto;padding:36px 22px}nav{display:flex;gap:20px;flex-wrap:wrap}a{color:#91b6ff}h1{line-height:1.4}h2{margin-top:36px}section{border:1px solid #304764;border-radius:14px;padding:20px;margin:20px 0}pre{background:#142137;padding:16px;overflow:auto;border-radius:10px}code{overflow-wrap:anywhere}p,li{color:#bdcadd}strong{color:#e7edf6}.note{border-left:3px solid #699aff;padding-left:16px}</style></head><body><main><nav><a href="/">ダッシュボード</a><a href="/guide">ユーザーガイド</a><a href="/onboarding">オンボーディング</a></nav>
 
-cd generic-software-factory
+<h1>初回オンボーディング</h1>
+<p>初回だけ実行設定と認証を用意します。設定済みなら<a href="/guide">ユーザーガイド</a>の通常操作へ進めます。</p>
+<h2>1. 必要なもの</h2><ul><li>Git、uv、Python環境</li><li>Webビルド用のNode.js/npm</li><li>開発実行用のDocker（CPU・メモリ等の制限を強制できること）と設定に指定した固定イメージ</li><li>対象GitHub Repositoryと必要なIssue/PR書込権限</li><li>利用するAIの認証。BedrockはPCの標準AWS認証、リージョン・モデルIDを設定</li></ul>
+<p>閲覧・設定診断にはAIの有料推論は不要です。開発実行時は要件・許可されたコードをAIへ送信します。</p>
+<h2>2. 依存関係と実行設定</h2><pre><code>uv sync --extra web --extra bedrock</code></pre>
+<p><a href="https://github.com/KOHEIITOH/generic-software-factory/blob/main/docs/local-issue-development.md">PC向け設定例</a>を使い、対象Repository・変更可能なファイル・Harness・検証内容・AI Provider・Dockerイメージを指定したoperator設定ファイルを、対象Repositoryの外に作成します。認証情報はそのファイルやイメージへ埋め込みません。</p>
+<p>設定の <code>data_root</code> とWebの保存先を同じ絶対パスにします。既存の実行証跡は自動リセットしません。</p>
+<h2>3. 初回登録と起動</h2><pre><code>export SF_DATA_DIR=/absolute/path/to/factory-data
+uv run sf operator register --config /absolute/path/operator.json --name 開発対象
+uv run sf web --rebuild</code></pre><p>環境変数の設定例はmacOS/Linuxのシェル形式です。WindowsではPowerShell等に合わせて設定してください。実行のファイルロック・Dockerの制限は利用PCで確認します。</p>
+<p>ターミナルに表示された操作リンクを開きます。このリンクは実行権限を含むため共有しないでください。通常URLから開いた閲覧用画面だけでは実行できません。</p>
+<h2>4. Issueを選択して実行</h2><p>「開発を進める」でIssueを選び、実行範囲と料金説明を確認して<strong>「同意して実行・Draft PR作成」</strong>を押します。テストと独立レビューを通過するとPRリンクを表示します。取り込み・手動紐付け・デモPR作成はありません。</p>
+<h2>困ったとき</h2><ul><li>操作権限がない: 起動したターミナルの操作リンクを開き直します。</li><li>設定が無効: ローカルで変更内容を確認し、実行設定を再登録します。</li><li>Docker・認証の不足: 詳細操作の診断で確認します。開始前の不足は修正後、同じ有限予算内で再開できます。</li><li>古いTask形式の保存先: 証跡を保管し、新しい保存先を指定します。自動変換・削除は行いません。</li></ul>
+<p class="note">loopback上の単一利用者向けです。AWSリソース作成・デプロイ・PRの自動マージは行いません。Bedrock＋GitHubの実サービス通し確認は利用PCで実施してください。</p>
+<p><a href="https://github.com/KOHEIITOH/generic-software-factory/blob/main/docs/local-web-execution.md">実行設定・認証・復旧の詳細</a> · <a href="/guide">ユーザーガイド</a></p>
 
-uv python install 3.13
-
-uv sync --python 3.13 --extra dev
-
-uv run sf --help
-
-</code></pre>
-<p><code>sf --help</code> に <code>doctor</code>, <code>task</code>, <code>run</code>, <code>analyze</code> などのサブコマンドが表示されれば、CLI起動は成功です。</p>
-<h2>3. AIなしで動作を確かめる</h2>
-<pre><code>
-uv run pytest
-
-uv run ruff check .
-
-uv run pyright
-
-</code></pre>
-<p>テストが成功すれば、少なくともPython基盤の検証は通っています。各AI Runtimeの動作はまだ確認できていません。</p>
-<h2>4. 接続するAIを選ぶ（任意）</h2>
-<h3>4-1. まず「Agent Runtime」と「Model Provider」を区別する</h3>
-<p><strong>Agent Runtime</strong> は計画・コード生成・ツール操作などを担当する実行ソフトウェアです。<strong>Model Provider</strong> は推論モデルを提供する接続先です。たとえば「Claude Code（Runtime）」と「Anthropic API（モデル提供）」は別の層です。Factory Coreは特定の製品に依存せず、Adapterで差し替える設計です。</p>
-<p><strong>重要:</strong> 下表の「接続済み」はFactoryの限定的なAdapterが存在するという意味です。全自動開発、任意リポジトリ編集、OSレベルの隔離、Windows/Linuxでの動作保証を意味しません。</p>
-<h3>4-2. Coding Agent / Agent Runtime 一覧</h3>
-<div class="table-scroll"><table><tbody>
-<tr><td>候補</td><td>Factory実装状況</td><td>Factoryでの実行方法</td><td>導入・認証</td><td>現時点の注意</td></tr>
-<tr><td><strong>OpenAI Codex CLI</strong></td><td><strong>接続済み</strong></td><td>CLI Adapter、read-only smoke / 限定fixture編集</td><td><a href="https://developers.openai.com/codex/cli/" target="_blank" rel="noopener noreferrer">公式Codex CLI</a>で導入、<code>codex login</code></td><td>実リポジトリへの自律編集は未対応</td></tr>
-<tr><td><strong>xAI Grok Build CLI</strong></td><td><strong>接続済み</strong></td><td>CLI Adapter、read-only smoke</td><td><a href="https://docs.x.ai/build/cli" target="_blank" rel="noopener noreferrer">公式Grok CLI</a>で導入、<code>grok login</code></td><td>ツール許可リストによる制限。OS隔離ではない</td></tr>
-<tr><td><strong>GitHub Copilot SDK / CLI</strong></td><td><strong>接続済み</strong></td><td>Python SDK Adapter、空workspace・ツール無効</td><td><a href="https://docs.github.com/en/copilot/how-tos/copilot-cli" target="_blank" rel="noopener noreferrer">GitHub Copilot CLI</a>で導入、<code>copilot login</code></td><td>SDK依存の追加インストールが必要</td></tr>
-<tr><td><strong>Anthropic Claude Code</strong></td><td><strong>未実装・追加候補</strong></td><td>将来CLI / SDK Adapter</td><td><a href="https://docs.anthropic.com/en/docs/claude-code/overview" target="_blank" rel="noopener noreferrer">公式Claude Code</a></td><td>Factory用 <code>sf claude-smoke</code> は存在しない</td></tr>
-<tr><td><strong>Google Gemini CLI</strong></td><td><strong>未実装・追加候補</strong></td><td>将来CLI Adapter</td><td><a href="https://github.com/google-gemini/gemini-cli" target="_blank" rel="noopener noreferrer">公式Gemini CLI</a></td><td>Factory用 <code>sf gemini-smoke</code> は存在しない</td></tr>
-<tr><td><strong>OpenAI Agents SDK等のCustom Agent</strong></td><td><strong>未実装・構想</strong></td><td>独自Runtime Adapter</td><td><a href="https://openai.github.io/openai-agents-python/" target="_blank" rel="noopener noreferrer">OpenAI Agents SDK</a></td><td>独自のツール権限・監査・隔離設計が必要</td></tr>
-<tr><td><strong>その他のCoding Agent</strong></td><td><strong>未実装・拡張候補</strong></td><td>共通契約を実装するAdapter</td><td>製品ごとの公式資料</td><td>対応を約束するものではない</td></tr>
-</tbody></table></div>
-<h3>4-3. Model Provider / モデル接続先（将来の拡張）</h3>
-<p>Agent Runtimeとは別に、Custom Agentが直接推論APIを呼ぶ場合の候補です。<strong>現時点でFactoryのModel Provider Adapterは未実装</strong>です。</p>
-<div class="table-scroll"><table><tbody>
-<tr><td>候補</td><td>接続方法の想定</td><td>役割</td></tr>
-<tr><td>OpenAI API</td><td>API Adapter</td><td>OpenAIモデルを直接呼び出す</td></tr>
-<tr><td>Anthropic API</td><td>API Adapter</td><td>Claudeモデルを直接呼び出す</td></tr>
-<tr><td>Google Gemini API / Vertex AI</td><td>API Adapter</td><td>Gemini系モデルを利用する</td></tr>
-<tr><td>AWS Bedrock</td><td>AWS SDK Adapter</td><td>AWS経由で対応モデルを利用する</td></tr>
-<tr><td>xAI API</td><td>API Adapter</td><td>Grokモデルを直接呼び出す</td></tr>
-<tr><td>Azure AI Foundry等</td><td>Provider Adapter</td><td>組織のクラウド基盤を利用する</td></tr>
-<tr><td>ローカル推論基盤（例: Ollama）</td><td>ローカルHTTP Adapter</td><td>対応するローカルモデルを利用する</td></tr>
-</tbody></table></div>
-<p><strong>BedrockやOllamaを入れただけで、FactoryからCoding Agentとして実行できるわけではありません。</strong> 必要に応じてCustom AgentとRuntime Adapterが別途必要です。各Providerの認証・料金・データ取扱い・モデル提供状況は導入時に確認します。</p>
-<h3>4-4. 現在利用できる3つのRuntimeを試す</h3>
-<p>利用するものだけを公式手順でインストールし、認証してください。コマンドは各CLIがPATH上にあることを前提とします。</p>
-<p><strong>Codex CLI</strong></p>
-<pre><code>
-codex --version
-
-codex login
-
-uv run sf codex-smoke
-
-</code></pre>
-<p><strong>Grok Build CLI</strong></p>
-<pre><code>
-grok --version
-
-grok login
-
-uv run sf grok-smoke
-
-</code></pre>
-<p><strong>GitHub Copilot SDK</strong></p>
-<pre><code>
-uv sync --python 3.13 --extra dev --extra copilot
-
-copilot --version
-
-copilot login
-
-uv run sf copilot-smoke
-
-</code></pre>
-<p>認証・課金・利用可能モデルは各サービスの契約に依存します。CLIごとの対応OSも公式資料を確認してください。Windowsでは一部ツールでWSLが必要になる可能性があり、Factory全体のWindowsネイティブ対応を保証するものではありません。</p>
-<h3>4-5. 選び方と現在の限界</h3>
-<ul>
-<li><strong>まずFactoryの動作を試したい:</strong> Codex CLIを使ったread-only smoke testが最も基本的な導線。</li>
-<li><strong>異なるRuntimeのAdapterを比較したい:</strong> Grok BuildやCopilot SDKも追加し、同じ無害な入力で接続確認。</li>
-<li><strong>Claude Code / Gemini CLIを使いたい:</strong> 現在はFactory Adapter未実装。単体での利用とFactory経由の利用を混同しない。</li>
-<li><strong>AWS Bedrockを使いたい:</strong> Converse Model ProviderとローカルIssue開発CLIを利用可能。PCの認証・設定と通し試験が必要。</li>
-</ul>
-<p><strong>どのAIを選んでも、モデルの回答だけで品質合格としないこと。</strong> Quality Gateは独立した検証証拠を必要とし、信頼できる証拠収集Adapterと隔離実行は今後の課題です。</p>
-<p>詳細: <span title="技術資料: docs/agent-runtime-roadmap.md">Agent Runtime / Model Provider対応方針</span>、<span title="技術資料: docs/adapter-contracts.md">Adapter契約</span>。</p>
-<h2>5. 外部Issueを取り込んで実行する（任意）</h2>
-<p>依頼はGitHub Issueで管理します。Factory独自Taskの作成・旧Task CLIは削除済みです。</p>
-<p>画面でIssueを取り込み、開発実行はoperator設定を使うローカルCLIから行います。</p>
-<pre><code>uv run sf issue develop --config /absolute/path/to/operator-config.json --confirm-run --confirm-bedrock</code></pre>
-<p><a href="https://github.com/KOHEIITOH/generic-software-factory/blob/main/docs/local-issue-development.md">PCでの設定・実行・復旧手順</a>を参照してください。旧Task形式は移行せず、新しい保存先でIssueを取り込み直します。</p>
-<h2>6. よくあるつまずき</h2>
-<ul>
-<li><code>uv</code> / <code>git</code> が見つからない: インストール後にターミナルを再起動し、PATHを確認。</li>
-<li><code>sf doctor</code> でCLI不足: 使わないRuntimeのCLIは不要。使うRuntimeだけ導入。</li>
-<li>認証エラー: 利用するCLIでログイン。認証情報をチャットやIssueに貼らない。</li>
-<li>Windowsのパス: PowerShellで実行し、Linuxの <code>/path/to/...</code> をそのままコピーしない。</li>
-<li>テストがOS依存で失敗: 失敗ログとOS・Python・uvのバージョンを控え、環境差分として調査。</li>
-</ul>
-<h2>7. 安全に使うための境界</h2>
-<p>Smoke test成功はAIが安全に任意コードを編集・実行できる証明ではありません。OSレベルの隔離、証拠の真正性、PR自動作成は未完成です。会社のコード、個人情報、認証情報は試験用に渡さないでください。リポジトリ解析コマンド <code>sf analyze</code> は内容をCopilotへ送信するため、<span title="技術資料: docs/local-repository-analysis.md">送信範囲と制約</span>を確認してください。</p>
-<h2>8. 次に読む</h2>
-<ul>
-<li><span title="技術資料: USER_GUIDE.html">利用ガイド（図解HTML）</span></li>
-<li><span title="技術資料: docs/architecture.md">アーキテクチャ</span></li>
-<li><span title="技術資料: docs/security.md">セキュリティ</span></li>
-<li><span title="技術資料: docs/quality-improvement-loop.md">Quality Gateと改善ループ</span></li>
-</ul></main></body></html>
+<footer>Software Factory · 更新 2026-11-09</footer></main></body></html>

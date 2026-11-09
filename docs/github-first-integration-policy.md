@@ -31,18 +31,18 @@ Provider名、認証用環境変数名、設定有無を返します。トーク
 
 | 条件 | 状態・根拠 |
 | --- | --- |
-| GitHub Issuesを初期標準として維持 | 既存`TaskSourceAdapter` / `ExternalIssue`を再利用し、既定factoryをGitHubへ接続。Webの取得/取込/一覧を維持 |
+| GitHub Issuesを初期標準として維持 | 既存`TaskSourceAdapter` / `ExternalIssue`を再利用し、既定factoryをGitHubへ接続。認証済みWebは登録RepositoryのIssueを選び、実行時に取得・固定する。手動取り込みAPIは廃止 |
 | CoreのGitHub固有検証を除去 | PR #97。`RepositoryBindingAdapter`に注入し、origin/provider/case規則を`GitHubRepositoryBinding`へ移動 |
 | 共通WorkflowにAPI/認証型を持ち込まない | `SourceControl`、`RepositoryCapabilities`、`PullRequestReference`を使用。Core/shared Workflowのimport guardで保護 |
-| 既存Draft PR動作をAdapter経由にする | PR #98。`GitHubSourceControl`にREST/認証/JSONを閉じ込め、既存の確認済みデモを共通処理へ接続 |
-| 最小設定でGitHubを選択 | `integration_defaults`、Web初期値、既存2種類の認証環境変数、設定例を一致させた |
+| 既存Draft PR動作をAdapter経由にする | PR #98でREST/認証/JSONを`GitHubSourceControl`へ分離。現在は実装成果物のDraft配送で利用し、デモ処理は削除 |
+| 最小設定でGitHubを選択 | `integration_defaults`、登録設定、既存2種類の認証環境変数、設定例を一致させた |
 | 他サービスを実装しない | GitLab/Bitbucket/Jira等の新規Adapterなし。契約検証にfixtureのみ使用 |
 | 既存データ・起動・安全境界を維持 | SQLite/File、GitHub HTTPS/SSH照合、Issue同一性、匿名読取、確認/権限拒否の回帰テスト |
 
 ## 境界
 
 - `factory.py` / `file_dashboard.py`: 共通契約で検証し、保存だけを行う。
-- `workflow.py` / `workflow_runner.py` / `draft_pr_demo.py`: 共通ドメイン型と操作を使う。
+- `workflow.py` / `workflow_runner.py` / `issue_execution.py`: 共通ドメイン型と操作を使う。
 - `integration_defaults.py`: 初期Providerを選ぶ組立箇所。GitHub選択をここへ集約する。
 - `github_*`: GitHubのURL/API形式・認証・origin照合と専用HTTP入口。
 
@@ -56,6 +56,4 @@ Coreの処理を書き換えず、組立とAdapter側で接続することを目
 opaque SCM識別子、確認/権限拒否、REST変換、秘密非表示、Core import guardをテストする。
 GitHub連携の変更系APIはmockで検証し、試験目的のBranch/Issue/PRを実サービスへ自動作成しない。
 
-既存デモのbranch/file/PRは複数資源の操作であり、分散transactionやexactly-onceではない。
-途中失敗・結果不明時の自動再試行や削除は追加していない。実装成果物からの安全な配送、
-外部結果の照合・冪等性、Worker復旧、公開API認証は引き続き別の実装項目。
+デモPRの画面・HTTP入口・オーケストレーションは削除した。実装成果物は既存のDraft配送と永続receiptで扱い、結果不明時は同じRunを照合する。SCM Adapterおよび配送の共通契約は維持する。

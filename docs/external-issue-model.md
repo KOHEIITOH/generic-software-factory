@@ -27,15 +27,16 @@ Run、Harness承認、Project/Repository関連付け、監査、usage、実行�
 - `/api/tasks`一覧・作成・repository紐付け・preflight。
 - Factoryの`create_task`等、TaskRecord、Task専用tableとTaskProject関連付け。
 
-Webは`GET /api/issues`、`POST /api/issues/{issue_key}/repository`、
-`GET /api/issues/{issue_key}/implementation-preflight`を使う。
-Issueの取得はGitHub import、開発実行は`sf issue develop`を使う。
+通常のWebは認証済みoperatorの登録設定からIssueを選択し、実装・テスト・レビュー・Draft PRを実行します。
+手動のIssue取り込み・紐付け・旧preflight入口は削除済みです。
+`GET /api/issues`はキャッシュ・過去Runの証跡参照用に維持します。
+Factory内部のIssue取得・bindは開発処理から使用します。CLIの入口は`sf issue develop`です。
 
 ## 互換性
 
 この変更は破壊的変更で、旧Taskデータの移行や互換aliasは提供しない。
 旧`tasks-v1`/`dashboard-v1`、Task tableを持つSQLiteを検出すると停止し、自動削除・変換しない。
-旧保存先がある場合は新しい空の保存先を指定してIssueを取り込み直す。
+旧保存先がある場合は新しい空の保存先を指定し、実行時にIssueを取得する。
 
 ```sh
 SF_DATA_DIR="$HOME/.sf-factory-issues" uv run sf web --rebuild

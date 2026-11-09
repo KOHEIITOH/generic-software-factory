@@ -1,28 +1,25 @@
-# 外部Task連携の基本方針
+# 外部Issue参照とTask Source Adapter
 
-FactoryはJira・GitHub Issues・Backlog等のチケット管理を置き換えない。Factory Coreは実行単位としてTask/Runを保持し、外部Issueとの紐付けをSource Adapterが担う。
+FactoryはGitHub Issues等の依頼管理を置き換えない。独立したFactory Taskは削除済みで、依頼は外部Issue、実行の単位と証跡はRunとして扱う。
 
 ## 不変条件
 
-- 外部Issueの識別子は `provider + instance + external_id` の組み合わせ。異なるテナントやサービス間で衝突しない。
-- 同一Issueを何度取得してもFactory Taskは重複しない。
-- 初回取り込み後のTask promptは再取り込みでは書き換えない。更新ポリシー・差分レビューは後続PRで明示する。
-- 外部Issueの状態とFactory Runの状態は別物。
-- CLIのローカルTask作成は従来通り動作する。
-- 外部へのコメント投稿・ステータス変更・Webhook受信・AI実行は今回の範囲外。
+- 外部Issueの識別子は `provider + instance + external_id`。異なる接続先を混同しない。
+- 取得結果は同一の外部Issue参照へ冪等に保存する。別の独自タスクは作らない。
+- Runごとに実行時の `issue_snapshot` を固定し、後のキャッシュ更新で過去要件を変えない。
+- Issue本文とリポジトリ文書は信頼できない入力。取得・保存だけではAI実行や権限昇格を許可しない。
 
-## 次の段階
+## 現在の契約と入口
 
-1. Adapter Protocolと手動取り込みCLIを追加し、実プロバイダを接続する前に契約を固定する。
-2. 認証情報の保管とAPI権限の最小化、外部入力の信頼境界、同期失敗時のリトライを設計する。
-3. Web UIには元IssueへのリンクとRunの実行状況を表示する。タスク管理の二重化を避ける。
-4. 外部更新・PRコメントは明示的な設定と権限確認後に追加する。
+`TaskSourceAdapter.fetch_issue(external_id) -> ExternalIssue` が読取境界。
+`import_issue(factory, adapter, external_id)` は内部/Python APIとしてID整合性と保存を扱う。
+保存は既存のFile/SQLite Adapterで行い、Task SourceはFactoryの保存先を直接操作しない。
 
-## Adapter契約（PR #30）
+通常の利用者は認証済みWebで登録RepositoryのIssueを選択し、明示同意して実行する。
+手動取り込み・紐付けのWeb入口は削除済み。CLIは既存の`sf issue develop`を使う。
+GitHubの読取・認証・ページングはAdapter/組立箇所に閉じ込め、初期ProviderはGitHubを正式採用する。
 
-`TaskSourceAdapter.fetch_issue(external_id)` は外部サービスからIssueのスナップショットを読み取り、`ExternalIssue` を返す。Factory側の `import_issue(factory, adapter, external_id)` がID整合性を確認し、既存のSQLiteに重複なく取り込む。
+要件分割による子Issue作成・親子関連は既存の専用tracker契約と承認付きWorkflowで扱う。
+読取だけのTask Sourceに書込能力を追加しない。バックグラウンドpollで開発を開始しない。
 
-- 認証・API呼び出し・リトライは個別Adapterの責任。CoreはJira SDK等に依存しない。
-- `provider` はサービス種別、`instance` は接続先の識別子。異なるテナントを混同しない。
-- 同期は明示的な呼び出しのみ。バックグラウンドポーリング・Webhookは未実装。
-- HTTP APIへの書き込み口はまだ追加しない。外部Issueを信頼済みの指示として扱わない。
+詳細: [外部Issueモデル](../external-issue-model.md)、[Web実行](../local-web-execution.md)。

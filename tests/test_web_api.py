@@ -55,12 +55,14 @@ def test_local_documentation_routes(tmp_path) -> None:
         root = client.get("/")
     assert root.status_code == 200
     assert guide.status_code == 200
-    assert "AI開発チーム" in guide.text
+    assert "同意して実行・Draft PR作成" in guide.text
     assert 'href="/onboarding"' in guide.text
     assert onboarding.status_code == 200
     assert "オンボーディング" in onboarding.text
     assert "<h2>" in onboarding.text
     assert "初回オンボーディング" in onboarding.text
+    assert "sf operator register" in onboarding.text
+    assert "Web UIからのTask作成" not in guide.text + onboarding.text
 
 
 def test_standalone_task_creation_api_is_removed(tmp_path) -> None:

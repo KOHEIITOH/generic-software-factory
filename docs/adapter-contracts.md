@@ -131,18 +131,16 @@ Agent Runtimeがモデル接続を所有しない場合に限り、Custom Agent�
 
 ## 6. SourceControl
 
-現在の最小契約は [`SourceControl`](../src/sf_factory/source_control.py) です。
-既存のDraft PRデモで必要な操作だけを実装しています。
+現在のSCM契約は [`SourceControl` / `ChangeSourceControl`](../src/sf_factory/source_control.py) です。
+Repository情報・capability・revision・commit・branch・Draft PRの共通型を使います。
+実装成果物の配送は変更内容と基準revisionを固定し、永続intent/receiptとremote readbackで照合します。
+旧デモのオーケストレーションとHTTP入口は削除済みで、通常の実行は同じRunのDraft配送を使います。
 
-- Repository情報と既存`RepositoryCapabilities`の取得
-- branchのrevision取得・新規作成
-- branchへのファイル追加（GitHub AdapterではContents APIによるcommit）
-- Draft PR作成と共通`PullRequestReference`への変換
-
-初期の実装・既定選択は`GitHubSourceControl`です。Taskは既存の`TaskSourceAdapter` /
-`ExternalIssue`、Repositoryは既存の共通契約を使います。共通WorkflowはGitHubのJSON、
-API URL、認証方式を受け取りません。worktree/diff/汎用commit/PR更新等は実際に必要になった
-段階で追加し、現時点で他サービスのAdapterは作りません。
+PR snapshot、remote source、レビューとbranch CASは既存の
+[`CollaborationSourceControl`](../src/sf_factory/collaboration_contracts.py) を使います。
+初期の既定実装は`GitHubSourceControl`です。依頼元は`TaskSourceAdapter` / `ExternalIssue`、
+Repositoryは既存の共通契約を再利用します。共通WorkflowはGitHubのJSON・API URL・認証方式を受け取りません。
+他サービスのAdapterを先回りして追加しません。
 
 Mergeは別capabilityとし、初期Policyでは人間承認を必須とします。RuntimeがGitを直接操作する場合も、Factoryのworkspace・branch・権限Policyを迂回してはいけません。
 
