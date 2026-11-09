@@ -6,13 +6,14 @@
 <h2>1. 必要なもの</h2><ul><li>Git、uv、Python環境</li><li>Webビルド用のNode.js/npm</li><li>開発実行用のDocker（CPU・メモリ等の制限を強制できること）と設定に指定した固定イメージ</li><li>対象GitHub Repositoryと必要なIssue/PR書込権限</li><li>利用するAIの認証。BedrockはPCの標準AWS認証、リージョン・モデルIDを設定</li></ul>
 <p>閲覧・設定診断にはAIの有料推論は不要です。開発実行時は要件・許可されたコードをAIへ送信します。</p>
 <h2>2. 依存関係と実行設定</h2><pre><code>uv sync --extra web --extra bedrock</code></pre>
-<p><a href="https://github.com/KOHEIITOH/generic-software-factory/blob/main/docs/local-issue-development.md">PC向け設定例</a>を使い、対象Repository・変更可能なファイル・Harness・検証内容・AI Provider・Dockerイメージを指定したoperator設定ファイルを、対象Repositoryの外に作成します。認証情報はそのファイルやイメージへ埋め込みません。</p>
-<p>設定の <code>data_root</code> とWebの保存先を同じ絶対パスにします。既存の実行証跡は自動リセットしません。</p>
-<h2>3. 初回登録と起動</h2><pre><code>export SF_DATA_DIR=/absolute/path/to/factory-data
-uv run sf operator register --config /absolute/path/operator.json --name 開発対象
-uv run sf web --rebuild</code></pre><p>環境変数の設定例はmacOS/Linuxのシェル形式です。WindowsではPowerShell等に合わせて設定してください。実行のファイルロック・Dockerの制限は利用PCで確認します。</p>
-<p>ターミナルに表示された操作リンクを開きます。このリンクは実行権限を含むため共有しないでください。通常URLから開いた閲覧用画面だけでは実行できません。</p>
+<p>GitHub/AIの認証、Dockerと依存入りの固定イメージをPCで準備します。認証情報はWebや設定ファイルに埋め込みません。</p>
+<h2>3. Webから初回登録</h2><pre><code>uv run sf web --rebuild</code></pre>
+<p>ターミナルの操作リンクを開き、「初回設定・Harness生成と改善」でRepositoryの絶対パスを指定します。GitHub名はoriginから検出します。変更範囲・検証・イメージ・Harnessの案を確認して承認すると登録できます。設定JSONの手作業は不要です。</p>
+<p>既存Harnessがあれば再利用し、なければ最小ルールを生成します。Python unittest/pytestの静的検出ができれば検証案を用意します。依存の不足や未知のテスト方式は詳細欄で設定します。検証を省略して成功扱いにはしません。</p>
+<p>この操作ではAI推論・Docker実行・GitHubへの変更・Repositoryへの書き込みは行いません。操作リンクは権限を含むため共有しないでください。</p>
+<details><summary>CLIから設定を登録する場合</summary><p>従来の設定ファイルによる方法も利用できます。保存先と設定のdata_rootを一致させます。</p><pre><code>uv run sf operator register --config /absolute/path/operator.json --name 開発対象</code></pre><p><a href="https://github.com/KOHEIITOH/generic-software-factory/blob/main/docs/local-issue-development.md">CLI向け設定例</a></p></details>
 <h2>4. Issueを選択して実行</h2><p>「開発を進める」でIssueを選び、実行範囲と料金説明を確認して<strong>「同意して実行・Draft PR作成」</strong>を押します。テストと独立レビューを通過するとPRリンクを表示します。取り込み・手動紐付け・デモPR作成はありません。</p>
+<h2>Harnessの改善</h2><p>品質失敗の証拠があるWeb実行から、定型ルールの改善案を自動作成します。保存済み案で根拠と内容を確認し承認すると、新しい設定で再検証できます。自動適用・追加のAI推論・無限再試行は行いません。認証・通信・Dockerの失敗は改善効果の根拠にしません。</p>
 <h2>困ったとき</h2><ul><li>操作権限がない: 起動したターミナルの操作リンクを開き直します。</li><li>設定が無効: ローカルで変更内容を確認し、実行設定を再登録します。</li><li>Docker・認証の不足: 詳細操作の診断で確認します。開始前の不足は修正後、同じ有限予算内で再開できます。</li><li>古いTask形式の保存先: 証跡を保管し、新しい保存先を指定します。自動変換・削除は行いません。</li></ul>
 <p class="note">loopback上の単一利用者向けです。AWSリソース作成・デプロイ・PRの自動マージは行いません。Bedrock＋GitHubの実サービス通し確認は利用PCで実施してください。</p>
 <p><a href="https://github.com/KOHEIITOH/generic-software-factory/blob/main/docs/local-web-execution.md">実行設定・認証・復旧の詳細</a> · <a href="/guide">ユーザーガイド</a></p>

@@ -9,7 +9,7 @@
 
 | 到達点 | 現在の接続 | 未完了の条件 |
 | --- | --- | --- |
-| M1 Harness | Discovery/Validation/選択/承認/Run固定、Project共通＋Repository＋変更directoryを接続 | 生成・継続評価・改善の全自動化 |
+| M1 Harness | Discovery/Validation/選択/承認/Run固定、Project共通＋Repository＋変更directory、Web初回設定・最小生成・定型改善提案を接続 | AI生成・継続評価・改善の全自動化 |
 | M2 安全な実行 | FileでDB不要、exact source snapshot、offline Docker、実check/review証跡、durable配送 | 分散Worker、全実行形態の復旧・クラウド実行 |
 | M3 Issue→Draft PR | Bedrock/Copilot text adapter、ローカルCLIとWebのIssue選択→単一実行→Draft PR、有限の同一PR修正、子Issue DAGの直列実行・merge照合 | PCのBedrock＋GitHubで実サービス通し確認。複数利用者・分散実行 |
 | M4 開発基盤 | 既存Project/Web/Adapter境界を再利用 | 並列処理、複数利用者認可、監視・コスト可視化 |
@@ -32,6 +32,10 @@
 2026-11-09: 旧手動取り込み・紐付け・デモPR・旧クイック開始・旧preflightを画面/APIから削除。
 通常画面の重複履歴・Runtime紹介と不要な背景取得も削除した。Project管理は必要時だけ読み込み、
 Harness・要件分割・レビュー・停止/復旧・証跡は維持する。[ADR 0052](decisions/0052-remove-obsolete-web-flows.md)参照。
+
+2026-11-09追加: Web初回設定、既存Harness再利用・欠落時の最小ルール生成、失敗Runからの定型改善案と承認後再検証を接続。
+AIによる任意ルール生成や改善効果の自動評価は完成扱いにせず、権限・検証の変更は人間の明示承認を維持する。
+[ADR 0053](decisions/0053-guided-setup-and-harness-feedback.md)に安全境界と限界を記録する。
 
 ## 1. North Starと判断基準
 

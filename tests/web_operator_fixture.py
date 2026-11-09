@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 import uvicorn
+from test_harness_runs import commit, git
 from test_issue_development import flow
 
 from sf_factory.automation_state import AutomationSession, fingerprint
@@ -22,6 +23,19 @@ def main():
     patch = pytest.MonkeyPatch()
     args = flow.__wrapped__(directory, patch)
     config = args['config']
+    git(config.root, 'remote', 'add', 'origin', 'https://github.com/fixture/repo.git')
+    setup_root = directory / 'setup-repository'
+    setup_root.mkdir()
+    git(setup_root, 'init', '-q')
+    git(setup_root, 'remote', 'add', 'origin', 'https://github.com/fixture/repo.git')
+    (setup_root / 'app.py').write_text('def add(a,b): return 0\n')
+    (setup_root / 'tests').mkdir()
+    (setup_root / 'tests/__init__.py').write_text('')
+    (setup_root / 'tests/test_add.py').write_text(
+        'import unittest\nfrom app import add\nclass TestAdd(unittest.TestCase):\n'
+        '    def test_sum(self): self.assertEqual(add(2,3),5)\n')
+    commit(setup_root)
+    (directory / 'setup-root').write_text(str(setup_root))
     path = directory / 'operator.json'
     path.write_text(json.dumps(asdict(config), default=str))
     OperatorProfiles(config.data_root).register(path, 'Browser fixture')

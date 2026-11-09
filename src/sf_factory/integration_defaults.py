@@ -23,6 +23,12 @@ def repository_binding() -> RepositoryBindingAdapter:
     return GitHubRepositoryBinding()
 
 
+def detect_repository(root):
+    from sf_factory.github_repo_identity import repository_from_origin
+
+    return repository_from_origin(root)
+
+
 def source_control() -> ChangeSourceControl:
     from sf_factory.github_source_control import GitHubSourceControl
 

@@ -40,5 +40,15 @@ operator経路は既存の有限Workflowへ接続し、読み取り専用Runtime
 [Web実行操作](local-web-execution.md)はloopback launcherが発行する操作権限を要求する。
 `/api/operator/session`、`profiles`、`profiles/{id}/issues`、`profiles/{id}/diagnostics`、
 `jobs`、`jobs/{id}/stop`、`logout` を使い、
-HTTPから設定ファイルpathや任意commandを受け取らない。通常のAPI起動は実行無効。
+実行APIは登録IDのみを受け取り、任意path/commandを実行しない。認証済みの初回設定APIだけが明示的なGit rootと検証argvの案を受け取り、固定内容を承認後にprivate設定として保存する。案の作成・登録ではコマンドを実行しない。通常のAPI起動は実行無効。
 既存の公開閲覧APIに実行権限は付与しない。operator応答はno-storeとする。
+
+
+## 認証済み初回設定とHarness提案
+
+`POST /api/operator/setup/inspect` でローカルGit root/origin/Harnessを静的検査し、
+`POST /api/operator/setup/proposals` で設定案を保存します。検査中はrepoのコード・テストを実行しません。
+`GET /api/operator/setup/proposals` で保存済み案を表示し、
+`POST /api/operator/setup/proposals/{id}/approve` で一致するfingerprintと明示確認を要求します。
+保存先や認証情報はHTTP入力にしません。旧クイック開始/手動取り込みの公開APIは復活させません。
+内部workerの品質失敗からの改善案は同じ保存/承認経路を使います。自動登録・自動再実行はしません。

@@ -51,7 +51,7 @@ class OperatorProfiles:
                 raise StateConflict('invalid registered profile')
         return state
 
-    def register(self, path: Path, name: str) -> dict:
+    def register(self, path: Path, name: str, *, replace_existing: bool = True) -> dict:
         if not isinstance(name, str) or not name.strip() or len(name) > 120:
             raise ValueError('bounded profile name required')
         if not path.is_absolute() or path != path.resolve(strict=True):
@@ -66,6 +66,9 @@ class OperatorProfiles:
                 raise StateConflict('operator profile limit reached')
             value = {'id': key, 'name': name.strip(), 'path': str(path),
                      'fingerprint': config.fingerprint, 'revoked': False}
+            prior = state['profiles'].get(key)
+            if prior is not None and not replace_existing and prior != value:
+                raise StateConflict('managed profile differs or was revoked; do not overwrite')
             state['profiles'][key] = value
             write_document(fd, state)
         return {k: value[k] for k in ('id', 'name', 'fingerprint', 'revoked')}

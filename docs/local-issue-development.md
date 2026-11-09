@@ -3,7 +3,7 @@
 ## 対象と境界
 
 ローカルOSのoperatorが、対象repository外に保存した設定を明示して起動するCLI。
-`uv run sf web --rebuild`の閲覧機能と起動方法は維持し、Webの実行ボタンはまだ追加しない。
+同じ開発処理は[Web実行と初回設定](local-web-execution.md)からも利用できる。本書はCLIで設定する場合の詳細。
 この経路はGitHubを標準Adapterに使うが、共通controllerはTaskSource/SourceControl契約で動く。
 DBは不要。新しいIssue形式のSQLiteは保持し、新しいPOSIX rootはFileを使用する。
 旧Task形式のrootはサポートしないため、[新しい保存先](external-issue-model.md)でIssueを取り込み直す。

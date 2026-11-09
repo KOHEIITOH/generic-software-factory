@@ -94,8 +94,8 @@ def compose_harness(
                 applicable[candidate.path] = candidate
     if set(selected) | set(exclusions) != set(applicable):
         raise ValueError('every applicable rule source must be selected or explicitly excluded')
-    if not selected:
-        raise ValueError('at least one applicable rule source must be selected')
+    if not selected and project_harness is None:
+        raise ValueError('at least one repository or approved Project rule source is required')
     sources = tuple(applicable[path] for path in selected)
     profile_sources = [source for source in sources if source.kind == 'profile']
     if len(profile_sources) > 1:

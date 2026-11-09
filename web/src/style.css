@@ -117,3 +117,5 @@ main{padding-top:28px}
 .operator-plan details{padding:10px;border:1px solid #304764;border-radius:8px}
 .operator-panel select{display:block;width:100%;max-width:100%;min-width:0;border:1px solid #385074;border-radius:8px;background:#0c1626;color:#edf3ff;padding:10px;font:inherit}
 .workspace-details>summary{cursor:pointer;padding:16px;margin-bottom:16px;border:1px solid #304764;border-radius:12px;color:#b7c8e2}
+
+.setup-panel textarea{display:block;width:100%;max-width:100%;min-width:0;border:1px solid #385074;border-radius:8px;background:#0c1626;color:#edf3ff;padding:10px;font:inherit}.setup-preview{padding:16px;margin:14px 0;border:1px solid #496ab0;border-radius:12px;overflow-wrap:anywhere}.setup-preview pre{white-space:pre-wrap;overflow-wrap:anywhere}.setup-panel li{white-space:pre-wrap}
