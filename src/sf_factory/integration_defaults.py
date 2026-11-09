@@ -54,3 +54,23 @@ def describe_integrations() -> dict:
 
     return {'task_source': DEFAULT_TASK_SOURCE, 'source_control': DEFAULT_SOURCE_CONTROL,
             'credentials': credential_status()}
+
+
+def repository_choices(cursor: str | None = None):
+    from sf_factory.github_source_control import GitHubSourceControl
+
+    return GitHubSourceControl().repository_choices(cursor)
+
+
+def repository_source():
+    from sf_factory.github_source_control import GitHubSourceControl
+
+    return GitHubSourceControl()
+
+
+def repository_origin(repository: str) -> str:
+    from sf_factory.github_repo_identity import _REPO
+
+    if not _REPO.fullmatch(repository) or '..' in repository:
+        raise ValueError('valid repository identity required')
+    return 'https://github.com/' + repository + '.git'

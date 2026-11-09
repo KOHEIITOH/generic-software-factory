@@ -8,15 +8,15 @@ GitHub Adapter・永続予算を使います。AWSリソース作成、デプロ
 `uv run sf web --rebuild` で起動し、ターミナルの操作リンクを開きます。
 実行設定が未登録なら「初回設定・Harness生成と改善」が開きます。
 
-1. 対象のクリーンなGit Repositoryの絶対パスを指定し「リポジトリとHarnessを確認」。GitHub名はoriginから検出します。
+1. GitHubのRepository一覧から対象を選び「このRepositoryを取得して初回設定へ」。一覧は初回設定画面を開いたときに読み込みます。手動clone・絶対パス入力は不要です。
 2. AI、変更可能ファイル、検証内容と固定Dockerイメージを確認します。既存Harnessは検出・検証して再利用し、ない場合は最小の共通ルールを生成します。
 3. 「設定とHarnessの案を作成」で表示された内容と除外Profileを確認し、承認して登録します。
 4. 登録した設定でIssueを選択し「同意して実行・Draft PR作成」を押します。
 
 設定JSONの手作業や `sf operator register` は不要です。設定はFactoryのprivate保存先に作成し、
-Repositoryへファイルを書き込みません。案作成・登録ではAI推論・Docker実行・GitHubへの変更は行いません。
+取得元Repositoryへファイルを書き込みません。取得・案作成・登録ではAI推論・Docker実行・GitHubへの変更は行いません。
 GitHub/AIの認証、Docker、固定イメージは利用PCで事前に準備します。秘密情報はWebへ入力しません。
-Factoryの保存先と開発対象は分離します。Factory自身のRepositoryを対象にする場合は、起動前に`SF_DATA_DIR`をそのRepositoryの外へ指定してください。
+取得したソースは、Factoryの起動Repositoryや保存データと分離したSF専用の場所で管理します。手動パス指定は「既存のローカルRepositoryを使う」に残します。その場合だけ、保存先と開発対象が重ならないよう指定します。
 Python unittest/pytestを静的に検出できれば検証案を用意します。0件・skip・失敗・expected failureは不合格です。
 pytest等の依存は実行イメージに含めてください。未検出の方式は詳細欄で検証argv・期待出力を指定します。
 要件分割・CLI用の親Issue番号は詳細欄で指定できます（初期値1）。通常の実行は画面で選んだIssueを使います。
@@ -158,3 +158,19 @@ Webの開発実行が品質条件で停止した場合、受信済みのモデ�
 リンクはマスク表示し、送信後は入力を消します。アプリはブラウザの保存領域に記録しません。
 期限切れ・ログアウトでは同じサーバーのリンクを使えます。サーバー再起動後は新しいリンクが必要です。
 再接続だけではAI実行・PR作成・中断した送信の再実行は行いません。実行の同意も確認し直します。
+
+
+## GitHubから取得したRepositoryの扱い
+
+取得は既存SCM Adapterの読取APIを使い、default branchの特定commitのソースを上限付きで保存します。
+履歴全体のcloneやGit checkoutは行わず、hooks・filter・submodule・setup/installコマンドを実行しません。
+取得対象は既存のremote source制約と同じ、最大1,000通常ファイル・合計8MiB・1ファイル1MiBです。
+シンボリックリンク、submodule、機密/制御パス、切り詰められた応答は拒否します。変更可能なRepoだけ登録候補にします。
+SF管理のbaselineは1保存先あたり64版まで保持し、自動削除や上書きはしません。
+
+実行時はGitHubの現在のdefault branchを再確認し、特定revisionのsnapshotで実装・テスト・Draft配送します。
+許可済みのHarness/manifest/CI等が変わっていればAI推論前に止め、再取得と設定確認を案内します。
+通常のコード更新では手動git pullは不要です。既存の管理baselineや過去Runは変更しません。
+ローカルbaselineのGit commitと実装対象のremote commitは別々に記録し、remote revisionを実行証跡に固定します。
+取得中断後は同じ版・hashのpublication intentを照合し、公開前なら安全に取得し直せます。
+既存の作業場所が変更されていた場合は上書きしません。

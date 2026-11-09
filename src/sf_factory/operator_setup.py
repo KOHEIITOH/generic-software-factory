@@ -314,7 +314,10 @@ class SetupProposals:
         artifact = _artifact(open_factory(self.root), run_id)
         if artifact['config_fingerprint'] != replace(config, issue=issue_id).fingerprint:
             raise StateConflict('feedback Run belongs to another configuration')
-        if artifact['scope']['revision'] != _revision(config.root):
+        from sf_factory.managed_repository import managed_baseline
+        managed = managed_baseline(self.root, config.root)
+        baseline = managed['local_revision'] if managed else artifact['scope']['revision']
+        if baseline != _revision(config.root):
             raise StateConflict('feedback source baseline changed')
         if artifact['phase'] not in {'started', 'proposed'}:
             return None

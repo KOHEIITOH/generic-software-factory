@@ -180,15 +180,18 @@ def test_git_filters_are_rejected_before_status_can_execute_them(prepared, tmp_p
     assert len(service.approvals.events(approval)) == 1
 
 
-def test_inherited_global_filter_is_rejected(prepared, tmp_path, monkeypatch):
-    _, factory, service, _, approval = prepared
+def test_inherited_global_filter_is_isolated(prepared, tmp_path, monkeypatch):
+    root, factory, _, _, _ = prepared
+    canary = tmp_path / 'global-filter-executed'
     global_config = tmp_path / 'global-lfs-config'
-    global_config.write_text('[filter "lfs"]\n  process = git-lfs filter-process\n')
+    global_config.write_text('[filter "untrusted"]\n  clean = touch ' + str(canary) + '\n')
+    (root / '.git/info/attributes').write_text('*.md filter=untrusted\n')
+    (root / 'AGENTS.md').write_text((root / 'AGENTS.md').read_text())
     monkeypatch.setenv('GIT_CONFIG_GLOBAL', str(global_config))
-    with pytest.raises(ValueError, match='configured Git filters'):
-        prepare(prepared)
-    assert not factory.list_runs()
-    assert len(service.approvals.events(approval)) == 1
+    run = prepare(prepared)
+    assert run['status'] == 'prepared'
+    assert not canary.exists()
+    assert len(factory.list_runs()) == 1
 
 
 @pytest.fixture

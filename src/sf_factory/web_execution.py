@@ -35,6 +35,11 @@ class InspectSetup(BaseModel):
     repository: str = Field(default='', max_length=200)
 
 
+class AcquireRepository(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+    repository: str = Field(min_length=3, max_length=200)
+
+
 class SetupCheck(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
     id: str = Field(min_length=1, max_length=64)
@@ -85,6 +90,40 @@ def install_execution_routes(app: FastAPI, root: Path, operator: WebOperator | N
     def profiles(request: Request):
         auth(request)
         return {'profiles': OperatorProfiles(root).list()}
+
+    @app.get('/api/operator/setup/repositories')
+    def repository_choices(request: Request,
+                           cursor: str | None = Query(default=None, max_length=512)):
+        auth(request)
+        from sf_factory.integration_defaults import repository_choices as catalog
+        from sf_factory.source_control import SourceControlError
+        try:
+            choices, next_cursor = catalog(cursor)
+            return {'repositories': [{'repository': info.external_id,
+                'can_push': info.capabilities.write} for info in choices],
+                'next_cursor': next_cursor}
+        except (ValueError, SourceControlError) as exc:
+            raise HTTPException(502, 'Repository list unavailable; check GitHub credentials'
+                                ) from exc
+
+    @app.post('/api/operator/setup/acquire')
+    def acquire_repository(payload: AcquireRepository, request: Request):
+        auth(request)
+        import subprocess
+
+        from sf_factory.integration_defaults import repository_origin, repository_source
+        from sf_factory.managed_repository import ManagedRepositories
+        from sf_factory.operator_setup import inspect_repository
+        from sf_factory.source_control import SourceControlError
+        try:
+            value = ManagedRepositories(root).acquire(payload.repository,
+                repository_source(), repository_origin)
+            result = inspect_repository(Path(value['root']), value['repository'], root)
+            return {**result, 'managed': True, 'remote_revision': value['remote_revision']}
+        except SourceControlError as exc:
+            raise HTTPException(502, 'Repository source unavailable; check GitHub access') from exc
+        except (ValueError, OSError, subprocess.SubprocessError) as exc:
+            raise HTTPException(422, 'Repository cannot be prepared safely') from exc
 
     @app.post('/api/operator/setup/inspect')
     def inspect_setup(payload: InspectSetup, request: Request):

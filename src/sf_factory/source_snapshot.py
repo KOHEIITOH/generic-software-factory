@@ -20,6 +20,7 @@ from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
 from sf_factory.factory import Factory
+from sf_factory.git_environment import git_environment
 from sf_factory.harness_discovery import _sensitive
 
 if TYPE_CHECKING:
@@ -33,8 +34,7 @@ MAX_TOTAL_BYTES = 16777216
 def _git(root: Path, arguments: list[str], budget: int, deadline: float) -> bytes:
     command = ['git', '--no-optional-locks', '-c', 'core.hooksPath=/dev/null',
                '-c', 'core.fsmonitor=false', '-C', str(root), *arguments]
-    environment = dict(os.environ, GIT_NO_LAZY_FETCH='1', GIT_NO_REPLACE_OBJECTS='1',
-                       GIT_ALLOW_PROTOCOL='', GIT_TERMINAL_PROMPT='0')
+    environment = git_environment()
     process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                stderr=subprocess.DEVNULL, env=environment)
     output = bytearray()

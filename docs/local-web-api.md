@@ -52,3 +52,12 @@ operator経路は既存の有限Workflowへ接続し、読み取り専用Runtime
 `POST /api/operator/setup/proposals/{id}/approve` で一致するfingerprintと明示確認を要求します。
 保存先や認証情報はHTTP入力にしません。旧クイック開始/手動取り込みの公開APIは復活させません。
 内部workerの品質失敗からの改善案は同じ保存/承認経路を使います。自動登録・自動再実行はしません。
+
+
+## 認証済みRepository選択・取得
+
+`GET /api/operator/setup/repositories?cursor=...` が既存GitHub認証でページ単位の選択肢を返します。
+`POST /api/operator/setup/acquire` はRepository識別子だけを受け取り、default branchのsourceを検証して
+SF管理の場所へ取得し、検査結果を返します。HTTPからURL・clone先・branch・認証情報は指定できません。
+同じ認証/host/origin/custom-headerが必要で、匿名の旧`/api/github/repositories`は復活させません。
+取得は読み取りと管理baselineの保存だけです。実行権限は従来どおり内容確認後のprofile登録と明示実行で与えます。

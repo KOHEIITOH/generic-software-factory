@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { operatorApi } from "./operatorSession";
 
 type Check = { id: string; argv: string[]; stdout: string };
@@ -7,15 +7,22 @@ type Proposal = { id: string; fingerprint: string; kind: string; name: string; s
   selected_harness: string[]; excluded_harness: [string, string][];
   project_harness: { project: string; rules: { name: string; text: string }[] } | null;
   run_id?: string; profile: { id: string } | null };
-type Inspection = { repository: string; root: string; revision: string; files: string[];
+type RepositoryChoice = { repository: string; can_push: boolean };
+type Inspection = { managed?: boolean; remote_revision?: string; repository: string; root: string; revision: string; files: string[];
   test_preset: string | null; image: string; test_argv: string[] | null; test_stdout: string | null;
   harness: { path: string; kind: string }[]; validation: { path: string; code: string }[] };
 async function api(path: string, options: RequestInit = {}) {
   const response = await operatorApi("/setup" + path, options);
+  if (!response.ok && (path.startsWith("/repositories") || path === "/acquire")) throw new Error("GitHub Repositoryを取得できません（" + response.status + "）。PCのGitHub認証・アクセス権・取得対象の状態を確認してください。");
   if (!response.ok) throw new Error(response.status === 409 ? "対象の版・設定が変わりました。内容を確認して作り直してください。" : "設定を確認できません（" + response.status + "）。Git root・origin・変更範囲・テストを確認してください。");
   return response.json();
 }
 export default function SetupPanel({ onApplied, refreshKey }: { onApplied: (id: string) => Promise<void>; refreshKey: string }) {
+  const operation = useRef(false);
+  const [local, setLocal] = useState(false);
+  const [catalog, setCatalog] = useState<RepositoryChoice[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const [root, setRoot] = useState(""); const [repository, setRepository] = useState("");
   const [issue, setIssue] = useState("1");
   const [name, setName] = useState(""); const [provider, setProvider] = useState("bedrock");
@@ -29,18 +36,30 @@ export default function SetupPanel({ onApplied, refreshKey }: { onApplied: (id: 
   async function refresh() { setSuggestions((await api("/proposals")).proposals.filter((p: Proposal) => p.status !== "approved")); }
   useEffect(() => { void refresh().catch(e => setError(e.message)); }, [refreshKey]);
   async function perform(task: () => Promise<void>) {
-    if (busy) return;
-    setBusy(true); setError("");
+    if (operation.current) return;
+    operation.current = true; setBusy(true); setError("");
     try { await task(); } catch (e) { setError(e instanceof Error ? e.message : "設定エラー"); }
-    finally { setBusy(false); }
+    finally { operation.current = false; setBusy(false); }
   }
+  useEffect(() => { void perform(() => loadRepositories()); }, []);
   function invalidate() { setProposal(null); setApproved(""); }
-  async function inspect() {
-    const data: Inspection = await api("/inspect", { method: "POST", body: JSON.stringify({ root, repository }) });
+  function inspectResult(data: Inspection) {
     setInspection(data); setRepository(data.repository); setRoot(data.root); setImage(data.image);
     setPaths(data.files.slice(0, 32).join("\n")); setName(data.repository);
     setCommand(data.test_argv ? JSON.stringify(data.test_argv) : "");
     setStdout(data.test_stdout || ""); invalidate();
+  }
+  async function loadRepositories(next: string | null = null) {
+    const data = await api("/repositories" + (next ? "?cursor=" + encodeURIComponent(next) : ""));
+    setCatalog(previous => Array.from(new Map<string, RepositoryChoice>((next ? [...previous, ...data.repositories] : data.repositories).map((item: RepositoryChoice) => [item.repository, item])).values()));
+    setCursor(data.next_cursor);
+    if (!next) { setRepository(""); setInspection(null); invalidate(); }
+  }
+  async function inspect() {
+    inspectResult(await api("/inspect", { method: "POST", body: JSON.stringify({ root, repository }) }));
+  }
+  async function acquire() {
+    inspectResult(await api("/acquire", { method: "POST", body: JSON.stringify({ repository }) }));
   }
   async function propose() {
     const argv: unknown = JSON.parse(command);
@@ -75,11 +94,21 @@ export default function SetupPanel({ onApplied, refreshKey }: { onApplied: (id: 
   return <div className="setup-panel"><h3>かんたん初回設定・Harness管理</h3>
     <p>リポジトリを確認し、変更範囲と検証を承認すると実行設定を登録できます。設定ファイルの手作業は不要です。AI認証とDockerはPCの設定を使います。</p>
     {error && <p role="alert">{error}</p>}
-    <form onSubmit={e => { e.preventDefault(); void perform(inspect); }}>
-      <label>対象Repositoryの絶対パス<input aria-label="セットアップのRepositoryパス" value={root} disabled={busy} onChange={e => { setRoot(e.target.value); setInspection(null); invalidate(); }} placeholder="/Users/you/projects/my-service" /></label>
-      <label>GitHub Repository（省略時はoriginから自動検出）<input aria-label="セットアップのGitHub Repository" value={repository} disabled={busy} onChange={e => { setRepository(e.target.value); setInspection(null); invalidate(); }} placeholder="owner/repo" /></label>
-      <button type="submit" disabled={busy || !root}>リポジトリとHarnessを確認</button>
-    </form>
+    <div className="operator-toolbar"><button type="button" disabled={busy} onClick={() => void perform(() => loadRepositories())}>GitHubのRepositoryを取得</button></div>
+    {catalog.length > 0 && <><label>Repositoryを検索<input aria-label="セットアップのRepository検索" value={search} disabled={busy} onChange={e => setSearch(e.target.value)} /></label>
+      <label>GitHub Repository<select aria-label="セットアップのGitHub Repository選択" value={repository} disabled={busy} onChange={e => { setRepository(e.target.value); setInspection(null); invalidate(); }}>
+        <option value="">選択してください</option>{catalog.filter(c => c.repository === repository || c.repository.toLowerCase().includes(search.toLowerCase())).map(c => <option key={c.repository} value={c.repository} disabled={!c.can_push}>{c.repository}{c.can_push ? "" : "（読み取りのみ）"}</option>)}</select></label></>}
+    {cursor && <button type="button" disabled={busy} onClick={() => void perform(() => loadRepositories(cursor))}>Repositoryをさらに取得</button>}
+    <button type="button" disabled={busy || !repository} onClick={() => void perform(acquire)}>このRepositoryを取得して初回設定へ</button>
+    <p>取得は読み取り専用です。SF専用の場所へ保存し、手動clone・絶対パス入力は不要です。AIやセットアップコマンドは実行しません。</p>
+    <details onToggle={e => setLocal(e.currentTarget.open)}><summary>既存のローカルRepositoryを使う（任意）</summary>
+      {local && <form onSubmit={e => { e.preventDefault(); void perform(inspect); }}>
+        <label>対象Repositoryの絶対パス<input aria-label="セットアップのRepositoryパス" value={root} disabled={busy} onChange={e => { setRoot(e.target.value); setInspection(null); invalidate(); }} placeholder="/Users/you/projects/my-service" /></label>
+        <label>GitHub Repository（省略時はoriginから自動検出）<input aria-label="セットアップのGitHub Repository" value={repository} disabled={busy} onChange={e => { setRepository(e.target.value); setInspection(null); invalidate(); }} placeholder="owner/repo" /></label>
+        <button type="submit" disabled={busy || !root}>リポジトリとHarnessを確認</button>
+      </form>}
+    </details>
+    {inspection?.managed && <p>GitHubから取得済み: {inspection.repository} · 版 {inspection.remote_revision}</p>}
     {inspection && <form onSubmit={e => { e.preventDefault(); void perform(propose); }}>
       <p>既存のHarness候補: {inspection.harness.map(h => h.path).join(", ") || "なし。最小Harnessを生成します。"}</p>
       {inspection.validation.length > 0 && <details><summary>検出した注意点</summary><ul>{inspection.validation.map((v, i) => <li key={i}>{v.path}: {v.code}</li>)}</ul></details>}

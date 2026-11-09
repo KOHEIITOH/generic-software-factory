@@ -35,6 +35,23 @@ def main():
         'import unittest\nfrom app import add\nclass TestAdd(unittest.TestCase):\n'
         '    def test_sum(self): self.assertEqual(add(2,3),5)\n')
     commit(setup_root)
+    from sf_factory.collaboration_contracts import RevisionFile, RevisionSource
+    from sf_factory.repository_contracts import RepositoryCapabilities
+    from sf_factory.source_control import RepositoryInfo
+    setup_revision = git(setup_root, 'rev-parse', 'HEAD')
+    snapshot = RevisionSource('fixture/repo', setup_revision, tuple(
+        RevisionFile(p, '100644', (setup_root / p).read_bytes())
+        for p in ('app.py', 'tests/__init__.py', 'tests/test_add.py')))
+    class SetupSource:
+        def describe_repository(self, repository):
+            return RepositoryInfo('fixture/repo', 'main', RepositoryCapabilities(True, True, True))
+        def branch_revision(self, repository, branch):
+            return setup_revision
+        def read_revision(self, repository, revision):
+            return snapshot
+    patch.setattr('sf_factory.integration_defaults.repository_source', SetupSource)
+    patch.setattr('sf_factory.integration_defaults.repository_choices', lambda cursor: ([
+        RepositoryInfo('fixture/repo', 'main', RepositoryCapabilities(True, True, True))], None))
     (directory / 'setup-root').write_text(str(setup_root))
     path = directory / 'operator.json'
     path.write_text(json.dumps(asdict(config), default=str))

@@ -7,6 +7,7 @@ from sf_factory.development_config import DevelopmentConfig
 from sf_factory.factory import Factory
 from sf_factory.file_state import lock_directory
 from sf_factory.issue_development import DevelopmentStopped, _artifact, develop_issue
+from sf_factory.managed_repository import ManagedHarnessChanged
 from sf_factory.model_provider import ModelProvider
 from sf_factory.review_automation import _save
 from sf_factory.source_control import ChangeSourceControl
@@ -53,11 +54,15 @@ def execute_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
                 data['run_id'] = run_id
                 data['requirement_sources'] = sources
                 _save(session, data, 'issue_run_prepared', status='ready')
+            from sf_factory.managed_repository import execution_source
+            remote = (execution_source(factory.root, config.root, config.repository, scm)
+                      if resume is None else None)
             result = develop_issue(factory=factory, config=config, source=source, scm=scm,
                 implementer=BudgetedModel(implementer, session, role='implementation',
                                           max_output_tokens=32768),
                 reviewer=BudgetedModel(reviewer, session, role='review', max_output_tokens=32768),
-                confirmed=True, resume=resume, on_prepared=prepared, discover_references=True)
+                confirmed=True, resume=resume, on_prepared=prepared, discover_references=True,
+                remote_source=remote)
             data.update(run_id=result['run_id'], pull_request=result['pull_request'])
             action = session.snapshot()['actions']['execute']
             if action['status'] == 'pending':
@@ -65,6 +70,8 @@ def execute_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
             elif action['receipt'] != {'run_id': result['run_id']}:
                 raise StatePermissionDenied('execution receipt differs')
             return _save(session, data, 'draft_pr_created', status='completed')
+        except ManagedHarnessChanged:
+            return _save(session, data, 'managed_harness_review_required')
         except DevelopmentStopped as exc:
             current = session.snapshot()
             if current['status'] == 'stopped':
