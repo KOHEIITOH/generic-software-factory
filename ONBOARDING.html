@@ -8,7 +8,7 @@
 <h2>2. 依存関係と実行設定</h2><pre><code>uv sync --extra web --extra bedrock</code></pre>
 <p>GitHub/AIの認証、Dockerと依存入りの固定イメージをPCで準備します。認証情報はWebや設定ファイルに埋め込みません。</p>
 <h2>3. Webから初回登録</h2><pre><code>uv run sf web --rebuild</code></pre>
-<p>ターミナルの操作リンクを開き、「初回設定・Harness生成と改善」でRepositoryの絶対パスを指定します。GitHub名はoriginから検出します。変更範囲・検証・イメージ・Harnessの案を確認して承認すると登録できます。設定JSONの手作業は不要です。</p>
+<p>ターミナルの操作リンクを開き、「初回設定・Harness生成と改善」でGitHub Repositoryを一覧から選び、SFが管理する場所へ取得します。手動clone・絶対パス入力は不要です。変更範囲・検証・イメージ・Harnessの案を確認して承認すると登録できます。設定JSONの手作業は不要です。</p>
 <p>既存Harnessがあれば再利用し、なければ最小ルールを生成します。Python unittest/pytestの静的検出ができれば検証案を用意します。依存の不足や未知のテスト方式は詳細欄で設定します。検証を省略して成功扱いにはしません。</p>
 <p>この操作ではAI推論・Docker実行・GitHubへの変更・Repositoryへの書き込みは行いません。操作リンクは権限を含むため共有しないでください。</p>
 <details><summary>CLIから設定を登録する場合</summary><p>従来の設定ファイルによる方法も利用できます。保存先と設定のdata_rootを一致させます。</p><pre><code>uv run sf operator register --config /absolute/path/operator.json --name 開発対象</code></pre><p><a href="https://github.com/KOHEIITOH/generic-software-factory/blob/main/docs/local-issue-development.md">CLI向け設定例</a></p></details>

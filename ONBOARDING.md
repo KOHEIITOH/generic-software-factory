@@ -11,7 +11,7 @@ FactoryはAI開発作業の工程・権限・品質判定を共通化する基�
 
 ## 現在のWeb UIでできること（2026年11月時点）
 
-`uv run sf web --rebuild`で起動し、[Web初回設定](docs/local-web-execution.md)からRepository・変更範囲・検証・Harnessの案を確認して登録します。設定JSONの手作業は不要です。GitHub/AI認証とDockerは利用PCで準備します。
+`uv run sf web --rebuild`で起動し、[Web初回設定](docs/local-web-execution.md)からGitHub Repositoryを選択し、SFによる取得後に変更範囲・検証・Harnessの案を確認して登録します。手動cloneと絶対パス入力は不要です。設定JSONの手作業は不要です。GitHub/AI認証とDockerは利用PCで準備します。
 ターミナルの操作リンクから開き、Issueを選んで「同意して実行・Draft PR作成」を押します。
 手動取り込み・Repositoryの手動紐付け・デモPR作成は不要です。
 

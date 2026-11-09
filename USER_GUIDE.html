@@ -17,7 +17,7 @@
 <li><strong>レビュー対応:</strong> Factory製PRのRunを指定して同じPRへ有限回の修正を行います。</li>
 <li><strong>Project管理:</strong> 複数Repositoryのメタデータ管理です。開いたときだけ読み込みます。実行対象とHarnessは実行設定から適用します。</li>
 </ul>
-<h2>初回設定・Harness生成と改善</h2><p>WebでRepositoryを確認し、変更範囲・検証・Harnessの案を承認すると実行設定を登録できます。既存ルールは再利用し、ない場合は最小ルールを生成します。設定JSONの手作業は不要です。</p><p>失敗したRunに品質証拠がある場合は、定型の改善案を自動生成します。承認後の新設定で再検証し、元の設定と証跡は保持します。改善効果をルールの追加だけで断定せず、自動適用や無限再試行は行いません。</p><p><a href="/onboarding">初回オンボーディング</a>で依存関係・Docker・GitHub/AI認証・実行設定を用意してください。設定後の通常起動は次のコマンドです。</p>
+<h2>初回設定・Harness生成と改善</h2><p>WebでGitHub Repositoryを選んで取得し、変更範囲・検証・Harnessの案を承認すると実行設定を登録できます。既存ルールは再利用し、ない場合は最小ルールを生成します。設定JSONの手作業、手動clone、絶対パス入力は不要です。</p><p>失敗したRunに品質証拠がある場合は、定型の改善案を自動生成します。承認後の新設定で再検証し、元の設定と証跡は保持します。改善効果をルールの追加だけで断定せず、自動適用や無限再試行は行いません。</p><p><a href="/onboarding">初回オンボーディング</a>で依存関係・Docker・GitHub/AI認証・実行設定を用意してください。設定後の通常起動は次のコマンドです。</p>
 <pre><code>uv run sf web --rebuild</code></pre>
 <p>ローカルPCの単一利用者向けです。重要な変更・PRのマージ・リリースは人間が確認します。専用DBは必須ではありません。Bedrock＋GitHubの実サービス通し確認は利用者PCで行います。</p>
 <p><a href="https://github.com/KOHEIITOH/generic-software-factory/blob/main/docs/local-web-execution.md">設定・操作・復旧の詳細</a> · <a href="https://github.com/KOHEIITOH/generic-software-factory/blob/main/docs/north-star-roadmap.md">M1〜M5ロードマップ</a></p>

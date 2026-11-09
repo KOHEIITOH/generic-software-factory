@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from sf_factory.factory import Factory, _now
+from sf_factory.git_environment import git_environment
 from sf_factory.harness_approval import HarnessApprovalRequest
 from sf_factory.harness_composition import compose_harness
 from sf_factory.harness_validation import validate_harness
@@ -26,20 +27,22 @@ def _revision(root: Path) -> str:
     try:
         filters = subprocess.run(
             [*base, 'config', '--name-only', '--get-regexp', '^filter\\.'],
-            capture_output=True, text=True, check=False, timeout=10,
+            capture_output=True, text=True, check=False, timeout=10, env=git_environment(),
         )
         if filters.returncode not in (0, 1) or filters.stdout.strip():
             raise ValueError('repositories with configured Git filters are unsupported')
         location = subprocess.run([*base, 'rev-parse', '--show-toplevel'],
-                                  capture_output=True, text=True, check=True, timeout=10)
+                                  capture_output=True, text=True, check=True, timeout=10,
+                                  env=git_environment())
         if Path(location.stdout.strip()) != root:
             raise ValueError('repository root mismatch')
         head = subprocess.run([*base, 'rev-parse', '--verify', 'HEAD^{commit}'],
-                              capture_output=True, text=True, check=True, timeout=10)
+                              capture_output=True, text=True, check=True, timeout=10,
+                              env=git_environment())
         status = subprocess.run(
             [*base, 'status', '--porcelain=v1', '--untracked-files=all',
              '--ignore-submodules=none'],
-            capture_output=True, text=True, check=True, timeout=10,
+            capture_output=True, text=True, check=True, timeout=10, env=git_environment(),
         )
         if status.stdout:
             raise ValueError('prepare requires a clean tracked and untracked worktree')

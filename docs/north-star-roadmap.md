@@ -40,6 +40,9 @@ AIによる任意ルール生成や改善効果の自動評価は完成扱いに
 2026-11-09追加: 期限切れ・ログアウト後の操作リンク再接続、同じタブでの再認証、権限の再確認を追加。
 認証を弱めずに操作を復旧する。[ADR 0054](decisions/0054-recover-operator-session.md)参照。
 
+2026-11-09追加: GitHub Repository選択→管理source取得→初回設定→Issue選択→実行を接続。手動clone/絶対パスは任意の既存localモードに移動。
+管理版の更新でもIssue所属と過去baselineを維持し、実行はremote revisionへ固定する。[ADR 0055](decisions/0055-managed-repository-onboarding.md)参照。
+
 ## 1. North Starと判断基準
 
 人間が開発目的を伝えると、Factoryが要件整理、設計、タスク分解、実装、テスト、独立レビュー、修正、Draft PR、承認付きリリース、実行結果からの改善までを統制する汎用プラットフォームを目指す。人間は目的設定・重要判断・最終承認に集中する。

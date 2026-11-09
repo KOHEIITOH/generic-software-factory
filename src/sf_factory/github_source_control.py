@@ -96,6 +96,43 @@ class GitHubSourceControl:
             raise SourceControlError('invalid_response', 'GraphQL operation not confirmed')
         return result['data']
 
+    def repository_choices(self, cursor: str | None = None):
+        if cursor is not None and (not isinstance(cursor, str) or not 1 <= len(cursor) <= 512):
+            raise ValueError('bounded repository cursor required')
+        data = self._graphql("""query($cursor:String){viewer{repositories(first:50,after:$cursor,
+          affiliations:[OWNER,COLLABORATOR,ORGANIZATION_MEMBER],
+          orderBy:{field:UPDATED_AT,direction:DESC}){
+          nodes{nameWithOwner viewerPermission isArchived isDisabled defaultBranchRef{name}}
+          pageInfo{hasNextPage endCursor}}}}""", {'cursor': cursor})
+        try:
+            value = data['viewer']['repositories']
+            if not isinstance(value['nodes'], list) or len(value['nodes']) > 50:
+                raise ValueError('bounded repository page required')
+            choices = []
+            for item in value['nodes']:
+                if item.get('isArchived') is True or item.get('isDisabled') is True:
+                    continue
+                name = item['nameWithOwner']
+                _base(name)
+                branch = item['defaultBranchRef']
+                if branch is None:
+                    continue
+                _branch(branch['name'])
+                choices.append(RepositoryInfo(name, branch['name'], RepositoryCapabilities(
+                    True, item['viewerPermission'] in {'ADMIN', 'MAINTAIN', 'WRITE'}, True)))
+            page = value['pageInfo']
+            if type(page['hasNextPage']) is not bool:
+                raise ValueError('pagination state required')
+            next_cursor = page['endCursor'] if page['hasNextPage'] else None
+            if next_cursor is not None and (not isinstance(next_cursor, str) or
+                                            not 1 <= len(next_cursor) <= 512):
+                raise ValueError('invalid next cursor')
+            if page['hasNextPage'] and next_cursor is None:
+                raise ValueError('missing next cursor')
+            return choices, next_cursor
+        except (KeyError, TypeError, AttributeError, ValueError) as exc:
+            raise SourceControlError('invalid_response', 'Invalid repository catalog') from exc
+
     def describe_repository(self, repository: str) -> RepositoryInfo:
         data = self._request(_base(repository))
         name = data.get('full_name')

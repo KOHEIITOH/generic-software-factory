@@ -236,6 +236,22 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
             project_id = (hashlib.sha256(('project:' + config.project_harness.project).encode())
                           .hexdigest()[:32] if shared_project and config.project_harness
                           else key[:32])
+            from sf_factory.managed_repository import managed_baseline
+            managed = managed_baseline(factory.root, config.root)
+            if managed is not None and not shared_project:
+                project_id = hashlib.sha256(
+                    ('managed-project:' + info.external_id).encode()).hexdigest()[:32]
+                previous_project = factory.harness_state().issue_projects.project_for_issue(
+                    issue_key)
+                if previous_project is not None and previous_project != project_id:
+                    previous_repositories = factory.project_registry().list_repositories(
+                        previous_project)
+                    # Preserve a known repository-local Project when adopting managed sources.
+                    # Explicit shared Projects still require their matching configuration.
+                    if any(r.provider_id == 'local-git' and hashlib.sha256(
+                            (info.external_id + '\0' + r.external_id).encode()).hexdigest()[:32]
+                           == previous_project for r in previous_repositories):
+                        project_id = previous_project
             repository_id = key[32:]
             registry = factory.project_registry()
             if not any(p.id == project_id for p in registry.list_projects('local-cli')):

@@ -86,3 +86,35 @@ def test_repository_validation_prevents_network(monkeypatch, repository):
     monkeypatch.setattr('sf_factory.github_source_control.urlopen', unexpected)
     with pytest.raises(ValueError):
         GitHubSourceControl().describe_repository(repository)
+
+
+def test_repository_catalog_uses_bounded_graphql_page_and_common_info(monkeypatch):
+    adapter = GitHubSourceControl()
+    seen = []
+    def graphql(query, variables):
+        seen.append(variables)
+        return {'viewer': {'repositories': {'nodes': [
+            {'nameWithOwner': 'example/repo', 'viewerPermission': 'WRITE',
+             'isArchived': False, 'isDisabled': False, 'defaultBranchRef': {'name': 'main'}},
+            {'nameWithOwner': 'example/read-only', 'viewerPermission': 'READ',
+             'isArchived': False, 'isDisabled': False, 'defaultBranchRef': {'name': 'main'}},
+            {'nameWithOwner': 'example/archive', 'isArchived': True}],
+            'pageInfo': {'hasNextPage': True, 'endCursor': 'next-page'}}}}
+    monkeypatch.setattr(adapter, '_graphql', graphql)
+    choices, next_cursor = adapter.repository_choices('previous-page')
+    assert seen == [{'cursor': 'previous-page'}]
+    assert next_cursor == 'next-page'
+    assert [c.external_id for c in choices] == ['example/repo', 'example/read-only']
+    assert choices[0].capabilities.write and not choices[1].capabilities.write
+    with pytest.raises(ValueError):
+        adapter.repository_choices('x' * 513)
+
+
+def test_repository_catalog_rejects_untrusted_names_and_missing_pagination(monkeypatch):
+    adapter = GitHubSourceControl()
+    monkeypatch.setattr(adapter, '_graphql', lambda *a: {'viewer': {'repositories': {
+        'nodes': [{'nameWithOwner': '../elsewhere', 'viewerPermission': 'ADMIN',
+                   'defaultBranchRef': {'name': 'main'}}],
+        'pageInfo': {'hasNextPage': False, 'endCursor': None}}}})
+    with pytest.raises(SourceControlError):
+        adapter.repository_choices()
