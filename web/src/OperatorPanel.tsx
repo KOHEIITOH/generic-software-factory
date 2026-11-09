@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import SetupPanel from "./SetupPanel";
+import { operatorApi as api, exchange, exchangeToken, linkToken } from "./operatorSession";
 
 type RequirementSources = { mode: string; revision: string; fingerprint: string; review_status?: string;
   documents: { path: string; sha256: string; bytes: number; reason: string }[];
@@ -22,26 +23,15 @@ const active = (job: Job) => ["queued", "running", "stopping"].includes(job.stat
 const labels: Record<string, string> = { queued: "実行待ち", running: "実行中", stopping: "停止処理中", stopped: "停止", interrupted: "中断・復旧確認が必要", finished: "ステップ終了", waiting: "次の操作・レビュー待ち", completed: "完了", ready: "次へ進めます", awaiting_plan_approval: "計画の確認・承認待ち", plan_approval_requested: "計画の承認を依頼", human_plan_approved: "計画を承認済み", plan_approval_stale: "計画作成後に対象の版が変更されました", plan_approval_mismatch: "表示した計画と承認対象が一致しません", pending: "依存PRのマージ待ち", pr_open: "PRレビュー・マージ待ち", merged: "マージ確認済み", failed: "失敗", plan_ready: "計画と子Issueを作成しました", child_pr_submitted: "Draft PRを作成しました", awaiting_review: "レビュー待ち", awaiting_merge: "マージ待ち", repair_submitted: "同じPRへ修正を追記しました", child_awaiting_review_or_merge: "子PRのレビュー・マージ待ち", child_merge_verified: "子PRのマージを確認しました", all_child_prs_merged: "すべての子PRのマージを確認しました", remote_read_unavailable: "接続の再確認待ち", operator_or_execution_stopped: "停止または実行条件の確認が必要です", operator_step_approved: "実行を承認", worker_claimed: "workerが開始", operator_stop_requested: "停止を要求", worker_step_finished: "ステップ終了", worker_lease_lost: "workerの中断を検出", budget_exhausted: "試行・推論予算の上限に達しました", api_budget_exhausted: "API予算の上限に達しました", deadline_exhausted: "実行期限に達しました", candidate_repeated: "同じ変更案が繰り返されたため停止しました", base_changed_requires_new_candidate: "基準ブランチが変更されました", child_quality_failed: "子Issueの検証または独立レビューに失敗しました", parent_requirement_changed: "親Issueの要件が変更されました", child_requirement_changed: "子Issueの要件が変更されました", child_create_unresolved: "子Issue作成結果の照合待ち", child_link_unresolved: "親子関連の照合待ち", child_execution_outcome_unknown: "前の実行結果が不明なため停止しました", requirement_advance_stopped: "実行条件または権限を確認してください", advance_stopped: "実行条件または権限を確認してください", requirements_insufficient: "要件が不足しているため停止しました", requirements_conflicting: "要件に矛盾があるため停止しました", requirements_discovery_limit: "要件資料の読取上限を超えました。参照資料を明示してください", requirements_context_limit: "要件とコードの文脈が上限を超えました", requirements_source_missing: "指定した要件資料が見つかりません", requirements_source_invalid: "要件資料の形式・内容を確認してください", requirements_source_changed: "計画時から要件資料が変更されました", requirements_plan_rejected: "要件分割の独立レビューを通過しませんでした", requirements_reference_write_conflict: "参照した要件資料への変更を含むため停止しました", requirements_interpreted: "要件の解釈を記録しました", repository_readme: "README", root_requirement_document: "ルートの要件文書", requirement_document_convention: "要件・仕様・設計の文書候補", operator_context_path: "明示指定", explicit: "明示指定", auto: "自動検出", issue_only: "親Issueのみ", insufficient: "要件不足", conflicting: "要件の矛盾", requirements: "要件", supporting: "参考資料", irrelevant: "要件として不採用" };
 Object.assign(labels, { draft_pr_created: "Draft PRを作成しました", issue_run_prepared: "実行対象を固定しました", issue_execution_outcome_unknown: "前の実行結果が不明なため停止しました", issue_quality_failed: "テストまたは独立レビューを通過しませんでした", issue_execution_stopped: "実行条件の確認が必要です", issue_prerequisites_unavailable: "実行準備を確認してください。修正後は同じIssueを実行できます", repository_delivery_blocked: "同じRepositoryの前のPR作成結果を照合してください", issue_delivery_reconciliation_required: "同じIssueを実行してPR作成結果を照合してください" });
 const text = (code: string) => labels[code] || code;
-async function api(path: string, options: RequestInit = {}) {
-  return fetch("/api/operator" + path, { ...options, credentials: "same-origin", headers: {
-    "Content-Type": "application/json", "x-sf-operator": "1", ...options.headers } });
-}
-// React StrictMode may repeat effects. Exchange the URL capability only once.
-let bootstrap: Promise<void> | null = null;
-function exchange() {
-  if (!bootstrap) {
-    const token = new URLSearchParams(window.location.hash.slice(1)).get("operator");
-    if (token) window.history.replaceState(null, "", window.location.pathname + window.location.search);
-    bootstrap = token ? api("/session", { method: "POST", headers: { Authorization: "Bearer " + token } })
-      .then(r => { if (!r.ok) throw new Error("ターミナルの操作リンクを開き直してください。"); }) : Promise.resolve();
-  }
-  return bootstrap;
-}
 function Link({ url, label }: { url?: string; label: string }) {
   return url?.startsWith("https://") ? <a className="source-link" href={url} target="_blank" rel="noopener noreferrer">{label} ↗</a> : null;
 }
 
 export default function OperatorPanel() {
+  const [reconnectLink, setReconnectLink] = useState("");
+  const [reconnecting, setReconnecting] = useState(false);
+  const refreshVersion = useRef(0);
+  const reconnectFlight = useRef(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [auth, setAuth] = useState("loading");
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -76,25 +66,54 @@ export default function OperatorPanel() {
   const planTerminal = progress?.status === "stopped" || progress?.status === "completed";
   const frozen = history[0]?.reviewers;
   const working = jobs.some(active);
-  const available = profile?.available && !working && !busy && !diagnosticBusy && !uncertain;
+  const available = profile?.available && !reconnecting && !working && !busy && !diagnosticBusy && !uncertain;
   const enabled = available && consent && (profile?.provider !== "bedrock" || bedrock);
 
   async function refresh() {
+    const version = ++refreshVersion.current;
     const [p, j] = await Promise.all([api("/profiles"), api("/jobs")]);
+    if (version !== refreshVersion.current) return;
     if ([p.status, j.status].some(s => s === 401 || s === 403)) { setAuth("locked"); return; }
     if (!p.ok || !j.ok) throw new Error("状態を取得できません。保存済みの状態を保持しています。");
     const list: Profile[] = (await p.json()).profiles;
     setProfiles(list); setJobs((await j.json()).jobs);
     setSelected(value => value || list.find(item => item.available)?.id || ""); setAuth("ready");
   }
+  async function reconnect(value?: string) {
+    if (reconnectFlight.current) return;
+    reconnectFlight.current = true; setReconnecting(true); setError("");
+    refreshVersion.current++; setConsent(false); setBedrock(false); setApprovalConsent(null);
+    try {
+      if (value !== undefined) {
+        const token = linkToken(value); setReconnectLink(""); await exchangeToken(token);
+      } else await exchange();
+      await refresh();
+    } catch (cause) { setAuth("locked"); setError(cause instanceof Error ? cause.message : "再接続できません。"); }
+    finally { reconnectFlight.current = false; setReconnecting(false); }
+  }
   useEffect(() => {
     let alive = true;
     void fetch("/api/operator/status").then(async r => {
       if (!r.ok || !(await r.json()).enabled) { if (alive) setAuth("disabled"); return; }
       await exchange(); if (alive) await refresh();
-    }).catch(cause => { if (alive) { setAuth("locked"); setError(cause.message); } });
-    return () => { alive = false; };
+    }).catch(() => { if (alive) { setAuth("locked"); setError("操作リンクを確認して再接続してください。"); } });
+    const expired = () => { setAuth("locked"); setConsent(false); setBedrock(false); setApprovalConsent(null); };
+    const hash = () => {
+      if (!new URLSearchParams(window.location.hash.slice(1)).has("operator")) return;
+      setConsent(false); setBedrock(false); setApprovalConsent(null); refreshVersion.current++;
+      void exchange().then(async () => { setError(""); await refresh(); })
+        .catch(() => { setAuth("locked"); setError("新しい操作リンクで再接続してください。"); });
+    };
+    window.addEventListener("sf-operator-expired", expired);
+    window.addEventListener("hashchange", hash);
+    return () => { alive = false; window.removeEventListener("sf-operator-expired", expired); window.removeEventListener("hashchange", hash); };
   }, []);
+  useEffect(() => {
+    if (auth !== "ready" && auth !== "locked") return;
+    const focus = () => { if (!reconnectFlight.current) void refresh().catch(() => {}); };
+    window.addEventListener("focus", focus);
+    return () => window.removeEventListener("focus", focus);
+  }, [auth]);
   useEffect(() => {
     if (!working || auth !== "ready") return;
     // Only read local status. Never start workflow steps from a timer.
@@ -174,10 +193,16 @@ export default function OperatorPanel() {
   }
   return <section className="panel operator-panel" id="operator">
     <div className="panel-head"><span className="eyebrow">ISSUE → DRAFT PR</span><h2>開発を進める</h2>
-      <p>Issueを選んで実行すると、実装・テスト・独立レビューを経てDraft PRを作成します。初回に実行設定と認証が必要です。</p></div>
+      <p>Issueを選んで実行すると、実装・テスト・独立レビューを経てDraft PRを作成します。初回に実行設定と認証が必要です。</p><p role="status">操作権限：{reconnecting ? "再接続中" : auth === "ready" ? "接続済み" : auth === "loading" ? "確認中" : auth === "disabled" ? "実行無効" : "再接続が必要"}</p></div>
     {auth === "loading" && <p>操作権限を確認しています…</p>}
     {auth === "disabled" && <p>PCのターミナルで <code>uv run sf web --rebuild</code> を使って起動してください。</p>}
-    {auth === "locked" && <p>操作権限がありません。起動したターミナルに表示されたダッシュボードのリンクを開いてください。</p>}
+    {auth === "locked" && <div className="operator-reconnect"><p>操作権限がありません。起動したターミナルに表示されたダッシュボードのリンクを開いてください。</p>
+      <p>API接続と操作権限は別です。権限の期限切れ・ログアウト後も、同じサーバーの操作リンクで再接続できます。再起動後は新しいリンクを使ってください。</p>
+      <form onSubmit={e => { e.preventDefault(); void reconnect(reconnectLink); }}>
+        <label>操作リンク<input aria-label="再接続用の操作リンク" type="password" autoComplete="off" spellCheck={false} value={reconnectLink} maxLength={2048} disabled={reconnecting} onChange={e => setReconnectLink(e.target.value)} placeholder="ターミナルの http://127.0.0.1:8000/#operator=…" /></label>
+        <button type="submit" disabled={reconnecting || !reconnectLink.trim()}>操作リンクで再接続</button>
+        <button type="button" disabled={reconnecting} onClick={() => void reconnect()}>権限を再確認</button>
+      </form><small>リンクは他人に共有しないでください。入力は再接続時に消去し、ブラウザの保存領域には記録しません。再接続だけではAI実行やPR作成は始まりません。</small></div>}
     {error && <p role="alert">{error}</p>}{message && <p role="status">{message}</p>}
     {auth === "ready" && <>
       <div className="operator-toolbar"><button type="button" disabled={busy} onClick={() => void refresh().catch(e => setError(e.message))}>状態を更新</button>
