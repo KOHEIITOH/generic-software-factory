@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { operatorApi } from "./operatorSession";
 
 type Check = { id: string; argv: string[]; stdout: string };
 type Proposal = { id: string; fingerprint: string; kind: string; name: string; status: string;
@@ -10,8 +11,7 @@ type Inspection = { repository: string; root: string; revision: string; files: s
   test_preset: string | null; image: string; test_argv: string[] | null; test_stdout: string | null;
   harness: { path: string; kind: string }[]; validation: { path: string; code: string }[] };
 async function api(path: string, options: RequestInit = {}) {
-  const response = await fetch("/api/operator/setup" + path, { ...options, credentials: "same-origin",
-    headers: { "Content-Type": "application/json", "x-sf-operator": "1" } });
+  const response = await operatorApi("/setup" + path, options);
   if (!response.ok) throw new Error(response.status === 409 ? "対象の版・設定が変わりました。内容を確認して作り直してください。" : "設定を確認できません（" + response.status + "）。Git root・origin・変更範囲・テストを確認してください。");
   return response.json();
 }
