@@ -391,3 +391,18 @@ def test_same_failed_run_does_not_duplicate_learning_through_an_equivalent_profi
     repeated = store.feedback(alternate['id'], alternate['fingerprint'],
                               '1', result['run_id'], result['session_id'])
     assert repeated['id'] == original['id'] and len(store.list()) == 1
+
+
+def test_improvement_preserves_project_when_adapter_canonicalizes_repository(job_flow, flow):
+    from sf_factory.repository_contracts import RepositoryCapabilities
+    from sf_factory.source_control import RepositoryInfo
+
+    root, _, payload, _ = job_flow
+    flow['config'] = replace(flow['config'], repository='Fixture/Repo')
+    path = root.parent / 'operator.json'
+    path.write_text(json.dumps(asdict(flow['config']), default=str))
+    registered = OperatorProfiles(root).register(path, 'Canonical repository fixture')
+    payload.update(profile_id=registered['id'], config_fingerprint=registered['fingerprint'])
+    flow['scm'].describe_repository = lambda repository: RepositoryInfo(
+        'fixture/repo', 'main', RepositoryCapabilities(True, True, True))
+    test_improvement_is_evaluated_with_unchanged_checks_before_next_pr(job_flow, flow)

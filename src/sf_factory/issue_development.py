@@ -231,7 +231,7 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
             factory.bind_issue_repository(issue_key, info.external_id, config.root)
             key = hashlib.sha256((info.external_id + '\0' + str(config.root)).encode()).hexdigest()
             shared_project = (config.project_harness is not None and
-                config.project_harness.project != repository_project_name(info.external_id,
+                config.project_harness.project != repository_project_name(config.repository,
                                                                           config.root))
             project_id = (hashlib.sha256(('project:' + config.project_harness.project).encode())
                           .hexdigest()[:32] if shared_project and config.project_harness
