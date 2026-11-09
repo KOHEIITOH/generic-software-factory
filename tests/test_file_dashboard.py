@@ -43,8 +43,7 @@ def test_web_file_roundtrip_without_sqlite_and_without_extra_commands(tmp_path, 
         assert client.post(url, json=repo, headers=headers).status_code == 409
         assert client.post('/api/issues', json={'prompt': 'cross-origin'}).status_code == 405
         assert client.get('/api/runs').json() == {'runs': []}
-        preflight = client.get(f'/api/issues/{issue_key}/implementation-preflight')
-        assert preflight.json()['execution_started'] is False
+        assert client.get('/api/issues').json()['issues'][0]['key'] == issue_key
     with TestClient(create_app(data_dir=tmp_path)) as client:
         assert client.get('/api/issues').json()['issues'][0]['prompt'] == 'keep me'
         assert client.get('/api/projects').json()['projects'][0]['name'] == 'Example'
@@ -203,7 +202,7 @@ def test_shared_operator_and_web_data_directory(tmp_path, monkeypatch):
     assert not (tmp_path / '.sf-factory').exists()
 
 
-def test_bound_issue_metadata_survives_reopen_and_preflight(tmp_path, monkeypatch):
+def test_bound_issue_metadata_survives_reopen(tmp_path, monkeypatch):
     monkeypatch.setattr(sqlite3, 'connect', no_sqlite)
     monkeypatch.setattr('sf_factory.github_repo_identity.verify_github_origin',
                         lambda path, repository: path)
@@ -211,20 +210,12 @@ def test_bound_issue_metadata_survives_reopen_and_preflight(tmp_path, monkeypatc
     issue_key = factory.import_issue(
         provider='github', instance='example/repo', external_id='42', prompt='Implement',
     )
-    headers = {'Origin': 'http://testserver'}
-    with TestClient(create_app(data_dir=tmp_path)) as client:
-        result = client.post(f'/api/issues/{issue_key}/repository', headers=headers, json={
-            'repository': 'example/repo', 'local_path': str(tmp_path),
-        })
-        assert result.status_code == 200
+    # Internal binding remains part of development, without a manual Web mutation route.
+    factory.bind_issue_repository(issue_key, 'example/repo', tmp_path)
     with TestClient(create_app(data_dir=tmp_path)) as client:
         row = client.get('/api/issues').json()['issues'][0]
         assert row['bound_repository'] == 'example/repo'
-        result = client.get(f'/api/issues/{issue_key}/implementation-preflight').json()
-        assert result['repository'] == 'example/repo'
-        assert result['execution_started'] is False
-        assert 'GitHub Issue source required' not in result['blockers']
-        assert 'Verified local repository binding required' not in result['blockers']
+        assert row['bound_local_path'] == str(tmp_path.resolve())
 
 
 def test_bad_binding_does_not_change_file_state(tmp_path, monkeypatch):

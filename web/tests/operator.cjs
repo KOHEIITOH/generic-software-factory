@@ -31,6 +31,12 @@ const net = require('node:net');
     const context = await browser.newContext();
     const page = await context.newPage();
     page.setDefaultTimeout(15000);
+    const projectRequests = []; const obsoleteRequests = [];
+    page.on('request', request => {
+      const pathname = new URL(request.url()).pathname;
+      if (pathname.startsWith('/api/projects')) projectRequests.push(pathname);
+      if (/^\/api\/(quick|github|runtimes|issues|runs)(\/|$)/.test(pathname)) obsoleteRequests.push(pathname);
+    });
     const pageErrors = []; page.on('pageerror', e => pageErrors.push(e.message));
     await page.goto(fs.readFileSync(path.join(temporary, 'operator-link'), 'utf8'));
     const panel = page.locator('#operator');
@@ -108,7 +114,25 @@ const net = require('node:net');
     assert.equal(await panel.getByRole('link', { name: 'Draft PRを開く ↗', exact: true }).first().getAttribute('href'), 'https://github.com/fixture/repo/pull/99');
     await panel.getByText('要件分割の計画・進捗', { exact: true }).click();
     await panel.getByText('実行履歴・操作の証跡', { exact: true }).click();
-    assert.equal(await page.locator('#workspace-details').getAttribute('open'), null, 'Auxiliary import/setup panels must be collapsed by default');
+    assert.equal(await page.locator('#workspace-details').getAttribute('open'), null, 'Optional Project management must be closed by default');
+    assert.deepEqual(projectRequests, [], 'Normal execution must not fetch optional Project data');
+    assert.deepEqual(obsoleteRequests, [], 'Normal execution must not call removed or duplicate APIs');
+    for (const label of ['デモ用Draft PRを作成', 'このIssueを取り込む', 'Repositoryを紐付け', 'クイック開始', 'AI実装の事前チェック']) {
+      assert(!(await page.locator('body').textContent()).includes(label), 'Obsolete control must be absent: ' + label);
+    }
+    await page.locator('#workspace-details > summary').click();
+    await page.getByRole('button', { name: 'Projectを登録', exact: true }).waitFor();
+    await page.getByLabel('新しいProject名', { exact: true }).fill('Browser Project');
+    await page.getByRole('button', { name: 'Projectを登録', exact: true }).click();
+    await page.getByText('Projectを登録しました。Repositoryを追加できます。', { exact: true }).waitFor();
+    await page.getByLabel('Repositoryの場所', { exact: true }).fill('fixture/repo');
+    await page.getByRole('button', { name: 'Repositoryを追加', exact: true }).click();
+    await page.getByText('Repositoryを登録しました。', { exact: true }).waitFor();
+    await page.locator('#workspace-details > summary').click();
+    await page.locator('#workspace-details > summary').click();
+    await page.getByLabel('Projectを選択', { exact: true }).selectOption({ label: 'Browser Project' });
+    await page.locator('#projects .repository-row strong').filter({ hasText: 'fixture/repo' }).waitFor();
+    await page.locator('#workspace-details > summary').click();
     if (process.env.SF_BROWSER_DESKTOP_SCREENSHOT) {
       await page.setViewportSize({ width: 1280, height: 2400 });
       await page.locator('main').evaluate(e => { e.scrollTop = 0; });
@@ -116,6 +140,10 @@ const net = require('node:net');
     }
     await page.setViewportSize({ width: 390, height: 844 });
     assert(await panel.evaluate(e => e.scrollWidth <= e.clientWidth + 1), 'Panel must fit mobile viewport');
+    await page.locator('#workspace-details > summary').click();
+    await page.getByRole('button', { name: 'Projectを登録', exact: true }).waitFor();
+    assert(await page.locator('body').evaluate(e => e.scrollWidth <= e.clientWidth + 1), 'Project management must fit mobile viewport');
+    await page.locator('#workspace-details > summary').click();
     if (process.env.SF_BROWSER_SCREENSHOT) await panel.screenshot({ path: process.env.SF_BROWSER_SCREENSHOT });
     const anonymous = await browser.newContext();
     const guest = await anonymous.newPage(); await guest.goto(origin);
@@ -124,7 +152,7 @@ const net = require('node:net');
     await panel.getByRole('button', { name: '操作権限を閉じる' }).click();
     await panel.getByText('操作権限がありません。', { exact: false }).waitFor();
     assert.deepEqual(pageErrors, []);
-    console.log('Operator browser checks passed: Issue selection + single execute-and-consent button to Draft PR, collapsed utilities/history, consent, fragment, idempotent retry, reviewed plan approval, progress, requirement source metadata/citations, stop, reload/resume, budgets, mobile, unauthorized access, logout.');
+    console.log('Operator browser checks passed: Issue selection + single execute-and-consent button to Draft PR, no obsolete controls/API requests, lazy Project management/reopen, collapsed history, consent, fragment, idempotent retry, reviewed plan approval, progress, requirement source metadata/citations, stop, reload/resume, budgets, mobile, unauthorized access, logout.');
   } finally {
     if (browser) await browser.close();
     if (server.exitCode === null) {

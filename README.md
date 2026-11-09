@@ -36,8 +36,8 @@ Generic Software Factoryは、ソフトウェア開発の計画・実行・品�
 - Agent Runtime Adapter: Codex CLI、Grok Build CLI、GitHub Copilot SDK（IssueのRunから選択可能。Copilotは空workspace・tools無効の現段階に限る）
 - 追加予定: Claude Code、Gemini CLI
 - Model Provider: AWS Bedrock ConverseとツールなしCopilot SDK。xAI API等は将来の追加候補
-- ローカルWeb UI: React / TypeScript / Vite（Issue取り込み・閲覧。実装実行は明示的なローカルCLI）
-- Task Source: GitHub Issues Adapterと重複防止付き取り込み。WebでのIssue取り込みと、明示設定したローカルCLIの開発入口に対応。
+- ローカルWeb UI: React / TypeScript / Vite（認証済みのIssue選択→実装・テスト・レビュー→Draft PR）
+- Task Source: GitHub Issues Adapterと重複防止付き取り込み。Web/CLIの開発実行時に要件を取得・固定。手動取り込みは不要。
 - 初期検証: 一時ディレクトリ内のread-only / サンプル限定code-edit smoke test。会社のソースコードは使用しない。
 
 ## Quickstart — macOS / Windows / Linux
@@ -117,20 +117,26 @@ Webからの実行・再開・停止は[ローカルWeb実行](docs/local-web-ex
 
 ## 現在のステータス
 
-**実験的MVP** — ローカルFile/SQLiteによるIssue/Run/Audit記録、Codex/Grok/Copilot Runtime Adapter、read-only smoke test、Codexによるサンプル限定のコード編集と単体テストを実装しています。`uv run sf analyze /path/to/repository --confirm-send` は指定されたローカルGitリポジトリから制限付きのテキストsnapshotをCopilotへ渡して解析します。SDK toolsは無効で、リポジトリ本体をworkspaceとして渡さず、Task/RunやFactory DBにはソース内容を保存しません。ファイルの編集・任意コマンド実行・隔離保証はありません。詳細は[解析の範囲と制約](docs/local-repository-analysis.md)を参照してください。`uv run sf dev-smoke --runtime codex` は使い捨て一時ディレクトリ内の同梱サンプルだけを編集します。編集可能なRuntimeは明示指定が必要で、現時点ではCodexのみ検証済みです。Factory Coreおよび共通AgentRuntime契約はCodexに依存しません。明示的なローカルoperator設定を使う `sf issue develop` には、Issue取得・AI変更案・実隔離の挙動テスト・別session/requestのレビュー・Draft PR配送/復旧を接続しました。実Bedrock/実GitHubでの最終通し成功はPCで未確認です。Webからの実装実行、失敗の自動修正ループ、MCP Serverは未実装です。
+**実験的MVP** — ローカルFile/SQLiteによるIssue/Run/Audit記録、Codex/Grok/Copilot Runtime Adapter、read-only smoke test、Codexによるサンプル限定のコード編集と単体テストを実装しています。`uv run sf analyze /path/to/repository --confirm-send` は指定されたローカルGitリポジトリから制限付きのテキストsnapshotをCopilotへ渡して解析します。SDK toolsは無効で、リポジトリ本体をworkspaceとして渡さず、Task/RunやFactory DBにはソース内容を保存しません。ファイルの編集・任意コマンド実行・隔離保証はありません。詳細は[解析の範囲と制約](docs/local-repository-analysis.md)を参照してください。`uv run sf dev-smoke --runtime codex` は使い捨て一時ディレクトリ内の同梱サンプルだけを編集します。編集可能なRuntimeは明示指定が必要で、現時点ではCodexのみ検証済みです。Factory Coreおよび共通AgentRuntime契約はCodexに依存しません。明示的なローカルoperator設定を使う `sf issue develop` には、Issue取得・AI変更案・実隔離の挙動テスト・別session/requestのレビュー・Draft PR配送/復旧を接続しました。実Bedrock/実GitHubでの最終通し成功はPCで未確認です。登録設定を使う認証済みWeb実行と有限の同一PR修正も接続済みです。MCP Serverは未実装です。
 
-## ローカルWeb UI（閲覧専用）
+## ローカルWeb UI（Issue → Draft PR）
 
 ```bash
 uv sync --extra web
 uv run sf web --rebuild
 ```
 
-ブラウザで `http://127.0.0.1:8000/` を開きます。画面には外部Issue、実行履歴、登録済みRuntimeが表示され、`/guide` と `/onboarding` からHTML資料を読めます。初回またはフロントエンド再構築時はNode.js/npmも必要です。ローカルAPIは認証なしのため外部公開しないでください。詳細は[ローカルWeb API](docs/local-web-api.md)を参照してください。
+初回に[実行設定と認証](docs/local-web-execution.md)を登録し、起動したターミナルの操作リンクを開きます。
+通常は **Issueを選択 →「同意して実行・Draft PR作成」** の2操作です。
+手動取り込み・紐付け・デモPRはありません。進捗・停止・復旧・PRリンクは同じ画面で扱います。
+Project管理は任意で、開いたときだけ読み込みます。診断・要件分割・レビュー対応は詳細操作です。
+`/guide` と `/onboarding` から利用手順を確認できます。Node.js/npmはWebビルド時に必要です。
+loopback専用です。実行にはoperator認証が必要で、直接起動したAPIでは実行無効です。
+詳細は[ローカルWeb API](docs/local-web-api.md)を参照してください。
 
 ## GitHub Issuesとローカル開発
 
-Issue取り込みは[GitHub Issues Adapterガイド](docs/guides/github-issues-source.md)を参照してください。
+通常はWebからIssueを選択します。開発者向けの読取Adapterは[GitHub Issues Adapterガイド](docs/guides/github-issues-source.md)を参照してください。
 ローカルでの実装・テスト・レビュー・Draft PRは、[PCでの設定・実行・復旧手順](docs/local-issue-development.md)を使います。
 
 ```sh

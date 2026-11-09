@@ -4,7 +4,7 @@
 uv run sf web --rebuild
 ```
 
-Web閲覧・外部Issue取り込みにはDBサーバー、Docker、事前のTask作成は不要。
+Webの閲覧とIssue/Runの証跡保存にDBサーバーは不要。通常のWeb実行は登録設定からIssueを選択し、実行時に要件を取得・固定する。手動取り込みは削除済み。閲覧にはDocker不要だが、開発実行には必要。
 独立Task・旧Task CLIは削除済み。依頼の本文は外部Issueで管理する。
 
 ## 保存先とbackend

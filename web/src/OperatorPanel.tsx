@@ -200,7 +200,7 @@ export default function OperatorPanel() {
           <button type="button" className="primary" disabled={!available || !issueId} onClick={() => submit("develop")}>同意して実行・Draft PR作成</button>
           {issueProgress && <div className="operator-progress"><h3>{issueProgress.pr_url ? "Draft PRを作成しました" : text(issueProgress.status)}</h3>
             <Link url={issueProgress.pr_url} label="Draft PRを開く" />
-            {issueHistory[0]?.result?.reason && <p>{text(issueHistory[0].result.reason)}</p>}
+            {issueHistory[0]?.result?.reason && issueHistory[0].result.reason !== "draft_pr_created" && <p>{text(issueHistory[0].result.reason)}</p>}
             <p>推論: {issueProgress.counts.model} / {issueProgress.limits.max_model_calls}回・API: {issueProgress.counts.api} / {issueProgress.limits.max_api_calls}回</p>
             <details><summary>実行の判断・停止理由</summary><ul>{issueProgress.decisions.map((d, i) => <li key={i}>{text(d.code)}</li>)}</ul></details>
             <p>同じIssueの再実行では、この実行記録を照合します。結果不明の推論は再送しません。</p></div>}

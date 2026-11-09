@@ -87,6 +87,12 @@ DBは不要、現段階ではPOSIXローカル保存先を使います。複数�
 検証では実HTTP/保存とChromium、実Docker workerケースを使用し、AI/SCMは模擬します。
 Bedrock＋GitHubの実サービス最終通し確認は、引き続き利用者のPCで行います。
 
+## 任意のProject管理
+
+Project/Repositoryのメタデータ管理は専用の折りたたみ画面を開いたときだけ読み込みます。
+通常のIssue実行にProject登録は不要です。Project共通Harnessは既存の実行設定から適用します。
+手動取り込み・紐付け・デモPR・旧クイック開始・Runtime紹介カード・重複履歴は削除しました。
+
 ## 要件資料の自動検出
 
 `context_paths` を指定すれば優先し、省略/空ならREADME・要件/仕様文書の候補を探します。

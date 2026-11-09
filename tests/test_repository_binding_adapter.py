@@ -57,7 +57,7 @@ def test_unrelated_external_issue_cannot_bind_to_another_scope(factory, tmp_path
 def test_core_and_shared_workflows_do_not_import_github_adapters():
     root = Path(__file__).resolve().parents[1] / 'src/sf_factory'
     for name in ('factory', 'file_dashboard', 'workflow', 'workflow_runner', 'harness_runs',
-                 'run_evidence', 'source_snapshot', 'draft_pr_demo', 'source_control'):
+                 'run_evidence', 'source_snapshot', 'issue_execution', 'source_control'):
         tree = ast.parse((root / f'{name}.py').read_text())
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom):

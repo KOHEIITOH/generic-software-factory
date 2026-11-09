@@ -5,19 +5,23 @@
 
 ## 0. 何ができる？
 
-FactoryはAI開発作業の工程・権限・品質判定を共通化するための基盤です。現状はローカルCLIでTask / Runを記録し、Codex・Grok・Copilotへの限定的な接続確認ができます。Workflow、Policy、Quality Gate、Improvement LoopのPython部品も実装されていますが、これらを統合した完全自律開発CLIやPR自動作成は未実装です。
+FactoryはAI開発作業の工程・権限・品質判定を共通化する基盤です。
+登録済みの実行設定で、GitHub Issueから実装・隔離テスト・独立レビュー・Draft PRまで進められます。
+実Bedrock＋GitHubの最終通し確認は利用者のPCで行います。完全自律開発の完成を意味しません。
 
 ## 現在のWeb UIでできること（2026年11月時点）
 
-Web UIは**閲覧専用**です。ローカルで `uv sync --extra web` を実行した後、`uv run sf web --rebuild` で起動し、`http://127.0.0.1:8000/` を開きます。初回ビルドにはNode.js/npmが必要です。
+初回に[実行設定と認証](docs/local-web-execution.md)を登録し、`uv run sf web --rebuild`で起動します。
+ターミナルの操作リンクから開き、Issueを選んで「同意して実行・Draft PR作成」を押します。
+手動取り込み・Repositoryの手動紐付け・デモPR作成は不要です。
 
-- ダッシュボード: 登録済みAI Runtime、Task一覧、Run履歴を閲覧
-- ユーザーガイド: `/guide` でHTMLを表示
-- オンボーディング: `/onboarding` でHTMLを表示
-- GitHub Issues: 読み取り専用Adapterと重複防止付きTask取り込みは**Python APIとして実装済み**（[開発者向け利用例](docs/guides/github-issues-source.md)）
-- **未実装**: Web UIからのTask作成・Issue取り込み・AI実行、任意リポジトリの自律編集、PR自動作成
+- 通常操作: Issue選択、実行、進捗・PRリンク、停止・復旧・履歴の確認
+- 詳細操作: 診断、要件分割と計画承認、同じPRのレビュー修正
+- Project管理: 任意。画面を開いたときだけ読み込みます
+- `/guide`、`/onboarding`: ブラウザで利用手順を確認
 
-非エンジニア向けのブラウザ完結型セットアップは将来の目標です。現在の初期セットアップには開発者によるCLI操作が必要です。APIは認証なしのローカル専用なので外部公開しないでください。
+初期設定にはCLI操作が必要です。loopback専用で、実行にはoperator認証が必要です。
+WebのビルドにはNode.js/npm、コードの検証には資源制限を強制できるDockerが必要です。
 
 ## 1. 最初に用意する
 
@@ -72,7 +76,7 @@ uv run pyright
 
 ### 4-3. Model Provider / モデル接続先（将来の拡張）
 
-Agent Runtimeとは別に、Custom Agentが直接推論APIを呼ぶ場合の候補です。**現時点でFactoryのModel Provider Adapterは未実装**です。
+Agent Runtimeとは別に、Custom Agentが直接推論APIを呼ぶ場合の候補です。**Bedrock ConverseとツールなしCopilot SDKのModel Providerを実装しています**。その他は追加候補です。
 
 | 候補 | 接続方法の想定 | 役割 |
 | --- | --- | --- |
@@ -124,21 +128,21 @@ uv run sf copilot-smoke
 - **Claude Code / Gemini CLIを使いたい:** 現在はFactory Adapter未実装。単体での利用とFactory経由の利用を混同しない。
 - **AWS Bedrockを使いたい:** Converse Model ProviderとローカルIssue開発CLIを利用可能。PCの認証・設定と通し試験が必要。
 
-**どのAIを選んでも、モデルの回答だけで品質合格としないこと。** Quality Gateは独立した検証証拠を必要とし、信頼できる証拠収集Adapterと隔離実行は今後の課題です。
+**どのAIを選んでも、モデルの回答だけで品質合格としないこと。** Quality Gateは実隔離テストと独立レビューの検証証拠を必要とします。利用するPCでDockerの資源制限と認証を確認します。
 
 詳細: [Agent Runtime / Model Provider対応方針](docs/agent-runtime-roadmap.md)、[Adapter契約](docs/adapter-contracts.md)。
 
-## 5. 外部Issueを取り込んで実行する（任意）
+## 5. GitHub Issueを選んで実行する
 
 開発依頼はGitHub Issueで管理します。Factory独自Taskの作成・旧Task CLIは削除済みです。
-WebからIssueを取り込み、開発実行はoperator設定を使うローカルCLIで行います。
+通常は認証済みWeb画面でIssueを選択して実行します。[初回設定・Web操作](docs/local-web-execution.md)を参照してください。CLIから同じ開発処理を実行することもできます。
 
 ```sh
 uv run sf issue develop --config /absolute/path/to/operator-config.json --confirm-run --confirm-bedrock
 ```
 
 [PCでの設定・実行・復旧](docs/local-issue-development.md)を参照してください。
-旧Task形式の保存先は移行しません。[新しい保存先](docs/external-issue-model.md)で取り込み直します。
+旧Task形式の保存先は移行しません。[新しい保存先](docs/external-issue-model.md)を指定し、実行時にIssueを取得します。
 
 ## 6. よくあるつまずき
 
@@ -150,7 +154,7 @@ uv run sf issue develop --config /absolute/path/to/operator-config.json --confir
 
 ## 7. 安全に使うための境界
 
-Smoke test成功はAIが安全に任意コードを編集・実行できる証明ではありません。OSレベルの隔離、証拠の真正性、PR自動作成は未完成です。会社のコード、個人情報、認証情報は試験用に渡さないでください。リポジトリ解析コマンド `sf analyze` は内容をCopilotへ送信するため、[送信範囲と制約](docs/local-repository-analysis.md)を確認してください。
+Smoke test成功はAIが安全に任意コードを編集・実行できる証明ではありません。開発実行には別途、承認済み設定・実Docker検証・独立レビュー・配送証跡が必要です。会社のコード、個人情報、認証情報は試験用に渡さないでください。リポジトリ解析コマンド `sf analyze` は内容をCopilotへ送信するため、[送信範囲と制約](docs/local-repository-analysis.md)を確認してください。
 
 ## 8. 次に読む
 
