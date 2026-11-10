@@ -335,3 +335,9 @@ AI/SCMを模擬した実保存・Docker・ブラウザ検証と、PCでの実サ
 [#127](https://github.com/KOHEIITOH/generic-software-factory/pull/127): 実SIGKILL・保存途中・通信切断の復旧検証。
 新規Web計画は派生した解釈/受入条件/依存関係を確認し、正確な計画と対象版への承認後に子Issueを公開する。
 判断と制約はADR 0048〜0050に記録。PCでの実Bedrock/GitHub E2Eは引き続き未確認。
+
+## Node / TypeScriptの初回設定（2026-11-10）
+
+ADR 0056: npm manifest/lockからVitest/Jest・型・lintの検証を提案し、承認後に
+依存込みの固定ローカルDocker imageを準備する。M2の安全な実行基盤を維持して
+M3のRepository→Issue→Draft導線へ接続する。実行時の通信・install scripts・ホストnpm実行は使わない。

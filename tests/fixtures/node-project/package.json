@@ -1,0 +1,1 @@
+{"name":"sf-node-fixture","private":true,"type":"module","scripts":{"test":"vitest run","typecheck":"tsc --noEmit","lint":"eslint src"},"devDependencies":{"vitest":"3.2.4","typescript":"5.9.3","eslint":"9.39.1"}}

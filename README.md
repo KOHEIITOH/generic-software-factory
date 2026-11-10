@@ -127,6 +127,7 @@ uv run sf web --rebuild
 ```
 
 起動したターミナルの操作リンクを開き、Webの[初回設定](docs/local-web-execution.md)でGitHub Repositoryを選び、SFが取得したソースの変更範囲・検証を確認して登録します。手動cloneや絶対パス入力は不要です。設定JSONの手作業は不要です。GitHub/AI認証・Dockerは利用PCで準備します。
+Node/TypeScriptではnpm lockからtest・typecheck・lintを提案し、Webの承認後に依存込みのDocker実行環境を準備できます。実行時のネットワークとinstall scriptsは使いません。
 通常は **Issueを選択 →「同意して実行・Draft PR作成」** の2操作です。
 手動取り込み・紐付け・デモPRはありません。進捗・停止・復旧・PRリンクは同じ画面で扱います。
 Harnessがなければ最小ルールを生成し、品質失敗からは承認付きの定型改善案を自動作成します。Project管理は任意で、開いたときだけ読み込みます。診断・要件分割・レビュー対応は詳細操作です。

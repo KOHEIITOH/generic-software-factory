@@ -8,10 +8,14 @@ type Proposal = { id: string; fingerprint: string; kind: string; name: string; s
   project_harness: { project: string; rules: { name: string; text: string }[] } | null;
   run_id?: string; profile: { id: string } | null };
 type RepositoryChoice = { repository: string; can_push: boolean };
+type NodePlan = { available: boolean; reason?: string; fingerprint?: string; image?: string | null;
+  has_tests?: boolean; scripts?: { script: string; command: string; kind: string }[]; bases?: string[] };
 type Inspection = { managed?: boolean; remote_revision?: string; repository: string; root: string; revision: string; files: string[];
+  node?: NodePlan | null; checks?: Check[];
   test_preset: string | null; image: string; test_argv: string[] | null; test_stdout: string | null;
   harness: { path: string; kind: string }[]; validation: { path: string; code: string }[] };
 const setupMessages: Record<string, string> = {
+  node_image_build: "Node依存イメージを準備できませんでした。Dockerの起動・ディスク容量・npm registryへの接続、package.jsonとlockの一致を確認してください。install scriptsは実行しません。",
   scm_credentials_missing: "WebプロセスにGitHub認証が設定されていません。GH_TOKENまたはGITHUB_TOKENを設定して再起動してください。gh auth loginだけでは接続されません。",
   scm_credentials_rejected: "GitHubが認証を拒否しました（401）。トークンの期限・失効・設定を確認してください。",
   scm_access_denied: "GitHubがアクセスを拒否しました（403等）。対象Repositoryへのアクセス、Contentsの読み取り権限、組織のSSO承認を確認してください。",
@@ -32,7 +36,7 @@ const setupMessages: Record<string, string> = {
   git_filters: "対象RepositoryにGit filter設定があります。この実行方式では安全に取得できません。",
   repository_origin: "Git originと選択したGitHub Repositoryが一致しません。owner/repoとoriginの設定を確認してください。",
   change_scope: "変更可能なファイルは、重複のないアプリケーションソースを1〜32件指定してください。テスト・Harnessは変更対象にできません。",
-  execution_image: "実行イメージは固定digest付きで指定してください（image@sha256:64桁の小文字16進数）。",
+  execution_image: "実行イメージは固定digest付きかローカルの固定image IDで指定してください（image@sha256:64桁、またはsha256:64桁の小文字16進数）。",
   behavioral_checks: "検証コマンド・期待出力が不正です。コマンドは文字列のJSON配列、期待出力は16KiB以内で指定してください。",
   harness_validation: "Harnessの検証で未解決の問題があります。「検出した注意点」を開いて確認してください。検証を省略して登録はできません。",
   source_types: "symlinkまたはsubmoduleを含むRepositoryは、この初回設定に対応していません。",
@@ -43,7 +47,7 @@ const setupFields: Record<string, string> = { root: "Repositoryの場所", repos
 async function api(path: string, options: RequestInit = {}) {
   const response = await operatorApi("/setup" + path, options);
   if (!response.ok) {
-    const stage = path === "/acquire" ? "GitHub Repositoryの取得" : path.startsWith("/repositories") ? "GitHub Repositoryの一覧取得" : path === "/inspect" ? "Repository確認" : path.endsWith("/approve") ? "設定の登録" : path === "/proposals" && options.method === "POST" ? "設定案の作成" : "設定の読み込み";
+    const stage = path === "/node-image" ? "Node実行環境の準備" : path === "/acquire" ? "GitHub Repositoryの取得" : path.startsWith("/repositories") ? "GitHub Repositoryの一覧取得" : path === "/inspect" ? "Repository確認" : path.endsWith("/approve") ? "設定の登録" : path === "/proposals" && options.method === "POST" ? "設定案の作成" : "設定の読み込み";
     if (response.status === 409) throw new Error(stage + "：対象の版・設定が変わったか、保存上限に達しました。内容を再確認してください（409）。");
     const data = await response.json().catch(() => null);
     const code = data?.detail?.code;
@@ -66,6 +70,7 @@ export default function SetupPanel({ onApplied, refreshKey }: { onApplied: (id: 
   const [issue, setIssue] = useState("1");
   const [name, setName] = useState(""); const [provider, setProvider] = useState("bedrock");
   const [inspection, setInspection] = useState<Inspection | null>(null);
+  const [nodeConsent, setNodeConsent] = useState("");
   const [paths, setPaths] = useState(""); const [image, setImage] = useState("");
   const [command, setCommand] = useState(""); const [stdout, setStdout] = useState("");
   const [proposal, setProposal] = useState<Proposal | null>(null);
@@ -85,7 +90,8 @@ export default function SetupPanel({ onApplied, refreshKey }: { onApplied: (id: 
   function inspectResult(data: Inspection) {
     setInspection(data); setRepository(data.repository); setRoot(data.root); setImage(data.image);
     setPaths(data.files.slice(0, 32).join("\n")); setName(data.repository);
-    setCommand(data.test_argv ? JSON.stringify(data.test_argv) : "");
+    setNodeConsent("");
+    setCommand(data.node?.available ? JSON.stringify(data.checks, null, 2) : data.test_argv ? JSON.stringify(data.test_argv) : "");
     setStdout(data.test_stdout || ""); invalidate();
   }
   async function loadRepositories(next: string | null = null) {
@@ -100,11 +106,16 @@ export default function SetupPanel({ onApplied, refreshKey }: { onApplied: (id: 
   async function acquire() {
     inspectResult(await api("/acquire", { method: "POST", body: JSON.stringify({ repository }) }));
   }
+  async function prepareNode() {
+    if (!inspection?.node?.fingerprint || nodeConsent !== inspection.node.fingerprint) return;
+    const data: Inspection = await api("/node-image", { method: "POST", body: JSON.stringify({ root, repository, fingerprint: nodeConsent, confirmed: true }) });
+    setInspection({ ...inspection, ...data }); setImage(data.image); setNodeConsent(""); invalidate();
+  }
   async function propose() {
     const argv: unknown = JSON.parse(command);
-    if (!Array.isArray(argv) || !argv.length || !argv.every(v => typeof v === "string")) throw new Error("検証コマンドは文字列のJSON配列で指定してください。");
+    if (!Array.isArray(argv) || !argv.length || (!inspection?.node?.available && !argv.every(v => typeof v === "string"))) throw new Error("検証コマンドはJSON配列で指定してください。");
     setProposal(await api("/proposals", { method: "POST", body: JSON.stringify({ root, repository, name, provider, image, issue,
-      allowed_paths: paths.split("\n").map(p => p.trim()).filter(Boolean), checks: [{ id: "behavior", argv, stdout }] }) }));
+      allowed_paths: paths.split("\n").map(p => p.trim()).filter(Boolean), checks: inspection?.node?.available ? argv : [{ id: "behavior", argv, stdout }] }) }));
     setApproved("");
   }
   async function apply(value: Proposal) {
@@ -149,19 +160,31 @@ export default function SetupPanel({ onApplied, refreshKey }: { onApplied: (id: 
     </details>
     {inspection?.managed && <p>GitHubから取得済み: {inspection.repository} · 版 {inspection.remote_revision}</p>}
     {inspection && <form onSubmit={e => { e.preventDefault(); void perform(propose); }}>
+      {inspection.node && <div><h4>Node / TypeScriptの実行環境</h4>
+        {!inspection.node.available ? <p role="status">{inspection.node.reason}</p> : <>
+          <p>package.jsonから検出した検証です。下記のコマンドと変更範囲を確認して承認します。</p>
+          <ul>{inspection.node.scripts?.map(s => <li key={s.script}>{s.script}: <code>{s.command}</code>（{s.kind}）</li>)}</ul>
+          {!inspection.node.has_tests && <p>自動テストは検出していません。型・lintの検証をテスト成功とはみなしません。</p>}
+          <p>テストは0件・skip・todo・失敗を不合格にします。実行時の通信は無効です。</p>
+          {!image ? <><p>初回だけDocker内に依存関係を準備します（最大10分）。固定されたNode/Pythonイメージと公開npm registryを使い、lockに従いnpm ciを実行します。install scripts・Repositoryコードは実行しません。PCの認証情報は渡しません。</p>
+            <details><summary>準備する固定ベースイメージ</summary><pre>{inspection.node.bases?.join("\n")}</pre></details>
+            <label><input type="checkbox" aria-label="Node依存の取得とDockerイメージ準備に同意する" disabled={busy} checked={nodeConsent === inspection.node.fingerprint} onChange={e => setNodeConsent(e.target.checked ? inspection.node!.fingerprint! : "")} />Node依存の取得とDockerイメージ準備に同意する</label>
+            <button type="button" disabled={busy || nodeConsent !== inspection.node.fingerprint} onClick={() => void perform(prepareNode)}>Node実行環境を準備</button></> : <p>Node実行環境：準備済み（固定されたローカルイメージ）</p>}
+        </>}
+      </div>}
       <p>既存のHarness候補: {inspection.harness.map(h => h.path).join(", ") || "なし。最小Harnessを生成します。"}</p>
       {inspection.validation.length > 0 && <details><summary>検出した注意点</summary><ul>{inspection.validation.map((v, i) => <li key={i}>{v.path}: {v.code}</li>)}</ul></details>}
       <label>設定名<input aria-label="セットアップの設定名" value={name} disabled={busy} onChange={e => { setName(e.target.value); invalidate(); }} /></label>
       <label>AI<select aria-label="セットアップのAI" value={provider} disabled={busy} onChange={e => { setProvider(e.target.value); invalidate(); }}><option value="bedrock">Amazon Bedrock</option><option value="copilot">Copilot SDK</option></select></label>
       <label>変更可能なファイル（1行に1つ・最大32件）<textarea aria-label="セットアップの変更範囲" value={paths} disabled={busy} rows={5} onChange={e => { setPaths(e.target.value); invalidate(); }} /></label>
-      {!inspection.test_preset && <p>安全に提案できるテスト方式を検出できませんでした。既存の検証コマンドと期待出力を指定してください。検証を省略して登録はできません。</p>}
-      <details open={!inspection.test_preset}><summary>検証・実行イメージ・要件分割</summary><label>要件分割・CLI用の親Issue番号<input aria-label="セットアップの親Issue" value={issue} disabled={busy} onChange={e => { setIssue(e.target.value); invalidate(); }} /></label>
-        <p>Python unittest/pytestの推奨設定は0件・skip・失敗を不合格にします。pytestと必要な依存は実行イメージに含めてください。依存関係はオフライン実行イメージに含めてください。ここではコマンドを実行しません。</p>
-        <label>検証コマンド（JSON配列）<textarea aria-label="セットアップの検証コマンド" value={command} disabled={busy} rows={4} onChange={e => { setCommand(e.target.value); invalidate(); }} /></label>
-        <label>成功時の期待出力（改行も一致）<textarea aria-label="セットアップの期待出力" value={stdout} disabled={busy} rows={2} onChange={e => { setStdout(e.target.value); invalidate(); }} /></label>
+      {!inspection.test_preset && !inspection.node?.available && <p>安全に提案できるテスト方式を検出できませんでした。既存の検証コマンドと期待出力を指定してください。検証を省略して登録はできません。</p>}
+      <details open={!inspection.test_preset && !inspection.node?.available}><summary>検証・実行イメージ・要件分割</summary><label>要件分割・CLI用の親Issue番号<input aria-label="セットアップの親Issue" value={issue} disabled={busy} onChange={e => { setIssue(e.target.value); invalidate(); }} /></label>
+        {!inspection.node?.available && <p>Python unittest/pytestの推奨設定は0件・skip・失敗を不合格にします。pytestと必要な依存は実行イメージに含めてください。ここではコマンドを実行しません。</p>}
+        <label>{inspection.node?.available ? "検証一覧（id・argv・stdoutのJSON配列）" : "検証コマンド（JSON配列）"}<textarea aria-label="セットアップの検証コマンド" value={command} disabled={busy} rows={4} onChange={e => { setCommand(e.target.value); invalidate(); }} /></label>
+        {!inspection.node?.available && <label>成功時の期待出力（改行も一致）<textarea aria-label="セットアップの期待出力" value={stdout} disabled={busy} rows={2} onChange={e => { setStdout(e.target.value); invalidate(); }} /></label>}
         <label>実行イメージ（固定digest・Python runnerを含む）<input aria-label="セットアップの実行イメージ" value={image} disabled={busy} onChange={e => { setImage(e.target.value); invalidate(); }} /></label>
       </details>
-      <button type="submit" disabled={busy || !paths.trim() || !command}>設定とHarnessの案を作成</button>
+      <button type="submit" disabled={busy || !paths.trim() || !command || !image}>設定とHarnessの案を作成</button>
     </form>}
     {proposal && preview(proposal)}
     <details><summary>保存済みの設定・改善案（{suggestions.length}件）</summary>

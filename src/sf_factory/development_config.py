@@ -9,6 +9,7 @@ from pathlib import Path
 
 from sf_factory.behavioral_check import BehavioralCheck
 from sf_factory.change_proposal import ProposalScope
+from sf_factory.docker_execution import pinned_image
 from sf_factory.project_harness import ProjectHarness
 from sf_factory.source_snapshot import _path
 
@@ -40,9 +41,7 @@ class DevelopmentConfig:
                 or self.data_root.is_relative_to(self.root)
                 or self.root.is_relative_to(self.data_root)):
             raise ValueError('canonical repository and separate durable data root required')
-        if (self.provider not in {'bedrock', 'copilot'} or not isinstance(self.image, str)
-                or not re.fullmatch(r'[a-z0-9./:_-]+@sha256:[a-f0-9]{64}',
-                                    self.image)):
+        if self.provider not in {'bedrock', 'copilot'} or not pinned_image(self.image):
             raise ValueError('supported text provider and digest-pinned image required')
         if (self.project_harness is not None
                 and not isinstance(self.project_harness, ProjectHarness)):

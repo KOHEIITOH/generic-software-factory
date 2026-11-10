@@ -12,6 +12,9 @@ on:
       - "src/sf_factory/web_worker.py"
       - "src/sf_factory/web_api.py"
       - "src/sf_factory/operator_setup.py"
+      - "src/sf_factory/node_setup.py"
+      - "tests/test_node_setup.py"
+      - "tests/fixtures/node-project/**"
       - "src/sf_factory/managed_repository.py"
       - "src/sf_factory/git_environment.py"
       - "src/sf_factory/harness_runs.py"
@@ -47,6 +50,9 @@ on:
       - "src/sf_factory/web_worker.py"
       - "src/sf_factory/web_api.py"
       - "src/sf_factory/operator_setup.py"
+      - "src/sf_factory/node_setup.py"
+      - "tests/test_node_setup.py"
+      - "tests/fixtures/node-project/**"
       - "src/sf_factory/managed_repository.py"
       - "src/sf_factory/git_environment.py"
       - "src/sf_factory/harness_runs.py"
@@ -111,8 +117,8 @@ jobs:
             docker --host=unix:///var/run/docker.sock pull "$SF_TEST_DOCKER_IMAGE"
       - name: Exercise required isolation checks
         run: |
-          uv run pytest tests/test_docker_execution.py tests/test_workspace_check.py tests/test_issue_development.py tests/test_review_automation.py tests/test_requirement_workflow.py tests/test_requirement_discovery_workflow.py tests/test_plan_approval.py tests/test_web_jobs.py tests/test_issue_execution.py tests/test_operator_setup.py tests/test_managed_repository.py -q \
-            -k 'real_offline_filesystem_and_identity or real_timeout_cleans_child_processes or real_output_limit_is_enforced or real_command_failure_is_preserved or real_bounded_input_roundtrip or real_stdin_backpressure_cannot_bypass_timeout or real_input_command_failure_is_not_success or real_candidate_runs_approved_fixture_tests or real_candidate_failure_preserves_actual_test_failure or real_candidate_source_mutation_is_rejected or real_candidate_timeout_is_reaped or real_parent_process_provenance_is_private or real_local_issue_workflow_with_offline_docker or real_docker_same_pr_review_repair or real_docker_requirement_plan_to_serial_prs or real_docker_web_worker_advances_existing_workflow or real_docker_auto_requirement_discovery_to_draft or real_docker_plan_preview_approval_then_draft or real_docker_selected_issue_to_draft or real_docker_web_setup_no_harness_to_draft or real_docker_failed_review_to_approved_improvement_to_draft or real_docker_managed_repository_to_draft' \
+          uv run pytest tests/test_docker_execution.py tests/test_workspace_check.py tests/test_issue_development.py tests/test_review_automation.py tests/test_requirement_workflow.py tests/test_requirement_discovery_workflow.py tests/test_plan_approval.py tests/test_web_jobs.py tests/test_issue_execution.py tests/test_operator_setup.py tests/test_managed_repository.py tests/test_node_setup.py -q \
+            -k 'real_offline_filesystem_and_identity or real_timeout_cleans_child_processes or real_output_limit_is_enforced or real_command_failure_is_preserved or real_bounded_input_roundtrip or real_stdin_backpressure_cannot_bypass_timeout or real_input_command_failure_is_not_success or real_candidate_runs_approved_fixture_tests or real_candidate_failure_preserves_actual_test_failure or real_candidate_source_mutation_is_rejected or real_candidate_timeout_is_reaped or real_parent_process_provenance_is_private or real_local_issue_workflow_with_offline_docker or real_docker_same_pr_review_repair or real_docker_requirement_plan_to_serial_prs or real_docker_web_worker_advances_existing_workflow or real_docker_auto_requirement_discovery_to_draft or real_docker_plan_preview_approval_then_draft or real_docker_selected_issue_to_draft or real_docker_web_setup_no_harness_to_draft or real_docker_failed_review_to_approved_improvement_to_draft or real_docker_managed_repository_to_draft or real_docker_node_setup_checks_and_issue_to_draft' \
             --junitxml="$RUNNER_TEMP/offline-isolation.xml"
       - name: Reject missing or skipped isolation checks
         run: |
@@ -122,7 +128,7 @@ jobs:
           from xml.etree import ElementTree
           report = Path(os.environ["RUNNER_TEMP"]) / "offline-isolation.xml"
           cases = ElementTree.parse(report).findall(".//testcase")
-          assert len(cases) == 22, "Expected all twenty-two required isolation checks"
+          assert len(cases) == 23, "Expected all twenty-three required isolation checks"
           assert all(not any(case.findall(tag) for tag in ("failure", "error", "skipped"))
                      for case in cases), "Required isolation checks must execute and pass"
           PY

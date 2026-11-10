@@ -30,6 +30,11 @@ ExecutionStatus = Literal[
 ]
 
 
+def pinned_image(image: str) -> bool:
+    return isinstance(image, str) and bool(re.fullmatch(
+        r'(?:[a-z0-9./:_-]+@)?sha256:[a-f0-9]{64}', image))
+
+
 @dataclass(frozen=True)
 class DockerExecutionResult:
     status: ExecutionStatus
@@ -120,7 +125,7 @@ def run_offline_command(
     """
     from sf_factory.operation_control import checkpoint
     checkpoint()
-    if not re.fullmatch(r'[a-z0-9./:_-]+@sha256:[a-f0-9]{64}', image):
+    if not pinned_image(image):
         raise ValueError('a pinned image digest is required')
     if (not isinstance(argv, tuple) or not argv or len(argv) > 128
             or any(not isinstance(a, str) or '\x00' in a or len(a) > 65536 for a in argv)
