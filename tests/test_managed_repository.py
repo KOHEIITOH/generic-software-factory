@@ -139,6 +139,29 @@ def test_acquisition_http_requires_operator_and_never_accepts_urls_or_paths(job_
         assert flow['scm'].writes == flow['implementer'].calls == 0
 
 
+def test_source_failures_have_safe_codes_in_http_and_terminal(job_flow, monkeypatch, caplog):
+    from urllib.error import HTTPError
+
+    from sf_factory.source_control import SourceControlError
+
+    root, auth, _, _ = job_flow
+    failure = SourceControlError('access_denied', 'private token=secret')
+    failure.__cause__ = HTTPError('https://private.invalid', 401, 'secret', {}, None)
+    def fail(*args, **kwargs):
+        raise failure
+    monkeypatch.setattr('sf_factory.integration_defaults.repository_source', fail)
+    monkeypatch.setattr('sf_factory.integration_defaults.repository_choices', fail)
+    with TestClient(create_app(data_dir=root, operator=auth), base_url=ORIGIN) as client:
+        login(client, auth)
+        for response in (client.get('/api/operator/setup/repositories', headers=HEADERS),
+                         client.post('/api/operator/setup/acquire',
+                            json={'repository': 'fixture/repo'}, headers=HEADERS)):
+            assert response.status_code == 502
+            assert response.json() == {'detail': {'code': 'scm_credentials_rejected'}}
+    assert 'scm_credentials_rejected upstream_status=401' in caplog.text
+    assert 'private' not in caplog.text and 'secret' not in caplog.text
+
+
 def test_refreshed_managed_revision_preserves_issue_project_membership(flow):
     scm = adapter(flow)
     store = ManagedRepositories(flow['factory'].root)

@@ -147,6 +147,12 @@ const net = require('node:net');
     if (process.env.SF_BROWSER_SCREENSHOT) await panel.screenshot({ path: process.env.SF_BROWSER_SCREENSHOT });
     await panel.getByText('初回設定・Harness生成と改善', { exact: true }).click();
     await panel.getByLabel('セットアップのGitHub Repository選択', { exact: true }).selectOption('fixture/repo');
+    await page.route('**/api/operator/setup/acquire', route => route.fulfill({
+      status: 502, contentType: 'application/json',
+      body: JSON.stringify({ detail: { code: 'scm_credentials_rejected' } }) }), { times: 1 });
+    await panel.getByRole('button', { name: 'このRepositoryを取得して初回設定へ', exact: true }).click();
+    await panel.getByText('GitHubが認証を拒否しました（401）', { exact: false }).waitFor();
+    assert.equal(await panel.getByRole('button', { name: '設定とHarnessの案を作成', exact: true }).count(), 0);
     await panel.getByRole('button', { name: 'このRepositoryを取得して初回設定へ', exact: true }).click();
     await panel.getByText('GitHubから取得済み:', { exact: false }).waitFor();
     assert.equal(await panel.getByLabel('セットアップのRepositoryパス', { exact: true }).count(), 0, 'Remote setup must not require a host path');

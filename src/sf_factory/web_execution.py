@@ -1,13 +1,26 @@
 """Operator-authenticated jobs; all public dashboard routes remain non-executing."""
+import logging
 from pathlib import Path
+from urllib.error import HTTPError
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
-from sf_factory.setup_errors import setup_error
+from sf_factory.setup_errors import setup_error, source_setup_error
 from sf_factory.state_store import StateConflict, StatePermissionDenied
 from sf_factory.web_jobs import WebJobs
 from sf_factory.web_operator import OperatorProfiles, WebOperator
+
+logger = logging.getLogger(__name__)
+
+
+def source_failure(operation: str, exc) -> HTTPException:
+    detail = source_setup_error(exc)
+    upstream = exc.__cause__
+    status = upstream.code if isinstance(upstream, HTTPError) else None
+    logger.warning('Repository %s failed: %s upstream_status=%s', operation,
+                   detail['code'], status)
+    return HTTPException(502, detail)
 
 
 class SubmitStep(BaseModel):
@@ -103,9 +116,10 @@ def install_execution_routes(app: FastAPI, root: Path, operator: WebOperator | N
             return {'repositories': [{'repository': info.external_id,
                 'can_push': info.capabilities.write} for info in choices],
                 'next_cursor': next_cursor}
-        except (ValueError, SourceControlError) as exc:
-            raise HTTPException(502, 'Repository list unavailable; check GitHub credentials'
-                                ) from exc
+        except SourceControlError as exc:
+            raise source_failure('catalog', exc) from exc
+        except ValueError as exc:
+            raise HTTPException(502, {'code': 'scm_response_invalid'}) from exc
 
     @app.post('/api/operator/setup/acquire')
     def acquire_repository(payload: AcquireRepository, request: Request):
@@ -122,7 +136,7 @@ def install_execution_routes(app: FastAPI, root: Path, operator: WebOperator | N
             result = inspect_repository(Path(value['root']), value['repository'], root)
             return {**result, 'managed': True, 'remote_revision': value['remote_revision']}
         except SourceControlError as exc:
-            raise HTTPException(502, 'Repository source unavailable; check GitHub access') from exc
+            raise source_failure('acquisition', exc) from exc
         except (ValueError, OSError, subprocess.SubprocessError) as exc:
             raise HTTPException(422, 'Repository cannot be prepared safely') from exc
 
