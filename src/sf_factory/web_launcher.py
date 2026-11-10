@@ -13,7 +13,7 @@ import webbrowser
 from pathlib import Path
 
 
-def launch_web(*, rebuild: bool = False) -> int:
+def launch_web(*, rebuild: bool = False, no_browser: bool = False) -> int:
     root = Path(__file__).resolve().parents[2]
     frontend = root / "web"
     index = frontend / "dist" / "index.html"
@@ -55,7 +55,8 @@ def launch_web(*, rebuild: bool = False) -> int:
     url = origin + "/#operator=" + operator.token
     print(f"Software Factory dashboard: {url}")
     try:
-        webbrowser.open(url)
+        if not no_browser:
+            webbrowser.open(url)
         uvicorn.run(app, host="127.0.0.1", port=8000, proxy_headers=False)
     except OSError as exc:
         print(f"Could not start dashboard: {exc}", file=sys.stderr)
