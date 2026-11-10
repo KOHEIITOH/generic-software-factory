@@ -182,7 +182,10 @@ def test_real_docker_node_setup_checks_and_issue_to_draft(flow, monkeypatch):
         'https://fixture.invalid/issues/' + issue)
     result = execute_issue(**{**flow, 'config': config, 'scm': scm,
         'implementer': NodeModel('node-implementation'), 'reviewer': NodeModel('node-review')})
-    assert result['status'] == 'completed' and scm.writes == 3
+    from sf_factory.issue_development import _artifact
+    observations = (_artifact(flow['factory'], result['run_id']).get('checks', [])
+                    if result.get('run_id') else [])
+    assert result['status'] == 'completed' and scm.writes == 3, (result, observations)
     assert (root / 'src/add.ts').read_bytes() == BAD
     # Real test gate rejects wrong implementations, skipped and zero-test reports.
     files = {p.relative_to(root).as_posix(): p.read_bytes() for p in root.rglob('*')
