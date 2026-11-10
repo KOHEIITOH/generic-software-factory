@@ -52,6 +52,11 @@ operator経路は既存の有限Workflowへ接続し、読み取り専用Runtime
 （例: `state_overlap`, `worktree_dirty`, `repository_origin`, `execution_image`,
 `harness_validation`）。未知の例外は `setup_invalid` とし、例外本文やローカルパスは返しません。
 入力スキーマの422は通常の検証エラー形式です。Webは操作段階と許可済みの項目名のみ表示します。
+Repository一覧・自動取得の502も `detail.code` で認証未設定、401、アクセス拒否、
+404、API利用制限、通信タイムアウト、取得期限、取得上限、応答検証失敗を区別します。
+ターミナルには操作名・固定コード・上流HTTPステータスのみを記録します。
+例: `Repository acquisition failed: scm_credentials_rejected upstream_status=401`。
+トークン、応答本文、URLやRepository名はこのエラー記録には含めません。
 SF自身のローカルフォルダを標準の `.sf-factory` 保存先と一緒に使うと
 `state_overlap` になります。GitHub選択からの管理領域への取得、または対象外の
 `SF_DATA_DIR` を使い、既存データの自動削除・移動は行いません。

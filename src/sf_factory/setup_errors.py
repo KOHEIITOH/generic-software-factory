@@ -1,4 +1,7 @@
 """Public setup diagnostics use fixed codes, never exception text or local paths."""
+from urllib.error import HTTPError, URLError
+
+from sf_factory.source_control import SourceControlError
 
 _MESSAGES = {
     'canonical repository location required': 'repository_location',
@@ -29,3 +32,30 @@ def setup_error(exc: Exception) -> dict[str, str]:
     if isinstance(exc, FileNotFoundError):
         return {'code': 'repository_missing'}
     return {'code': _MESSAGES.get(str(exc), 'setup_invalid')}
+
+
+def source_setup_error(exc: SourceControlError) -> dict[str, str]:
+    """Distinguish actionable failures using allowlisted transport evidence only."""
+    cause = exc.__cause__
+    if isinstance(cause, HTTPError):
+        if cause.code == 429 or (cause.code == 403 and (
+                cause.headers.get('X-RateLimit-Remaining') == '0'
+                or cause.headers.get('Retry-After') is not None)):
+            return {'code': 'scm_rate_limited'}
+        if cause.code == 401:
+            return {'code': 'scm_credentials_rejected'}
+        if cause.code == 404:
+            return {'code': 'scm_repository_unavailable'}
+    if isinstance(cause, TimeoutError) or (
+            isinstance(cause, URLError) and isinstance(cause.reason, TimeoutError)):
+        return {'code': 'scm_timeout'}
+    known = {
+        'Remote source read deadline exceeded': 'scm_source_deadline',
+        'Remote source budget exceeded': 'scm_source_limit',
+        'Unsupported remote source object': 'scm_source_type',
+        'Complete bounded remote tree required': 'scm_source_inventory',
+    }
+    fallback = {'not_configured': 'scm_credentials_missing',
+                'access_denied': 'scm_access_denied', 'unavailable': 'scm_unavailable',
+                'invalid_response': 'scm_response_invalid'}
+    return {'code': known.get(str(exc), fallback.get(exc.kind, 'scm_unavailable'))}

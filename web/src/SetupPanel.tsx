@@ -12,6 +12,18 @@ type Inspection = { managed?: boolean; remote_revision?: string; repository: str
   test_preset: string | null; image: string; test_argv: string[] | null; test_stdout: string | null;
   harness: { path: string; kind: string }[]; validation: { path: string; code: string }[] };
 const setupMessages: Record<string, string> = {
+  scm_credentials_missing: "WebプロセスにGitHub認証が設定されていません。GH_TOKENまたはGITHUB_TOKENを設定して再起動してください。gh auth loginだけでは接続されません。",
+  scm_credentials_rejected: "GitHubが認証を拒否しました（401）。トークンの期限・失効・設定を確認してください。",
+  scm_access_denied: "GitHubがアクセスを拒否しました（403等）。対象Repositoryへのアクセス、Contentsの読み取り権限、組織のSSO承認を確認してください。",
+  scm_repository_unavailable: "GitHubで対象Repositoryを確認できません（404）。Repositoryの存在とトークンのアクセス対象を確認してください。非公開Repositoryの権限不足でも発生します。",
+  scm_rate_limited: "GitHubのAPI利用制限に達しました。連続再試行せず、制限が解除されてから取得してください。",
+  scm_timeout: "GitHubとの通信がタイムアウトしました。PCのネットワーク・プロキシ接続を確認してください。",
+  scm_source_deadline: "Repositoryのファイル取得が120秒の制限に達しました。認証エラーではありません。",
+  scm_source_limit: "Repositoryが取得上限を超えています（1,000ファイル・合計8MiB）。",
+  scm_source_type: "取得対象に非対応のオブジェクト、symlink・submodule、または1MiBを超えるファイルがあります。",
+  scm_source_inventory: "GitHubから完全なファイル一覧を取得できませんでした。省略された一覧や2,000件を超える一覧は使えません。",
+  scm_response_invalid: "GitHubの応答を安全に検証できませんでした。認証成功とは判定していません。",
+  scm_unavailable: "GitHubへの通信に失敗しました。PCのネットワーク・プロキシとGitHubの稼働状況を確認してください。",
   state_overlap: "対象RepositoryとSFの状態保存先が重なっています。GitHubのRepository選択から自動取得してください。既存のローカルRepositoryを使う場合はSF_DATA_DIRを対象Repositoryの外へ設定してください。",
   repository_missing: "指定した場所または設定ファイルが見つかりません。Repositoryのパスを確認し、必要なら再取得してください。",
   worktree_dirty: "対象Repositoryに未コミットの変更・未追跡ファイルがあります。変更を保全してから再確認してください。自動削除・リセットは行いません。",
@@ -30,13 +42,12 @@ const setupMessages: Record<string, string> = {
 const setupFields: Record<string, string> = { root: "Repositoryの場所", repository: "GitHub Repository", name: "設定名（1〜100文字）", provider: "AI", image: "実行イメージ", allowed_paths: "変更可能なファイル（1〜32件）", checks: "検証コマンド・期待出力", issue: "親Issue番号（正の整数）", fingerprint: "承認対象の版", confirmed: "設定の承認" };
 async function api(path: string, options: RequestInit = {}) {
   const response = await operatorApi("/setup" + path, options);
-  if (!response.ok && (path.startsWith("/repositories") || path === "/acquire")) throw new Error("GitHub Repositoryを取得できません（" + response.status + "）。PCのGitHub認証・アクセス権・取得対象の状態を確認してください。");
   if (!response.ok) {
-    const stage = path === "/inspect" ? "Repository確認" : path.endsWith("/approve") ? "設定の登録" : path === "/proposals" && options.method === "POST" ? "設定案の作成" : "設定の読み込み";
+    const stage = path === "/acquire" ? "GitHub Repositoryの取得" : path.startsWith("/repositories") ? "GitHub Repositoryの一覧取得" : path === "/inspect" ? "Repository確認" : path.endsWith("/approve") ? "設定の登録" : path === "/proposals" && options.method === "POST" ? "設定案の作成" : "設定の読み込み";
     if (response.status === 409) throw new Error(stage + "：対象の版・設定が変わったか、保存上限に達しました。内容を再確認してください（409）。");
     const data = await response.json().catch(() => null);
     const code = data?.detail?.code;
-    if (typeof code === "string" && setupMessages[code]) throw new Error(stage + "：" + setupMessages[code] + "（422 / " + code + "）");
+    if (typeof code === "string" && setupMessages[code]) throw new Error(stage + "：" + setupMessages[code] + "（" + response.status + " / " + code + "）");
     // Only allowlisted field names are displayed. Never echo server input/exception text.
     const fields = Array.isArray(data?.detail) ? [...new Set<string>(data.detail.flatMap((e: { loc?: unknown[] }) => {
       const field = e.loc?.[1]; return typeof field === "string" && setupFields[field] ? [setupFields[field]] : [];
