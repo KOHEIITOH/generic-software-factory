@@ -9,6 +9,7 @@ from pathlib import Path
 
 from sf_factory.behavioral_check import BehavioralCheck
 from sf_factory.change_proposal import ProposalScope
+from sf_factory.docker_execution import pinned_image
 from sf_factory.project_harness import ProjectHarness
 from sf_factory.source_snapshot import _path
 
@@ -28,6 +29,7 @@ class DevelopmentConfig:
     excluded_harness: tuple[tuple[str, str], ...] = ()
     project_harness: ProjectHarness | None = None
     context_hashes: tuple[tuple[str, str], ...] = ()
+    source_hashes: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
         for value in (self.repository, self.issue):
@@ -40,9 +42,7 @@ class DevelopmentConfig:
                 or self.data_root.is_relative_to(self.root)
                 or self.root.is_relative_to(self.data_root)):
             raise ValueError('canonical repository and separate durable data root required')
-        if (self.provider not in {'bedrock', 'copilot'} or not isinstance(self.image, str)
-                or not re.fullmatch(r'[a-z0-9./:_-]+@sha256:[a-f0-9]{64}',
-                                    self.image)):
+        if self.provider not in {'bedrock', 'copilot'} or not pinned_image(self.image):
             raise ValueError('supported text provider and digest-pinned image required')
         if (self.project_harness is not None
                 and not isinstance(self.project_harness, ProjectHarness)):
@@ -63,6 +63,16 @@ class DevelopmentConfig:
                 or any(p not in self.context_paths or not isinstance(h, str)
                        or not re.fullmatch('[a-f0-9]{64}', h) for p, h in self.context_hashes)):
             raise ValueError('unique hashes within approved context paths required')
+        if (not isinstance(self.source_hashes, tuple) or len(self.source_hashes) > 32
+                or any(not isinstance(pair, tuple) or len(pair) != 2
+                       for pair in self.source_hashes)):
+            raise ValueError('bounded frozen source hash pairs required')
+        if (len({p for p, _ in self.source_hashes}) != len(self.source_hashes)
+                or any(not isinstance(h, str) or not re.fullmatch('[a-f0-9]{64}', h)
+                       for _, h in self.source_hashes)):
+            raise ValueError('unique frozen source hashes required')
+        for path, _ in self.source_hashes:
+            _path(path)
         if (not isinstance(self.checks, tuple) or not 1 <= len(self.checks) <= 16
                 or not all(isinstance(c, BehavioralCheck) for c in self.checks)
                 or len({c.id for c in self.checks}) != len(self.checks)):
@@ -77,6 +87,8 @@ class DevelopmentConfig:
         data = asdict(self)
         if not self.context_hashes:
             data.pop('context_hashes')
+        if not self.source_hashes:
+            data.pop('source_hashes')
         if self.project_harness is None:
             data.pop('project_harness')
         return hashlib.sha256(json.dumps(data, default=str, sort_keys=True,
@@ -88,7 +100,7 @@ class DevelopmentConfig:
                     'allowed_paths', 'selected_harness', 'checks'}
         if (not isinstance(value, dict) or not required <= set(value)
                 or not set(value) <= required | {'excluded_harness', 'project_harness',
-                                                'context_paths', 'context_hashes'}
+                                                'context_paths', 'context_hashes', 'source_hashes'}
                 or any(not isinstance(value.get(k, []), list) for k in (
                     'allowed_paths', 'selected_harness', 'context_paths', 'checks'))):
             raise ValueError('exact development config schema required')
@@ -97,6 +109,7 @@ class DevelopmentConfig:
             'selected_harness': tuple(value['selected_harness']),
             'context_paths': tuple(value.get('context_paths', [])),
             'context_hashes': tuple(tuple(pair) for pair in value.get('context_hashes', [])),
+            'source_hashes': tuple(tuple(pair) for pair in value.get('source_hashes', [])),
             'excluded_harness': tuple(tuple(pair) for pair in value.get('excluded_harness', [])),
             'project_harness': ProjectHarness.from_document(value['project_harness'])
                 if value.get('project_harness') is not None else None,

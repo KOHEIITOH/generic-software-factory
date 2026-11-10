@@ -144,6 +144,8 @@ def inspect_repository(root: Path, repository: str, data_root: Path) -> dict:
         raise ValueError('bounded nonempty source tree required')
     validation = validate_harness(root)
     preset = _test_preset(root, files)
+    from sf_factory.node_setup import node_plan
+    node = node_plan(root, files, data_root) if preset is None else None
     if _revision(root) != revision:
         raise StateConflict('repository changed during inspection')
     return {'repository': repository, 'root': str(root), 'revision': revision,
@@ -151,7 +153,9 @@ def inspect_repository(root: Path, repository: str, data_root: Path) -> dict:
         'test_preset': preset,
         'harness': [asdict(c) for c in validation.discovery.candidates],
         'validation': [asdict(i) for i in validation.issues],
-        'inventory': fingerprint(asdict(validation)), 'image': DEFAULT_IMAGE,
+        'inventory': fingerprint(asdict(validation)),
+        'node': node, 'image': (node.get('image') or '') if node else DEFAULT_IMAGE,
+        'checks': node.get('checks', []) if node else [],
         'test_argv': {'unittest': UNITTEST_COMMAND, 'pytest': PYTEST_COMMAND}.get(preset or ''),
         'test_stdout': 'SF_TESTS_PASSED\n' if preset else None}
 
@@ -307,6 +311,10 @@ class SetupProposals:
             repository_project_name(repository, root), BASELINE)
         config = DevelopmentConfig(repository, issue, root, self.root, provider, image,
             allowed_paths, selected, (), checks, excluded_harness=excluded, project_harness=project)
+        node = inspection.get('node')
+        if node and node.get('available'):
+            hashes = node['hashes']
+            config = replace(config, source_hashes=tuple(hashes.items()))
         return self.create(config, name)
 
     def feedback(self, profile_id: str, expected: str, issue_id: str, run_id: str,

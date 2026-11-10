@@ -1,5 +1,6 @@
 """Operator-authenticated jobs; all public dashboard routes remain non-executing."""
 import logging
+import subprocess
 from pathlib import Path
 from urllib.error import HTTPError
 
@@ -76,6 +77,11 @@ class ApproveSetup(BaseModel):
     confirmed: bool
 
 
+class PrepareNodeImage(InspectSetup):
+    fingerprint: str = Field(pattern='^[a-f0-9]{64}$')
+    confirmed: bool
+
+
 def install_execution_routes(app: FastAPI, root: Path, operator: WebOperator | None) -> None:
     def auth(request: Request):
         if operator is None:
@@ -148,6 +154,24 @@ def install_execution_routes(app: FastAPI, root: Path, operator: WebOperator | N
             return inspect_repository(Path(payload.root), payload.repository, root)
         except (ValueError, OSError) as exc:
             raise HTTPException(422, setup_error(exc)) from exc
+
+    @app.post('/api/operator/setup/node-image')
+    def prepare_node_image(payload: PrepareNodeImage, request: Request):
+        auth(request)
+        if payload.confirmed is not True:
+            raise HTTPException(403, 'Explicit npm image preparation approval required')
+        from sf_factory.node_setup import prepare_image
+        from sf_factory.operator_setup import inspect_repository
+        try:
+            inspection = inspect_repository(Path(payload.root), payload.repository, root)
+            plan = inspection.get('node')
+            if (not plan or not plan.get('available')
+                    or plan['fingerprint'] != payload.fingerprint):
+                raise StateConflict('Node dependency plan changed; inspect again')
+            prepare_image(Path(payload.root), root, plan)
+            return inspect_repository(Path(payload.root), payload.repository, root)
+        except (ValueError, OSError, subprocess.SubprocessError) as exc:
+            raise HTTPException(422, {'code': 'node_image_build'}) from exc
 
     @app.post('/api/operator/setup/proposals', status_code=201)
     def create_setup(payload: CreateSetup, request: Request):

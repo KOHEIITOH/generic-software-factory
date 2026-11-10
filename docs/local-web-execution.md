@@ -174,3 +174,27 @@ SF管理のbaselineは1保存先あたり64版まで保持し、自動削除や�
 ローカルbaselineのGit commitと実装対象のremote commitは別々に記録し、remote revisionを実行証跡に固定します。
 取得中断後は同じ版・hashのpublication intentを照合し、公開前なら安全に取得し直せます。
 既存の作業場所が変更されていた場合は上書きしません。
+
+## Node / TypeScript / Reactの初回設定
+
+rootの`package.json`と`package-lock.json`（npm lock v2/v3）を静的に読み、
+Vitest/Jestのtest、`tsc --noEmit`のtypecheck、ESLintのlintを提案します。
+対象のコマンドと変更範囲を確認してください。非対応のtestスクリプトを検出した場合は、
+型・lintだけへ黙って置き換えません。testが存在しない場合はその旨を表示し、型・lintの
+完了を自動テスト成功とは扱いません。Nextのbuild/devサーバー起動は自動提案しません。
+
+初回だけ「Node依存の取得とDockerイメージ準備に同意する」にチェックして
+「Node実行環境を準備」を押します（最大10分）。Docker内で固定Node/Pythonベースと
+package.json/lockだけを使い、`npm ci --ignore-scripts`で公開npm registryから依存を取得します。
+ホストでnpmやRepositoryのコードは実行せず、.npmrc・GitHub/AWS認証・作業ツリー全体は
+ビルドに渡しません。install scriptsは無効です。非公開registry、git/file依存、workspaces、
+yarn/pnpmやpostinstallが必須のパッケージはこの自動準備には対応していません。
+
+準備後は固定ローカルimage ID（`sha256:...`）と検証案が設定され、通常のHarness承認から
+Repository→Issue→実行へ進めます。lock/manifestハッシュは実行設定へ固定し、変更時は再承認が必要です。
+イメージはlocal daemonに保存し、registryへpushしません。削除された場合は再準備してください。
+
+実際の検証は従来どおり非root・network none・認証なし・固定CPU/memory/pids/time制限で実行します。
+ソースは保持し、ビルドキャッシュ/レポートはコンテナ内の一時コピーへ書きます。
+Vitest/Jestは実行レポートの0件・skip・todo・失敗を拒否します。型・lintは別チェックです。
+依存取得と検証を分離し、実行時のnpm installやネットワーク利用で補いません。

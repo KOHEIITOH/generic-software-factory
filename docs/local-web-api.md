@@ -73,3 +73,11 @@ SF自身のローカルフォルダを標準の `.sf-factory` 保存先と一緒
 SF管理の場所へ取得し、検査結果を返します。HTTPからURL・clone先・branch・認証情報は指定できません。
 同じ認証/host/origin/custom-headerが必要で、匿名の旧`/api/github/repositories`は復活させません。
 取得は読み取りと管理baselineの保存だけです。実行権限は従来どおり内容確認後のprofile登録と明示実行で与えます。
+
+Node対応Repositoryのinspect/acquire応答には `node`（静的検証案・manifest/lock fingerprint・
+ベースimage・準備済みimage ID）と `checks` を含めます。未対応時は理由を返し、Pythonイメージを
+Node向けの既定値として表示しません。
+`POST /api/operator/setup/node-image` はroot/repository、正確なfingerprint、`confirmed:true`を要求します。
+通常のoperator/session/origin認証の下、固定Dockerfileで明示承認された依存準備のみ行います。
+任意Dockerfile・URL・build引数・シークレットは入力できません。準備失敗は422/node_image_build、
+版の不一致は409です。登録・AI推論・GitHubへの書き込みはこのAPIでは行いません。

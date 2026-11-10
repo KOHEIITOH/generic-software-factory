@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import shutil
 import sys
 from dataclasses import asdict, replace
 from pathlib import Path
@@ -42,16 +43,32 @@ def main():
     snapshot = RevisionSource('fixture/repo', setup_revision, tuple(
         RevisionFile(p, '100644', (setup_root / p).read_bytes())
         for p in ('app.py', 'tests/__init__.py', 'tests/test_add.py')))
+    node_root = directory / 'node-repository'
+    shutil.copytree(Path(__file__).parent / 'fixtures/node-project', node_root)
+    git(node_root, 'init', '-q')
+    commit(node_root)
+    node_revision = git(node_root, 'rev-parse', 'HEAD')
+    node_snapshot = RevisionSource('fixture/node', node_revision, tuple(
+        RevisionFile(p.relative_to(node_root).as_posix(), '100644', p.read_bytes())
+        for p in node_root.rglob('*') if p.is_file() and '.git' not in p.parts))
     class SetupSource:
         def describe_repository(self, repository):
-            return RepositoryInfo('fixture/repo', 'main', RepositoryCapabilities(True, True, True))
+            return RepositoryInfo(repository, 'main', RepositoryCapabilities(True, True, True))
         def branch_revision(self, repository, branch):
-            return setup_revision
+            return node_revision if repository == 'fixture/node' else setup_revision
         def read_revision(self, repository, revision):
-            return snapshot
+            return node_snapshot if repository == 'fixture/node' else snapshot
     patch.setattr('sf_factory.integration_defaults.repository_source', SetupSource)
     patch.setattr('sf_factory.integration_defaults.repository_choices', lambda cursor: ([
-        RepositoryInfo('fixture/repo', 'main', RepositoryCapabilities(True, True, True))], None))
+        RepositoryInfo(r, 'main', RepositoryCapabilities(True, True, True))
+        for r in ('fixture/repo', 'fixture/node')], None))
+    prepared_images = {}
+    patch.setattr('sf_factory.node_setup.cached_image',
+                  lambda root, key: prepared_images.get(key))
+    def prepare_node(root, state_root, plan):
+        prepared_images[plan['fingerprint']] = 'sha256:' + 'd' * 64
+        return prepared_images[plan['fingerprint']]
+    patch.setattr('sf_factory.node_setup.prepare_image', prepare_node)
     (directory / 'setup-root').write_text(str(setup_root))
     path = directory / 'operator.json'
     path.write_text(json.dumps(asdict(config), default=str))
