@@ -180,6 +180,17 @@ def test_real_docker_node_setup_checks_and_issue_to_draft(flow, monkeypatch):
     flow['source'].fetch_issue = lambda issue: ExternalIssue('fixture-issues', 'fixture/repo',
         issue, 'Implement add(a,b) in src/add.ts to return their sum.',
         'https://fixture.invalid/issues/' + issue)
+    import sf_factory.issue_execution as selected_issue
+    original_develop = selected_issue.develop_issue
+    def diagnose_develop(**kwargs):
+        try:
+            return original_develop(**kwargs)
+        except Exception as exc:
+            from sf_factory.issue_development import _artifact
+            checks = (_artifact(flow['factory'], exc.run_id).get('checks', [])
+                      if hasattr(exc, 'run_id') else [])
+            pytest.fail(f'Node development failed: {type(exc).__name__}: {exc}; {checks}')
+    monkeypatch.setattr(selected_issue, 'develop_issue', diagnose_develop)
     result = execute_issue(**{**flow, 'config': config, 'scm': scm,
         'implementer': NodeModel('node-implementation'), 'reviewer': NodeModel('node-review')})
     from sf_factory.issue_development import _artifact
