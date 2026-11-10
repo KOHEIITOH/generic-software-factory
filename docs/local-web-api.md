@@ -48,6 +48,13 @@ operator経路は既存の有限Workflowへ接続し、読み取り専用Runtime
 
 `POST /api/operator/setup/inspect` でローカルGit root/origin/Harnessを静的検査し、
 `POST /api/operator/setup/proposals` で設定案を保存します。検査中はrepoのコード・テストを実行しません。
+静的検査・設定案・登録の422は既知の原因を `detail.code` で返します
+（例: `state_overlap`, `worktree_dirty`, `repository_origin`, `execution_image`,
+`harness_validation`）。未知の例外は `setup_invalid` とし、例外本文やローカルパスは返しません。
+入力スキーマの422は通常の検証エラー形式です。Webは操作段階と許可済みの項目名のみ表示します。
+SF自身のローカルフォルダを標準の `.sf-factory` 保存先と一緒に使うと
+`state_overlap` になります。GitHub選択からの管理領域への取得、または対象外の
+`SF_DATA_DIR` を使い、既存データの自動削除・移動は行いません。
 `GET /api/operator/setup/proposals` で保存済み案を表示し、
 `POST /api/operator/setup/proposals/{id}/approve` で一致するfingerprintと明示確認を要求します。
 保存先や認証情報はHTTP入力にしません。旧クイック開始/手動取り込みの公開APIは復活させません。

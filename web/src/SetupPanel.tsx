@@ -11,10 +11,38 @@ type RepositoryChoice = { repository: string; can_push: boolean };
 type Inspection = { managed?: boolean; remote_revision?: string; repository: string; root: string; revision: string; files: string[];
   test_preset: string | null; image: string; test_argv: string[] | null; test_stdout: string | null;
   harness: { path: string; kind: string }[]; validation: { path: string; code: string }[] };
+const setupMessages: Record<string, string> = {
+  state_overlap: "対象RepositoryとSFの状態保存先が重なっています。GitHubのRepository選択から自動取得してください。既存のローカルRepositoryを使う場合はSF_DATA_DIRを対象Repositoryの外へ設定してください。",
+  repository_missing: "指定した場所または設定ファイルが見つかりません。Repositoryのパスを確認し、必要なら再取得してください。",
+  worktree_dirty: "対象Repositoryに未コミットの変更・未追跡ファイルがあります。変更を保全してから再確認してください。自動削除・リセットは行いません。",
+  repository_location: "Repositoryの場所を確認できません。Git直下の絶対パスを指定してください。~やsymlinkを含むパスは使えません。",
+  repository_revision: "Gitのコミットを確認できません。コミット済みのRepository直下を指定してください。",
+  git_filters: "対象RepositoryにGit filter設定があります。この実行方式では安全に取得できません。",
+  repository_origin: "Git originと選択したGitHub Repositoryが一致しません。owner/repoとoriginの設定を確認してください。",
+  change_scope: "変更可能なファイルは、重複のないアプリケーションソースを1〜32件指定してください。テスト・Harnessは変更対象にできません。",
+  execution_image: "実行イメージは固定digest付きで指定してください（image@sha256:64桁の小文字16進数）。",
+  behavioral_checks: "検証コマンド・期待出力が不正です。コマンドは文字列のJSON配列、期待出力は16KiB以内で指定してください。",
+  harness_validation: "Harnessの検証で未解決の問題があります。「検出した注意点」を開いて確認してください。検証を省略して登録はできません。",
+  source_types: "symlinkまたはsubmoduleを含むRepositoryは、この初回設定に対応していません。",
+  source_size: "取得対象は1〜1,000ファイルのRepositoryに限られます。",
+  setup_name: "設定名は1〜100文字で入力してください。",
+};
+const setupFields: Record<string, string> = { root: "Repositoryの場所", repository: "GitHub Repository", name: "設定名（1〜100文字）", provider: "AI", image: "実行イメージ", allowed_paths: "変更可能なファイル（1〜32件）", checks: "検証コマンド・期待出力", issue: "親Issue番号（正の整数）", fingerprint: "承認対象の版", confirmed: "設定の承認" };
 async function api(path: string, options: RequestInit = {}) {
   const response = await operatorApi("/setup" + path, options);
   if (!response.ok && (path.startsWith("/repositories") || path === "/acquire")) throw new Error("GitHub Repositoryを取得できません（" + response.status + "）。PCのGitHub認証・アクセス権・取得対象の状態を確認してください。");
-  if (!response.ok) throw new Error(response.status === 409 ? "対象の版・設定が変わりました。内容を確認して作り直してください。" : "設定を確認できません（" + response.status + "）。Git root・origin・変更範囲・テストを確認してください。");
+  if (!response.ok) {
+    const stage = path === "/inspect" ? "Repository確認" : path.endsWith("/approve") ? "設定の登録" : path === "/proposals" && options.method === "POST" ? "設定案の作成" : "設定の読み込み";
+    if (response.status === 409) throw new Error(stage + "：対象の版・設定が変わったか、保存上限に達しました。内容を再確認してください（409）。");
+    const data = await response.json().catch(() => null);
+    const code = data?.detail?.code;
+    if (typeof code === "string" && setupMessages[code]) throw new Error(stage + "：" + setupMessages[code] + "（422 / " + code + "）");
+    // Only allowlisted field names are displayed. Never echo server input/exception text.
+    const fields = Array.isArray(data?.detail) ? [...new Set<string>(data.detail.flatMap((e: { loc?: unknown[] }) => {
+      const field = e.loc?.[1]; return typeof field === "string" && setupFields[field] ? [setupFields[field]] : [];
+    }))] : [];
+    throw new Error(stage + "に失敗しました（" + response.status + "）。" + (fields.length ? "入力を確認してください：" + fields.join("、") : "原因を特定できませんでした。押したボタンとこの表示を共有してください。"));
+  }
   return response.json();
 }
 export default function SetupPanel({ onApplied, refreshKey }: { onApplied: (id: string) => Promise<void>; refreshKey: string }) {

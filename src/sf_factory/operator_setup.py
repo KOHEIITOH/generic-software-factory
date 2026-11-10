@@ -120,9 +120,10 @@ def _test_preset(root: Path, files: list[str]) -> str | None:
 
 def inspect_repository(root: Path, repository: str, data_root: Path) -> dict:
     if (not root.is_absolute() or root != root.resolve(strict=True)
-            or any(p.is_symlink() for p in (root, *root.parents))
-            or root.is_relative_to(data_root) or data_root.is_relative_to(root)):
-        raise ValueError('canonical repository outside Factory storage required')
+            or any(p.is_symlink() for p in (root, *root.parents))):
+        raise ValueError('canonical repository location required')
+    if root.is_relative_to(data_root) or data_root.is_relative_to(root):
+        raise ValueError('repository overlaps Factory storage')
     revision = _revision(root)
     repository = repository or detect_repository(root)
     repository_binding().verify(provider=DEFAULT_TASK_SOURCE, instance=repository,
