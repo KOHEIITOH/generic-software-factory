@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
+from sf_factory.setup_errors import setup_error
 from sf_factory.state_store import StateConflict, StatePermissionDenied
 from sf_factory.web_jobs import WebJobs
 from sf_factory.web_operator import OperatorProfiles, WebOperator
@@ -132,7 +133,7 @@ def install_execution_routes(app: FastAPI, root: Path, operator: WebOperator | N
         try:
             return inspect_repository(Path(payload.root), payload.repository, root)
         except (ValueError, OSError) as exc:
-            raise HTTPException(422, 'Clean Git root, origin and safe files required') from exc
+            raise HTTPException(422, setup_error(exc)) from exc
 
     @app.post('/api/operator/setup/proposals', status_code=201)
     def create_setup(payload: CreateSetup, request: Request):
@@ -146,7 +147,7 @@ def install_execution_routes(app: FastAPI, root: Path, operator: WebOperator | N
                 checks=tuple(BehavioralCheck(c.id, tuple(c.argv), c.stdout)
                              for c in payload.checks), issue=payload.issue)
         except (ValueError, OSError) as exc:
-            raise HTTPException(422, 'Invalid setup scope, Harness or checks') from exc
+            raise HTTPException(422, setup_error(exc)) from exc
 
     @app.get('/api/operator/setup/proposals')
     def setup_proposals(request: Request):
@@ -163,7 +164,7 @@ def install_execution_routes(app: FastAPI, root: Path, operator: WebOperator | N
         try:
             return SetupProposals(root).approve(key, payload.fingerprint)
         except (ValueError, OSError) as exc:
-            raise HTTPException(422, 'Proposal cannot be installed; inspect again') from exc
+            raise HTTPException(422, setup_error(exc)) from exc
 
     @app.post('/api/operator/profiles/{key}/diagnostics')
     def diagnostics(key: str, payload: DiagnoseProfile, request: Request):

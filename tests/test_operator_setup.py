@@ -178,6 +178,46 @@ def test_setup_http_requires_operator_origin_strict_schema_and_explicit_approval
                               headers=HEADERS)
         assert applied.status_code == 200 and applied.json()['profile']['id']
         assert applied.headers['cache-control'] == 'no-store'
+
+
+def test_setup_errors_identify_dirty_tree_image_and_harness_without_echoing_input(job_flow,
+                                                                                flow,
+                                                                                monkeypatch):
+    root, auth, _, _ = job_flow
+    config = flow['config']
+    payload = {**setup_args(flow), 'root': str(config.root),
+               'allowed_paths': list(config.allowed_paths),
+               'checks': json.loads(json.dumps([asdict(c) for c in config.checks]))}
+    with TestClient(create_app(data_dir=root, operator=auth), base_url=ORIGIN) as client:
+        login(client, auth)
+        for location, code in ((str(root.parent), 'state_overlap'),
+                               (str(root / 'missing'), 'repository_missing'),
+                               ('~/projects/repo', 'repository_location')):
+            result = client.post('/api/operator/setup/inspect', json={
+                'root': location, 'repository': config.repository}, headers=HEADERS)
+            assert result.status_code == 422
+            assert result.json() == {'detail': {'code': code}}
+        result = client.post('/api/operator/setup/proposals',
+                             json={**payload, 'image': 'x' * 70}, headers=HEADERS)
+        assert result.status_code == 422
+        assert result.json() == {'detail': {'code': 'execution_image'}}
+        (config.root / 'untracked-private.txt').write_text('private input')
+        result = client.post('/api/operator/setup/inspect', json={
+            'root': str(config.root), 'repository': config.repository}, headers=HEADERS)
+        assert result.status_code == 422
+        assert result.json() == {'detail': {'code': 'worktree_dirty'}}
+        assert (config.root / 'untracked-private.txt').read_text() == 'private input'
+        (config.root / 'untracked-private.txt').unlink()
+        (config.root / 'AGENTS.md').write_bytes(b'\x00')
+        commit(config.root)
+        result = client.post('/api/operator/setup/proposals', json=payload, headers=HEADERS)
+        assert result.status_code == 422
+        assert result.json() == {'detail': {'code': 'harness_validation'}}
+        def fail(*args, **kwargs):
+            raise ValueError('private exception /Users/private/token=secret')
+        monkeypatch.setattr(SetupProposals, 'initial', fail)
+        result = client.post('/api/operator/setup/proposals', json=payload, headers=HEADERS)
+        assert result.json() == {'detail': {'code': 'setup_invalid'}}
         assert flow['implementer'].calls == flow['scm'].writes == 0
 
 
