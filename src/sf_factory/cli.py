@@ -16,6 +16,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("doctor", help="check local prerequisites")
     web = sub.add_parser("web", help="start the local dashboard (builds UI if needed)")
     web.add_argument("--rebuild", action="store_true", help="rebuild frontend assets")
+    web.add_argument("--no-browser", action="store_true",
+                     help="start the dashboard without opening a browser")
     operator = sub.add_parser("operator", help="manage locally approved Web execution profiles")
     op = operator.add_subparsers(dest="operator_command", required=True)
     register = op.add_parser("register")
@@ -178,7 +180,7 @@ def main() -> int:
     if args.command == "web":
         from sf_factory.web_launcher import launch_web
 
-        return launch_web(rebuild=args.rebuild)
+        return launch_web(rebuild=args.rebuild, no_browser=args.no_browser)
     if args.command == "doctor":
         return run_doctor()
     if args.command == "runtime":
