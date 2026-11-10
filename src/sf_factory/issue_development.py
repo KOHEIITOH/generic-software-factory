@@ -289,7 +289,7 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
             else:
                 snapshots.create_remote(run_id, remote_source)
             snapshot, files = snapshots.load(run_id)
-            for path, expected in config.context_hashes:
+            for path, expected in (*config.context_hashes, *config.source_hashes):
                 if path not in files or hashlib.sha256(files[path]).hexdigest() != expected:
                     raise StatePermissionDenied('frozen requirement/reference content changed')
             scope = ProposalScope(run_id, revision, composition.bundle_hash,
@@ -324,7 +324,7 @@ def develop_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
                     reference_paths=references,
                     project_harness=config.project_harness)
                 if {c.path for c in proposal.changes} & (
-                        set(dict(config.context_hashes)) |
+                        set(dict(config.context_hashes)) | set(dict(config.source_hashes)) |
                         (set(reference_paths) if discover_references else set())):
                     raise StatePermissionDenied('frozen requirement references are read-only')
                 producer = implementation.identity()

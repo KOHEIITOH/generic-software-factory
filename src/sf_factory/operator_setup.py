@@ -314,8 +314,7 @@ class SetupProposals:
         node = inspection.get('node')
         if node and node.get('available'):
             hashes = node['hashes']
-            config = replace(config, context_paths=tuple(hashes),
-                             context_hashes=tuple(hashes.items()))
+            config = replace(config, source_hashes=tuple(hashes.items()))
         return self.create(config, name)
 
     def feedback(self, profile_id: str, expected: str, issue_id: str, run_id: str,

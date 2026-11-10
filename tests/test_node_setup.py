@@ -16,11 +16,13 @@ from test_web_operator import HEADERS, ORIGIN
 
 from sf_factory.behavioral_check import BehavioralCheck
 from sf_factory.change_proposal import ProposalScope, parse_change_proposal
+from sf_factory.issue_development import develop_issue
 from sf_factory.issue_execution import execute_issue
 from sf_factory.model_provider import ModelResponse
 from sf_factory.node_setup import DOCKERFILE, NODE_IMAGE, node_plan, prepare_image
 from sf_factory.operator_setup import SetupProposals, inspect_repository
 from sf_factory.source_control import PreparedCommit
+from sf_factory.state_store import StatePermissionDenied
 from sf_factory.task_sources import ExternalIssue
 from sf_factory.web_api import create_app
 from sf_factory.web_operator import OperatorProfiles
@@ -123,14 +125,15 @@ def test_node_config_freezes_lock_and_uses_multiple_reviewed_checks(flow):
         checks=checks)
     receipt = store.approve(proposal['id'], proposal['fingerprint'])
     _, config = OperatorProfiles(store.root).get(receipt['profile']['id'])
-    assert dict(config.context_hashes) == data['node']['hashes']
+    assert dict(config.source_hashes) == data['node']['hashes']
+    assert config.context_paths == ()
     assert len(config.checks) == 3
     with (root / 'package-lock.json').open('a') as stream:
         stream.write('\n')
     commit(root)
     flow['scm'].parent = git(root, 'rev-parse', 'HEAD')
-    result = execute_issue(**{**flow, 'config': config})
-    assert result['status'] != 'completed'
+    with pytest.raises(StatePermissionDenied, match='frozen requirement/reference'):
+        develop_issue(**{**flow, 'config': config})
     assert flow['implementer'].calls == flow['scm'].writes == 0
 
 

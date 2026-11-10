@@ -30,6 +30,9 @@ Runtime checks use the same unprivileged offline container and limits. Copy sour
 private tmpfs directory, link image-owned dependencies, and place generated caches/reports
 there. Preserve original candidate bytes and provenance. Manifest and lock hashes are frozen
 as read-only approved references, checked before inference and by the runtime wrapper.
+Use bounded `source_hashes` for these integrity-only files; they are not requirement
+documents or implicit model context. Existing `context_hashes` retain their document
+meaning and limits. Planning validates source pins and child scopes preserve them.
 Vitest/Jest reports must contain a positive number of executed, passed assertions and no
 skips/todos/failures. Lint/type checks are separately named. No installs/network during tests.
 

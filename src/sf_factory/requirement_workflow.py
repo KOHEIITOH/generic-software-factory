@@ -1,6 +1,7 @@
 """Bounded external-Issue plan, serial execution and verified merge progression."""
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import asdict, replace
 from pathlib import PurePosixPath
@@ -173,6 +174,9 @@ def _advance(factory, config, source, scm, tracker, implementer, reviewer,
         verify_remote_harness(config.root, remote)
         if remote.repository != config.repository or remote.revision != revision:
             raise StateConflict('planning source differs from repository revision')
+        frozen = {f.path: hashlib.sha256(f.content).hexdigest() for f in remote.files}
+        if any(frozen.get(path) != expected for path, expected in config.source_hashes):
+            raise StatePermissionDenied('frozen source content changed before planning')
         selected_sources = discover_requirement_sources(remote, explicit=config.context_paths,
             reference_slots=32 - len(config.selected_harness))
         discovered_hashes = {d.path: d.sha256 for d in selected_sources.documents}
