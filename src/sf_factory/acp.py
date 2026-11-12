@@ -26,6 +26,14 @@ class AcpCommand:
             raise ValueError("ACP command must be a non-empty argv sequence")
 
 
+class AcpRemoteError(RuntimeError):
+    """Redacted JSON-RPC failure with only a numeric error code."""
+
+    def __init__(self, code: int | None) -> None:
+        self.code = code
+        super().__init__("ACP agent returned a JSON-RPC error")
+
+
 class AcpRuntime:
     """Run one ACP session via newline-delimited JSON-RPC over stdio."""
 
@@ -72,6 +80,7 @@ class AcpRuntime:
         threading.Thread(target=reader, daemon=True).start()
         request_id = 0
         output: list[str] = []
+        stage = "initialize"
         try:
             def call(method: str, params: dict) -> dict:
                 nonlocal request_id
@@ -116,7 +125,10 @@ class AcpRuntime:
                     if response.get("id") != current_id:
                         raise RuntimeError("Unexpected ACP response ID")
                     if "error" in response:
-                        raise RuntimeError("ACP agent returned an error")
+                        remote_error = response["error"]
+                        code = remote_error.get("code") if isinstance(remote_error, dict) else None
+                        safe_code = code if type(code) is int else None
+                        raise AcpRemoteError(safe_code)
                     result = response.get("result")
                     if not isinstance(result, dict):
                         raise RuntimeError("Malformed ACP response")
@@ -127,12 +139,14 @@ class AcpRuntime:
                 "clientCapabilities": {"fs": {"readTextFile": False, "writeTextFile": False}},
                 "clientInfo": {"name": "generic-software-factory", "version": "0.1.0"},
             })
+            stage = "session/new"
             session = call("session/new", {
                 "cwd": str(workspace), "mcpServers": [],
             })
             session_id = session.get("sessionId")
             if not isinstance(session_id, str) or not session_id:
                 raise RuntimeError("ACP session ID missing")
+            stage = "session/prompt"
             response = call("session/prompt", {
                 "sessionId": session_id,
                 "prompt": [{"type": "text", "text": prompt}],
@@ -149,8 +163,13 @@ class AcpRuntime:
                 runtime=self.name, status="timed_out", output="",
                 exit_code=None, error_kind="timeout", error_message="ACP timed out",
             )
-        except (OSError, ValueError, RuntimeError, json.JSONDecodeError):
-            return self._failed("ACP protocol or execution failed")
+        except AcpRemoteError as exc:
+            code = str(exc.code) if exc.code is not None else "unknown"
+            return self._failed(f"ACP {stage} remote JSON-RPC error (code={code})")
+        except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
+            # Report only the failure category and stage; never expose agent data,
+            # remote error messages, file paths, or authentication details.
+            return self._failed(f"ACP {stage} failed ({type(exc).__name__})")
         finally:
             process.kill()
             try:
