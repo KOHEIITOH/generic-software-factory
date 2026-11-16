@@ -15,7 +15,7 @@ from sf_factory.review_automation import _save
 from sf_factory.run_evidence import EvidenceSubject
 from sf_factory.run_review import parse_review
 from sf_factory.source_snapshot import SourceSnapshotService
-from sf_factory.state_store import StateConflict
+from sf_factory.state_store import StateConflict, StatePermissionDenied
 
 LIMITS = AutomationLimits(max_rounds=3, max_model_calls=8, max_seconds=3600)
 
@@ -96,7 +96,10 @@ def failure_context(factory, config, run_id: str, attempt: int,
 
 
 def improve_issue(*, factory, config, source, scm, implementer, reviewer,
-                  trusted_reviewers=()) -> dict:
+                  confirmed: bool, trusted_reviewers=()) -> dict:
+    if (confirmed is not True or not config.auto_improve or implementer is reviewer
+            or factory.root != config.data_root):
+        raise StatePermissionDenied('explicit bounded improvement scope required')
     session = AutomationSession(factory.root,
         subject='issue-development:' + config.repository + ':' + config.issue,
         config_fingerprint=fingerprint({'development': config.fingerprint,

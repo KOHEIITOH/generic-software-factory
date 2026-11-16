@@ -43,7 +43,8 @@ def execute_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
     if config.auto_improve:
         from sf_factory.issue_improvement import improve_issue
         return improve_issue(factory=factory, config=config, source=source, scm=scm,
-            implementer=implementer, reviewer=reviewer, trusted_reviewers=trusted_reviewers)
+            implementer=implementer, reviewer=reviewer, confirmed=True,
+            trusted_reviewers=trusted_reviewers)
     session = AutomationSession(factory.root,
         subject='issue-development:' + config.repository + ':' + config.issue,
         config_fingerprint=fingerprint({'development': config.fingerprint,

@@ -15,6 +15,8 @@ from test_web_operator import HEADERS, ORIGIN
 from sf_factory.automation_state import AutomationSession
 from sf_factory.docker_execution import DockerExecutionResult
 from sf_factory.issue_execution import execute_issue
+from sf_factory.issue_improvement import improve_issue
+from sf_factory.state_store import StatePermissionDenied
 from sf_factory.web_api import create_app
 from sf_factory.web_jobs import WebJobs
 from sf_factory.web_worker import run_job
@@ -71,6 +73,14 @@ def test_failure_evidence_drives_repair_and_exactly_one_draft(repair):
     opposite = execute_issue(**{**repair, 'config': replace(repair['config'], auto_improve=False)})
     assert opposite['pull_request'] == result['pull_request']
     assert repair['implementer'].calls == 2 and repair['scm'].writes == 3
+
+
+def test_improvement_entry_requires_explicit_confirmation_and_policy(repair):
+    with pytest.raises(StatePermissionDenied):
+        improve_issue(**{**repair, 'confirmed': False})
+    with pytest.raises(StatePermissionDenied):
+        improve_issue(**{**repair, 'config': replace(repair['config'], auto_improve=False)})
+    assert repair['implementer'].calls == 0 and repair['scm'].writes == 0
 
 
 def test_review_findings_drive_a_distinct_candidate_and_fresh_review(repair):
