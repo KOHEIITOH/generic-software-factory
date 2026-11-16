@@ -12,22 +12,27 @@ type PlanPreview = { plan: { requirements: { id: string; text: string; sources: 
 type Profile = { id: string; name: string; fingerprint: string; available: boolean; repository?: string; issue?: string; provider?: string; allowed_paths?: string[]; checks?: string[]; context_paths?: string[]; requirement_mode?: string };
 type Issue = { id: string; title: string; url?: string };
 type Progress = { run_id?: string; pr_url?: string; plan_preview?: PlanPreview | null; requirement_sources?: RequirementSources | null; status: string; counts: Record<string, number>; limits: Record<string, number>; expires_at: string;
+  improvement?: { attempt: number | null; attempts: { attempt: number; kind: string; failed_checks: string[]; must_fix: number }[] };
   children: { id: string; issue_id: string; issue_url?: string; status: string; run_id?: string; pr_url?: string }[];
   decisions: { at: string; code: string }[] };
 type Job = { issue_id?: string; id: string; profile_id: string; config_fingerprint: string; action: string; reviewers: string[]; status: string;
   created_at: string; stop_requested: boolean; result: { status: string; reason?: string } | null; progress: Progress | null; events: { code: string }[] };
 type Diagnostic = { can_attempt: boolean; checked_at: string; checks: { id: string; status: string; detail: string; remedy: string }[] };
 type Submission = { issue_id?: string; profile_id: string; config_fingerprint: string; request_id: string; action: string; confirm_run: boolean;
+  auto_improve?: boolean;
   confirm_bedrock: boolean; run_id: string | null; reviewers: string[]; approved_plan?: string | null };
 const active = (job: Job) => ["queued", "running", "stopping"].includes(job.status);
 const labels: Record<string, string> = { queued: "実行待ち", running: "実行中", stopping: "停止処理中", stopped: "停止", interrupted: "中断・復旧確認が必要", finished: "ステップ終了", waiting: "次の操作・レビュー待ち", completed: "完了", ready: "次へ進めます", awaiting_plan_approval: "計画の確認・承認待ち", plan_approval_requested: "計画の承認を依頼", human_plan_approved: "計画を承認済み", plan_approval_stale: "計画作成後に対象の版が変更されました", plan_approval_mismatch: "表示した計画と承認対象が一致しません", pending: "依存PRのマージ待ち", pr_open: "PRレビュー・マージ待ち", merged: "マージ確認済み", failed: "失敗", plan_ready: "計画と子Issueを作成しました", child_pr_submitted: "Draft PRを作成しました", awaiting_review: "レビュー待ち", awaiting_merge: "マージ待ち", repair_submitted: "同じPRへ修正を追記しました", child_awaiting_review_or_merge: "子PRのレビュー・マージ待ち", child_merge_verified: "子PRのマージを確認しました", all_child_prs_merged: "すべての子PRのマージを確認しました", remote_read_unavailable: "接続の再確認待ち", operator_or_execution_stopped: "停止または実行条件の確認が必要です", operator_step_approved: "実行を承認", worker_claimed: "workerが開始", operator_stop_requested: "停止を要求", worker_step_finished: "ステップ終了", worker_lease_lost: "workerの中断を検出", budget_exhausted: "試行・推論予算の上限に達しました", api_budget_exhausted: "API予算の上限に達しました", deadline_exhausted: "実行期限に達しました", candidate_repeated: "同じ変更案が繰り返されたため停止しました", base_changed_requires_new_candidate: "基準ブランチが変更されました", child_quality_failed: "子Issueの検証または独立レビューに失敗しました", parent_requirement_changed: "親Issueの要件が変更されました", child_requirement_changed: "子Issueの要件が変更されました", child_create_unresolved: "子Issue作成結果の照合待ち", child_link_unresolved: "親子関連の照合待ち", child_execution_outcome_unknown: "前の実行結果が不明なため停止しました", requirement_advance_stopped: "実行条件または権限を確認してください", advance_stopped: "実行条件または権限を確認してください", requirements_insufficient: "要件が不足しているため停止しました", requirements_conflicting: "要件に矛盾があるため停止しました", requirements_discovery_limit: "要件資料の読取上限を超えました。参照資料を明示してください", requirements_context_limit: "要件とコードの文脈が上限を超えました", requirements_source_missing: "指定した要件資料が見つかりません", requirements_source_invalid: "要件資料の形式・内容を確認してください", requirements_source_changed: "計画時から要件資料が変更されました", requirements_plan_rejected: "要件分割の独立レビューを通過しませんでした", requirements_reference_write_conflict: "参照した要件資料への変更を含むため停止しました", requirements_interpreted: "要件の解釈を記録しました", repository_readme: "README", root_requirement_document: "ルートの要件文書", requirement_document_convention: "要件・仕様・設計の文書候補", operator_context_path: "明示指定", explicit: "明示指定", auto: "自動検出", issue_only: "親Issueのみ", insufficient: "要件不足", conflicting: "要件の矛盾", requirements: "要件", supporting: "参考資料", irrelevant: "要件として不採用" };
 Object.assign(labels, { managed_harness_review_required: "GitHubのHarness・依存設定の再確認が必要です。初回設定からRepositoryを再取得して内容を確認してください。", draft_pr_created: "Draft PRを作成しました", issue_run_prepared: "実行対象を固定しました", issue_execution_outcome_unknown: "前の実行結果が不明なため停止しました", issue_quality_failed: "テストまたは独立レビューを通過しませんでした", issue_execution_stopped: "実行条件の確認が必要です", issue_prerequisites_unavailable: "実行準備を確認してください。修正後は同じIssueを実行できます", repository_delivery_blocked: "同じRepositoryの前のPR作成結果を照合してください", issue_delivery_reconciliation_required: "同じIssueを実行してPR作成結果を照合してください" });
+Object.assign(labels, { auto_improvement_attempt_started: "自動改善の実行を開始", auto_improvement_planned: "失敗記録から次の修正を計画", auto_improvement_exhausted: "自動改善3回の上限で停止しました", auto_improvement_unknown_inference: "AI呼び出しの結果が不明です。再送せず停止しました", auto_improvement_not_repairable: "自動修正できる検証結果を確認できません。実行記録の確認が必要です", auto_improvement_stopped: "実行条件・権限・対象の版などを再確認してください。自動改善を停止しました" });
+Object.assign(labels, { auto_improvement_candidate_unavailable: "修正対象の応答や変更案を確認できません", auto_improvement_checks_incomplete: "検証記録が揃っていません。自動再試行せず停止しました", auto_improvement_execution_unavailable: "隔離実行・後片付け・ソース保全を確認できません。環境の確認が必要です", auto_improvement_review_unavailable: "独立レビューの有効な結果がありません。記録の確認が必要です", auto_improvement_context_limit: "修正へ渡す証跡が上限を超えました", auto_improvement_baseline_changed: "修正前後でソースやHarnessの版が変わったため停止しました" });
 const text = (code: string) => labels[code] || code;
 function Link({ url, label }: { url?: string; label: string }) {
   return url?.startsWith("https://") ? <a className="source-link" href={url} target="_blank" rel="noopener noreferrer">{label} ↗</a> : null;
 }
 
 export default function OperatorPanel() {
+  const [autoImprove, setAutoImprove] = useState(true);
   const [reconnectLink, setReconnectLink] = useState("");
   const [reconnecting, setReconnecting] = useState(false);
   const refreshVersion = useRef(0);
@@ -160,7 +165,7 @@ export default function OperatorPanel() {
     if (!profile || (action === "develop" ? !available || !issueId : !enabled)) return;
     void send({ profile_id: profile.id, config_fingerprint: profile.fingerprint,
       request_id: crypto.randomUUID().replaceAll("-", ""), action, confirm_run: action === "develop" || consent,
-      ...(action === "develop" ? { issue_id: issueId } : {}),
+      ...(action === "develop" ? { issue_id: issueId, auto_improve: autoImprove } : {}),
       confirm_bedrock: action === "develop" ? profile.provider === "bedrock" : bedrock, run_id: action === "review" ? runId : null,
       reviewers: frozen || reviewers.split(",").map(s => s.trim()).filter(Boolean) });
   }
@@ -225,11 +230,14 @@ export default function OperatorPanel() {
           {issuesBusy && <p role="status">Issueを読み込み中…</p>}
           {!issuesBusy && !issues.length && <p>このページに開いているIssueはありません。</p>}
           <p>実行すると、表示した範囲のAI送信・隔離テスト・PR作成に同意したものとして進めます。{profile.provider === "bedrock" && <strong>Bedrockの推論料金が発生します。</strong>}</p>
+          <label><input type="checkbox" checked={autoImprove} disabled={!available || uncertain} onChange={e => setAutoImprove(e.target.checked)} />失敗時に自動改善する（最大3回）</label>
+          <p>自動改善では失敗した変更・検証結果・レビュー指摘をAIへ渡します。同じ変更範囲・テスト・Harnessを維持し、全体で推論8回・予約トークン300万・1時間を上限に停止します。PRのマージやルールの自動変更は行いません。</p>
           <button type="button" className="primary" disabled={!available || !issueId} onClick={() => submit("develop")}>同意して実行・Draft PR作成</button>
           {issueProgress && <div className="operator-progress"><h3>{issueProgress.pr_url ? "Draft PRを作成しました" : text(issueProgress.status)}</h3>
             <Link url={issueProgress.pr_url} label="Draft PRを開く" />
             {issueHistory[0]?.result?.reason && issueHistory[0].result.reason !== "draft_pr_created" && <p>{text(issueHistory[0].result.reason)}</p>}
             <p>推論: {issueProgress.counts.model} / {issueProgress.limits.max_model_calls}回・API: {issueProgress.counts.api} / {issueProgress.limits.max_api_calls}回</p>
+            {issueProgress.improvement?.attempt && <div><p>自動改善：{issueProgress.improvement.attempt} / 3回目</p><ul>{issueProgress.improvement.attempts.map(a => <li key={a.attempt}>{a.attempt}回目：{a.kind === "checks" ? "検証失敗 " + a.failed_checks.join(", ") : a.kind === "candidate" ? "実装応答の形式を修正" : "独立レビューの修正指摘 " + a.must_fix + "件"}</li>)}</ul></div>}
             <details><summary>実行の判断・停止理由</summary><ul>{issueProgress.decisions.map((d, i) => <li key={i}>{text(d.code)}</li>)}</ul></details>
             <p>同じIssueの再実行では、この実行記録を照合します。結果不明の推論は再送しません。</p></div>}
           <details><summary>詳細設定・要件の分割・レビュー対応</summary><p>要件分割の対象: 親Issue #{profile.issue}（登録設定）</p>
@@ -281,6 +289,7 @@ export default function OperatorPanel() {
       <details><summary>実行履歴・操作の証跡</summary><h3>操作履歴</h3>{!jobs.length && <p>まだ実行していません。</p>}{jobs.filter(j => !active(j)).slice(0, 20).map(j => <article key={j.id} className="operator-job">
         <strong>{profiles.find(p => p.id === j.profile_id)?.name || "登録設定"}{j.issue_id ? " · Issue #" + j.issue_id : ""} · {j.action === "develop" ? "実装→Draft PR" : j.action} · {text(j.status)}</strong><small>{new Date(j.created_at).toLocaleString("ja-JP")} · {j.id.slice(0, 12)}</small>
         {j.result && <p>{text(j.result.reason || j.result.status)}</p>}<Link url={j.progress?.pr_url} label="Draft PRを開く" />{active(j) && <button type="button" disabled={busy || j.stop_requested} onClick={() => void stop(j)}>{j.stop_requested ? "停止要求済み" : "停止を要求"}</button>}
+        {j.progress?.improvement?.attempt && <p>自動改善：{j.progress.improvement.attempt} / 3回目。終了した検証・レビューの失敗記録：{j.progress.improvement.attempts.length}件</p>}
         {j.status === "interrupted" && <p>実行記録を照合してから再開します。結果不明の推論・書き込みは再送しません。</p>}
         {j.status === "stopped" && <p>停止した試行は終了扱いになる場合があります。判断履歴を確認してください。</p>}
         <details><summary>操作の証跡</summary><ul>{j.events.map((e, i) => <li key={i}>{text(e.code)}</li>)}</ul></details>

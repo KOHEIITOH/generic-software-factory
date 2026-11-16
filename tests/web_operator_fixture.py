@@ -94,13 +94,17 @@ def main():
         from sf_factory.plan_preview import approval_fingerprint
         job = store.get(key)
         if job['action'] == 'develop':
-            selected = replace(config, issue=job['issue_id'])
+            selected = replace(config, issue=job['issue_id'],
+                               auto_improve=job.get('auto_improve', False))
             session = AutomationSession(config.data_root,
                 subject='issue-development:' + selected.repository + ':' + selected.issue,
                 config_fingerprint=fingerprint({'development': selected.fingerprint,
                                                 'reviewers': tuple(job['reviewers'])}))
             if session.snapshot()['status'] != 'completed':
-                session.save({'run_id': 'e' * 32, 'pull_request': {
+                session.save({'run_id': 'e' * 32,
+                    **({'attempt': 2, 'attempts': [{'attempt': 1, 'kind': 'checks',
+                        'failed_checks': ['addition'], 'must_fix': 0}]}
+                       if job.get('auto_improve') else {}), 'pull_request': {
                     'external_id': '99', 'url': 'https://github.com/fixture/repo/pull/99'}},
                     expected_version=session.snapshot()['version'], status='completed',
                     decision='draft_pr_created')

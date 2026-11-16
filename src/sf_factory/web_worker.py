@@ -65,7 +65,9 @@ def run_job(root: Path, key: str, *, executor: Callable = execute_local_developm
                         workflow_action=job['action'] if job['action'] != 'review' else None,
                         review_run=job['run_id'], trusted_reviewers=tuple(job['reviewers']),
                         require_plan_approval=True, approved_plan=job.get('approved_plan'),
-                        **({'issue_id': job['issue_id']} if job['action'] == 'develop' else {}))
+                        **({'issue_id': job['issue_id'],
+                            **({'auto_improve': True} if job.get('auto_improve') else {})}
+                           if job['action'] == 'develop' else {}))
                     if (job['action'] == 'develop'
                             and result.get('reason') == 'issue_quality_failed'
                             and result.get('run_id') and result.get('session_id')):

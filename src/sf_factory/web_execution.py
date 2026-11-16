@@ -34,6 +34,7 @@ class SubmitStep(BaseModel):
     approved_plan: str | None = Field(default=None, pattern='^[a-f0-9]{64}$')
     confirm_run: bool
     confirm_bedrock: bool = False
+    auto_improve: bool = False
     run_id: str | None = Field(default=None, pattern='^[a-f0-9]{32}$')
     reviewers: list[str] = Field(default_factory=list, max_length=16)
 
@@ -245,7 +246,8 @@ def install_execution_routes(app: FastAPI, root: Path, operator: WebOperator | N
                 config_fingerprint=payload.config_fingerprint, request_id=payload.request_id,
                 action=payload.action, confirm_bedrock=payload.confirm_bedrock,
                 run_id=payload.run_id, reviewers=tuple(payload.reviewers),
-                approved_plan=payload.approved_plan, issue_id=payload.issue_id)
+                approved_plan=payload.approved_plan, issue_id=payload.issue_id,
+                auto_improve=payload.auto_improve)
         except (StatePermissionDenied, ValueError, OSError) as exc:
             raise HTTPException(403, 'Registered scope or consent check failed') from exc
         if created:

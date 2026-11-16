@@ -1,6 +1,8 @@
 """One selected Issue to one Draft PR, with durable finite execution receipts."""
 from __future__ import annotations
 
+from dataclasses import replace
+
 from sf_factory.automation_state import AutomationSession, fingerprint
 from sf_factory.budgeted_model import BudgetedModel
 from sf_factory.development_config import DevelopmentConfig
@@ -15,11 +17,33 @@ from sf_factory.state_store import StatePermissionDenied
 from sf_factory.task_sources import TaskSourceAdapter
 
 
+def completed_counterpart(root, config: DevelopmentConfig, reviewers: tuple) -> dict | None:
+    """Changing only repair policy cannot publish a second PR for completed work."""
+    alternate = replace(config, auto_improve=not config.auto_improve)
+    subject = 'issue-development:' + config.repository + ':' + config.issue
+    scope = fingerprint({'development': alternate.fingerprint, 'reviewers': reviewers})
+    key = fingerprint({'subject': subject, 'config': scope})[:32]
+    path = root / 'automation-v1' / key
+    if not path.is_dir():
+        return None
+    with lock_directory(path) as fd:
+        state = AutomationSession._read(fd)
+    if state['config'] != scope or state['subject'] != subject:
+        raise StatePermissionDenied('completed execution scope differs')
+    if state['status'] != 'completed':
+        return None
+    return {'session_id': key, 'status': 'completed', **state['data'], 'reason': 'draft_pr_created'}
+
+
 def execute_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSourceAdapter,
                   scm: ChangeSourceControl, implementer: ModelProvider, reviewer: ModelProvider,
                   confirmed: bool, trusted_reviewers: tuple[str, ...] = ()) -> dict:
     if not confirmed or implementer is reviewer or factory.root != config.data_root:
         raise StatePermissionDenied('scoped confirmation and independent providers required')
+    if config.auto_improve:
+        from sf_factory.issue_improvement import improve_issue
+        return improve_issue(factory=factory, config=config, source=source, scm=scm,
+            implementer=implementer, reviewer=reviewer, trusted_reviewers=trusted_reviewers)
     session = AutomationSession(factory.root,
         subject='issue-development:' + config.repository + ':' + config.issue,
         config_fingerprint=fingerprint({'development': config.fingerprint,
@@ -27,9 +51,13 @@ def execute_issue(*, factory: Factory, config: DevelopmentConfig, source: TaskSo
     directory = factory.root / 'issue-controller-v1'
     directory.mkdir(mode=0o700, exist_ok=True)
     with lock_directory(directory):
+        existing = completed_counterpart(factory.root, config, trusted_reviewers)
+        if existing is not None:
+            return existing
         state = session.snapshot()
         if state['status'] in {'stopped', 'completed'}:
-            return {'session_id': session.id, 'status': state['status'], **state['data']}
+            return {'session_id': session.id, 'status': state['status'], **state['data'],
+                    'reason': state['decisions'][-1]['code'] if state['decisions'] else 'stopped'}
         data = state['data']
         prior_guard = getattr(scm, 'request_guard', None)
         if hasattr(scm, 'request_guard'):
