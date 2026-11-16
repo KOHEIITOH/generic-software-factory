@@ -30,8 +30,11 @@ class DevelopmentConfig:
     project_harness: ProjectHarness | None = None
     context_hashes: tuple[tuple[str, str], ...] = ()
     source_hashes: tuple[tuple[str, str], ...] = ()
+    auto_improve: bool = False
 
     def __post_init__(self) -> None:
+        if type(self.auto_improve) is not bool:
+            raise ValueError('explicit boolean automatic improvement policy required')
         for value in (self.repository, self.issue):
             if (not isinstance(value, str) or not value.strip() or len(value) > 512
                     or any(ord(c) < 32 for c in value)):
@@ -89,6 +92,8 @@ class DevelopmentConfig:
             data.pop('context_hashes')
         if not self.source_hashes:
             data.pop('source_hashes')
+        if not self.auto_improve:
+            data.pop('auto_improve')
         if self.project_harness is None:
             data.pop('project_harness')
         return hashlib.sha256(json.dumps(data, default=str, sort_keys=True,
@@ -100,7 +105,8 @@ class DevelopmentConfig:
                     'allowed_paths', 'selected_harness', 'checks'}
         if (not isinstance(value, dict) or not required <= set(value)
                 or not set(value) <= required | {'excluded_harness', 'project_harness',
-                                                'context_paths', 'context_hashes', 'source_hashes'}
+                                                'context_paths', 'context_hashes', 'source_hashes',
+                                                'auto_improve'}
                 or any(not isinstance(value.get(k, []), list) for k in (
                     'allowed_paths', 'selected_harness', 'context_paths', 'checks'))):
             raise ValueError('exact development config schema required')

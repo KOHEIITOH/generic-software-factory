@@ -81,3 +81,9 @@ Node向けの既定値として表示しません。
 通常のoperator/session/origin認証の下、固定Dockerfileで明示承認された依存準備のみ行います。
 任意Dockerfile・URL・build引数・シークレットは入力できません。準備失敗は422/node_image_build、
 版の不一致は409です。登録・AI推論・GitHubへの書き込みはこのAPIでは行いません。
+
+選択Issueの `POST /api/operator/jobs` は `auto_improve: true` を受け付けます。
+`develop`以外では拒否し、同じrequest_idのポリシー変更も拒否します。省略はfalseです。
+登録設定のfingerprint照合後にポリシーを固定し、workerへ伝達します。
+progressの `improvement` は試行番号と既知の失敗分類・check ID・must-fix件数だけを返します。
+候補コード・テスト出力・レビュー本文・モデル応答をHTTPへ追加公開しません。

@@ -64,13 +64,17 @@ def execute_local_development(*, config_path: Path, confirmed: bool, confirm_bed
                               expected_fingerprint: str | None = None,
                               require_plan_approval: bool = False,
                               approved_plan: str | None = None,
-                              issue_id: str | None = None) -> dict:
+                              issue_id: str | None = None, auto_improve: bool = False) -> dict:
     """Trusted local operator entry shared by CLI and the private Web worker."""
     if confirmed is not True:
         raise ConfirmationRequired('--confirm-run')
     config = load_config(config_path)
     if expected_fingerprint is not None and config.fingerprint != expected_fingerprint:
         raise PermissionError('approved execution configuration changed')
+    if type(auto_improve) is not bool or (auto_improve and workflow_action != 'develop'):
+        raise ValueError('automatic improvement requires selected Issue execution')
+    if workflow_action == 'develop':
+        config = replace(config, auto_improve=auto_improve)
     if issue_id is not None:
         if workflow_action != 'develop' or not re.fullmatch('[1-9][0-9]{0,18}', issue_id):
             raise ValueError('selected Issue requires the scoped development action')
@@ -100,7 +104,9 @@ def execute_local_development(*, config_path: Path, confirmed: bool, confirm_bed
     from sf_factory.factory_selection import open_factory
     from sf_factory.integration_defaults import source_control, task_source
 
-    if workflow_action == 'develop':
+    if workflow_action == 'develop' or (
+            config.auto_improve and workflow_action is None and resume is None
+            and review_run is None):
         from sf_factory.issue_execution import execute_issue
 
         result = execute_issue(factory=open_factory(config.data_root), config=config,

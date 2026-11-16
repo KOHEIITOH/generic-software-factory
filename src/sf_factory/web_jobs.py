@@ -64,6 +64,8 @@ class WebJobs:
                         (not isinstance(job.get('issue_id'), str) or
                          not re.fullmatch('[1-9][0-9]{0,18}', job['issue_id'])))
                     or type(job.get('stop_requested')) is not bool
+                    or type(job.get('auto_improve', False)) is not bool
+                    or (job.get('auto_improve', False) and job.get('action') != 'develop')
                     or (job.get('action') == 'approve' and
                         not re.fullmatch('[a-f0-9]{64}', job.get('approved_plan', '')))):
                 raise StateConflict('invalid Web job')
@@ -106,7 +108,9 @@ class WebJobs:
                 request_id: str, confirm_bedrock: bool, run_id: str | None = None,
                 reviewers: tuple[str, ...] = (),
                 approved_plan: str | None = None,
-                issue_id: str | None = None) -> tuple[dict, bool]:
+                issue_id: str | None = None, auto_improve: bool = False) -> tuple[dict, bool]:
+        if type(auto_improve) is not bool or (auto_improve and action != 'develop'):
+            raise ValueError('automatic improvement applies only to selected Issue execution')
         if (action not in {'plan', 'advance', 'review', 'approve', 'develop'}
                 or not re.fullmatch('[a-f0-9]{32}', request_id)
                 or (action == 'review') != (run_id is not None)
@@ -125,24 +129,32 @@ class WebJobs:
             raise StatePermissionDenied('explicit Bedrock inference consent required')
         command = {'profile_id': profile_id, 'config_fingerprint': config_fingerprint,
                    'action': action, 'run_id': run_id, 'reviewers': list(reviewers),
-                   'confirm_bedrock': confirm_bedrock}
+                   'confirm_bedrock': confirm_bedrock, 'auto_improve': auto_improve}
         if approved_plan is not None:
             command['approved_plan'] = approved_plan
         if issue_id is not None:
             config = replace(config, issue=issue_id)
             command['issue_id'] = issue_id
+        if action == 'develop':
+            config = replace(config, auto_improve=auto_improve)
         subject = ('review:' + config.repository + ':' + str(run_id) if action == 'review' else
                    'issue-development:' + config.repository + ':' + config.issue
                    if action == 'develop' else
                    'requirements:' + config.repository + ':' + config.issue)
         session_id = fingerprint({'subject': subject, 'config': fingerprint({
             'development': config.fingerprint, 'reviewers': reviewers})})[:32]
+        if action == 'develop':
+            from sf_factory.issue_execution import completed_counterpart
+            completed = completed_counterpart(self.root, config, reviewers)
+            if completed is not None:
+                session_id = completed['session_id']
         with lock_directory(self.directory) as fd:
             state = self._read(fd)
             self._reconcile(state)
             prior = state['jobs'].get(request_id)
             if prior is not None:
-                if any(prior[k] != v for k, v in command.items()):
+                if any(prior.get(k, False if k == 'auto_improve' else None) != v
+                       for k, v in command.items()):
                     raise StateConflict('request identity already used for another scope')
                 return prior, False
             if approved_plan is not None:
@@ -256,5 +268,7 @@ class WebJobs:
                 'requirement_sources': source_summary,
                 'plan_preview': plan_preview(state),
                 'run_id': data.get('run_id'),
+                'improvement': {'attempt': data.get('attempt'),
+                                'attempts': data.get('attempts', [])},
                 'pr_url': data.get('pull_request', {}).get('url'),
                 'decisions': [{'at': d['at'], 'code': d['code']} for d in state['decisions'][-20:]]}
